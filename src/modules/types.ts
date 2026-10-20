@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import type { OverlayKey } from '../map/overlays';
-import type { Selection } from '../lib/types';
+import type { Facility, Selection } from '../lib/types';
+import type { Place } from '../lib/routeCtx';
 
 export interface ModuleProps {
   visible: Record<OverlayKey, boolean>;
@@ -16,6 +17,12 @@ export interface ModuleProps {
   /** Gewähltes Radarbild (Index), null = aktuelles */
   radarFrame: number | null;
   setRadarFrame: (i: number | null) => void;
+  /** Punkte der Nähe-Suche auf der Karte */
+  setNearby: (d: { items: Facility[]; color: Record<string, string> } | null) => void;
+  /** Gewählte Verbindung als Linien auf der Karte */
+  setRoute: (fc: GeoJSON.FeatureCollection | null) => void;
+  /** Ziel aus „Verbindung suchen“ einer Detailansicht */
+  routeTarget: Place | null;
 }
 
 /**

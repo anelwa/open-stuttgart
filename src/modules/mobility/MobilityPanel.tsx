@@ -4,11 +4,14 @@ import { fmtNum, occupancy, ago } from '../../lib/format';
 import { LayerRow, Section, Source, ErrorNote, LiveDot } from '../../components/ui';
 import { useStops } from '../../lib/stops';
 import type { ModuleProps } from '../types';
+import { Anschluss } from '../../components/Anschluss';
+import { BahnHbf } from '../../components/BahnHbf';
+import { PuenktlichkeitSection } from '../../components/Puenktlichkeit';
 
 const QUICK = ['Hauptbahnhof', 'Charlottenplatz', 'Stadtmitte', 'Schlossplatz', 'Bad Cannstatt Wilhelmsplatz', 'Vaihingen', 'Marienplatz', 'Feuersee'];
 
-export function MobilityPanel({ visible, toggle, select, flyTo }: ModuleProps) {
-  const { parking, sharing, roadworks } = useData();
+export function MobilityPanel({ visible, toggle, select, flyTo, setLayer }: ModuleProps) {
+  const { parking, sharing, roadworks, traffic } = useData();
   const stops = useStops();
 
   const park = useMemo(() => {
@@ -34,11 +37,14 @@ export function MobilityPanel({ visible, toggle, select, flyTo }: ModuleProps) {
   const works = roadworks.data?.items ?? [];
   const active = works.filter((w) => w.status === 'active').length;
 
+  const meld = traffic.data?.items ?? [];
+  const akut = meld.filter((t) => t.typ === 'Unfall' || t.typ === 'Stau' || t.typ === 'Sperrung');
+
   const quick = QUICK.map((n) => stops.find((s) => s.properties.name === n)).filter(Boolean);
 
   return (
     <div className="module">
-      <Section title="Haltestelle wählen" aside="Echtzeit-Abfahrten">
+      <Section title="Haltestelle wählen" explain="abfahrten" aside="Echtzeit-Abfahrten">
         <div className="chips">
           {quick.map((s) => (
             <button key={s!.properties.id} type="button" className="chip" onClick={() => {
@@ -67,12 +73,37 @@ export function MobilityPanel({ visible, toggle, select, flyTo }: ModuleProps) {
           <LayerRow icon="cone" tone="amber" title="Baustellen" on={visible.roadworks} onToggle={() => toggle('roadworks')}
             loading={roadworks.loading && !roadworks.data}
             meta={roadworks.error && !roadworks.data ? 'nicht erreichbar' : `${active} im Bau · ${works.length - active} geplant`} />
+          <LayerRow icon="warn" tone="amber" title="Verkehrsmeldungen" on={visible.traffic} onToggle={() => toggle('traffic')}
+            loading={traffic.loading && !traffic.data}
+            meta={traffic.error && !traffic.data ? 'nicht erreichbar' : <><LiveDot stale={!!traffic.error} /> {meld.filter((t) => t.typ === 'Unfall').length} Unfälle · {meld.filter((t) => t.typ === 'Stau').length} Staus · {meld.filter((t) => t.typ === 'Sperrung').length} Sperrungen</>} />
           <LayerRow icon="route" tone="green" title="Hauptradrouten" on={visible.bike} onToggle={() => toggle('bike')}
             meta="Radnetz der Stadt Stuttgart" />
         </div>
       </Section>
 
-      <Section title="Parkhäuser, aktuelle Belegung" aside={parking.updatedAt ? ago(parking.updatedAt) : undefined}>
+      <Section title="Verkehrsmeldungen" explain="verkehr" aside={traffic.updatedAt ? ago(traffic.updatedAt) : undefined}>
+        {traffic.error && !traffic.data && <ErrorNote text="Verkehrsmeldungen gerade nicht erreichbar." onRetry={traffic.reload} />}
+        {traffic.data && !akut.length && <p className="muted small">Derzeit keine Unfälle, Staus oder Sperrungen gemeldet. {meld.length ? `${meld.length} Meldungen zu Baustellen und Sonstigem.` : ''}</p>}
+        <ul className="traffic-list">
+          {akut.slice(0, 6).map((t) => (
+            <li key={t.id}>
+              <button type="button" onClick={() => { setLayer('traffic', true); flyTo([t.lon, t.lat], 14.5); }}>
+                <span className={`traffic-typ typ-${t.typ}`}>{t.typ}</span>
+                <span className="traffic-text">{t.text}</span>
+                <span className="traffic-src">{t.quelle}{t.seit ? `, seit ${new Date(t.seit).toLocaleString('de-DE', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr` : ''}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        {akut.length > 6 && <p className="muted small">Weitere {akut.length - 6} Meldungen auf der Karte.</p>}
+        <p className="muted small">Gemeldete Ereignisse. Eine Verkehrslage mit Geschwindigkeiten für Stadtstraßen ist offen nicht verfügbar.</p>
+      </Section>
+
+      <PuenktlichkeitSection />
+      <Anschluss />
+      <BahnHbf />
+
+      <Section title="Parkhäuser, aktuelle Belegung" explain="parken" aside={parking.updatedAt ? ago(parking.updatedAt) : undefined}>
         {parking.error && !parking.data && <ErrorNote text="Parkdaten gerade nicht erreichbar." onRetry={parking.reload} />}
         {park.cap > 0 && (
           <div className="occ-summary">
@@ -105,6 +136,7 @@ export function MobilityPanel({ visible, toggle, select, flyTo }: ModuleProps) {
       <Source>
         Fahrplan: VVS (CC BY 4.0). Abfahrten: EFA-BW/NVBW (dl-de/by-2-0). Parken: Stadt Stuttgart, PBW über MobiData BW.
         Sharing: Anbieter über MobiData BW. Baustellen und Radrouten: Landeshauptstadt Stuttgart (Open Data).
+        Verkehrsmeldungen: Landesmeldestelle Baden-Württemberg und Integrierte Verkehrsleitzentrale Stuttgart über MobiData BW (dl-de/by-2-0); Autobahn GmbH des Bundes.
       </Source>
     </div>
   );

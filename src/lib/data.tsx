@@ -2,12 +2,13 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 import { usePolling, type Polled } from './api';
 import type { Radar } from './rain';
 import type { Kessel } from '../components/Kessel';
-import type { AirStation, EventsResponse, ParkingSite, Place, Roadwork, SharingResponse, Water, Weather } from './types';
+import type { AirStation, EventsResponse, ParkingSite, Place, Roadwork, SharingResponse, TrafficItem, Water, Weather } from './types';
 
 export interface AppData {
   parking: Polled<{ sites: ParkingSite[]; fetchedAt: string; source: string }>;
   sharing: Polled<SharingResponse>;
   roadworks: Polled<{ items: Roadwork[]; fetchedAt: string; source: string }>;
+  traffic: Polled<{ items: TrafficItem[]; publiziert: string | null; lmsVerfuegbar: boolean; quelle: string }>;
   air: Polled<{ stations: AirStation[]; fetchedAt: string; source: string }>;
   weather: Polled<Weather & { fetchedAt: string }>;
   water: Polled<Water & { fetchedAt: string }>;
@@ -37,6 +38,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     parking: usePolling('/api/parking', 60_000),
     sharing: usePolling('/api/sharing', 60_000),
     roadworks: usePolling('/api/roadworks', 15 * 60_000),
+    traffic: usePolling('/api/traffic', 2 * 60_000),
     air: usePolling('/api/air', 15 * 60_000),
     weather: usePolling('/api/weather', 10 * 60_000),
     water: usePolling('/api/water', 15 * 60_000),

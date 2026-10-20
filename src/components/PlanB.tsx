@@ -1,5 +1,6 @@
 // Alternativen bei Ausfall oder großer Verspätung: nächste Fahrt derselben Linie,
 // Leihfahrzeuge und Nachbarhaltestellen in Gehweite.
+import { Explain } from '../lib/info';
 import { useMemo } from 'react';
 import { useData } from '../lib/data';
 import { distM, walkMin } from '../lib/geo';
@@ -47,7 +48,7 @@ export function PlanB({ deps, here, stopName, now, select, flyTo }: {
 
   return (
     <section className="section planb">
-      <header className="section-head"><h3>Alternativen</h3><span className="section-aside">Schätzung</span></header>
+      <header className="section-head"><h3>Alternativen</h3><span className="section-aside">Schätzung<Explain id="planb" /></span></header>
       <ul className="planb-list">
         {hit.slice(0, 3).map((d, i) => {
           const next = deps.find((x) => x !== d && !x.cancelled && x.line === d.line && x.destination === d.destination && t(x) > Date.parse(d.planned));

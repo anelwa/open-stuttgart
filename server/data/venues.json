@@ -1,0 +1,37 @@
+{
+ "_hinweis": "Gepflegte Ortsliste für das Modul „Was geht“ (Spezifikation 6.4). Koordinaten, OSM- und Wikidata-Kennungen aus OpenStreetMap (Nominatim, © OpenStreetMap-Mitwirkende, ODbL), abgefragt am 20.10.2026. Säle und Schreibweisen der Quellen stehen unter aliases und werden auf den Ort abgebildet. approx: Ort ist ein Gelände (Campus), der Punkt steht nur für das Gelände.",
+ "venues": [
+  { "id": "wizemann", "name": "Im Wizemann", "aliases": ["Im Wizemann", "Wizemann", "Im Wizemann Halle", "Im Wizemann Club", "Im Wizemann Studio", "Im Wizemann Vorhof"], "address": "Quellenstraße 7, 70376 Stuttgart", "lat": 48.807985, "lon": 9.200331, "osm": "node/4642148612", "wikidata": null, "district": "Bad Cannstatt" },
+  { "id": "lka", "name": "LKA Longhorn", "aliases": ["LKA Longhorn", "LKA-Longhorn", "LKA Longhorn Stuttgart", "Longhorn"], "address": "Heiligenwiesen 6, 70327 Stuttgart", "lat": 48.767284, "lon": 9.251771, "osm": "node/130481686", "wikidata": "Q1648324", "district": "Wangen" },
+  { "id": "theaterhaus", "name": "Theaterhaus Stuttgart", "aliases": ["Theaterhaus", "Theaterhaus Stuttgart", "Theaterhaus am Pragsattel"], "address": "Siemensstraße 11, 70469 Stuttgart", "lat": 48.810307, "lon": 9.179043, "osm": "node/6263524718", "wikidata": "Q1304434", "district": "Feuerbach" },
+  { "id": "bix", "name": "Bix Jazzclub", "aliases": ["Bix", "Bix Jazzclub", "BIX Jazzclub & Lounge", "Bix Jazzclub Stuttgart"], "address": "Leonhardsplatz 28, 70182 Stuttgart", "lat": 48.772987, "lon": 9.179914, "osm": "way/324853476", "wikidata": null, "district": "Mitte" },
+  { "id": "wagenhallen", "name": "Wagenhallen", "aliases": ["Wagenhallen", "Wagenhallen Stuttgart", "Container City"], "address": "Innerer Nordbahnhof 1, 70191 Stuttgart", "lat": 48.799725, "lon": 9.185910, "osm": "way/80178010", "wikidata": "Q100890405", "district": "Nord" },
+  { "id": "lehmann", "name": "Lehmann Club", "aliases": ["Lehmann", "Lehmann Club", "LEHMANN Club"], "address": "Breitscheidstraße 12, 70174 Stuttgart", "lat": 48.779763, "lon": 9.167093, "osm": "node/959289928", "wikidata": null, "district": "Mitte" },
+  { "id": "proton", "name": "Proton The Club", "aliases": ["Proton", "Proton The Club", "proTON The Club"], "address": "Königstraße 49, 70173 Stuttgart", "lat": 48.773723, "lon": 9.175403, "osm": "node/4429521079", "wikidata": null, "district": "Mitte" },
+  { "id": "merlin", "name": "Kulturzentrum Merlin", "aliases": ["Merlin", "Kulturzentrum Merlin", "Kulturverein Merlin"], "address": "Augustenstraße 72, 70178 Stuttgart", "lat": 48.770212, "lon": 9.161101, "osm": "way/28098584", "wikidata": "Q1791914", "district": "West" },
+  { "id": "clubcann", "name": "clubCANN", "aliases": ["clubCANN", "Club Cann", "Club CANN"], "address": "Kegelenstraße 21, 70372 Stuttgart", "lat": 48.800318, "lon": 9.218392, "osm": "node/10693206305", "wikidata": null, "district": "Bad Cannstatt" },
+  { "id": "clubzentral", "name": "Club Zentral", "aliases": ["Club Zentral", "Jugendhaus Mitte"], "address": "Hohe Straße 9, 70174 Stuttgart", "lat": 48.777257, "lon": 9.170031, "osm": "node/3330902107", "wikidata": null, "district": "Mitte" },
+  { "id": "hallschlag", "name": "Jugendhaus Hallschlag", "aliases": ["Jugendhaus Hallschlag", "JuHa 376 Hallschlag", "JuHa Hallschlag", "Hallschlag"], "address": "Bad Cannstatt, Stuttgart", "lat": 48.813329, "lon": 9.201496, "osm": "way/143957853", "wikidata": null, "district": "Bad Cannstatt" },
+  { "id": "werkstatthaus", "name": "Werkstatthaus", "aliases": ["Werkstatthaus"], "address": "Gerokstraße 7, 70188 Stuttgart", "lat": 48.779962, "lon": 9.193576, "osm": "way/25885741", "wikidata": null, "district": "Mitte" },
+  { "id": "helene", "name": "Helene P.", "aliases": ["Helene P.", "Helene P"], "address": "Obere Weinsteige 9, 70597 Stuttgart", "lat": 48.750083, "lon": 9.170210, "osm": "way/1553251758", "wikidata": null, "district": "Degerloch" },
+  { "id": "karlsplatz", "name": "Karlsplatz", "aliases": ["Karlsplatz", "Flohmarkt Karlsplatz"], "address": "Karlsplatz, 70173 Stuttgart", "lat": 48.776559, "lon": 9.180924, "osm": "way/507962489", "wikidata": "Q1733960", "district": "Mitte" },
+  { "id": "hft", "name": "Hochschule für Technik Stuttgart", "aliases": ["HFT Stuttgart", "Hochschule für Technik", "HfT Stuttgart"], "address": "Schellingstraße 24, 70174 Stuttgart", "lat": 48.780274, "lon": 9.172525, "osm": "way/354369593", "wikidata": "Q1540704", "district": "Mitte", "approx": true },
+  { "id": "hdm", "name": "Hochschule der Medien", "aliases": ["Hochschule der Medien", "HdM", "HdM Stuttgart"], "address": "Nobelstraße 10, 70569 Stuttgart", "lat": 48.741644, "lon": 9.101029, "osm": "way/355513467", "wikidata": "Q1233544", "district": "Vaihingen", "approx": true },
+  { "id": "hohenheim", "name": "Universität Hohenheim", "aliases": ["Universität Hohenheim", "Schloss Hohenheim", "Uni Hohenheim"], "address": "Schloss Hohenheim, 70599 Stuttgart", "lat": 48.712720, "lon": 9.214135, "osm": "relation/7201678", "wikidata": "Q1514135", "district": "Plieningen", "approx": true },
+  { "id": "abk", "name": "Staatliche Akademie der Bildenden Künste", "aliases": ["Akademie der Bildenden Künste", "ABK Stuttgart", "Kunstakademie"], "address": "Am Weißenhof 1, 70191 Stuttgart", "lat": 48.800674, "lon": 9.174650, "osm": "way/25089952", "wikidata": "Q2324294", "district": "Nord", "approx": true }
+ ],
+ "ticketio": [
+  { "shop": "lehmannclub", "venueId": "lehmann", "scene": "party" },
+  { "shop": "protontheclub", "venueId": "proton", "scene": "party" },
+  { "shop": "proton-the-club", "venueId": "proton", "scene": "party" },
+  { "shop": "lehmann-discotronic" },
+  { "shop": "clubkowalskistuttgart", "scene": "party" },
+  { "shop": "schonnice" },
+  { "shop": "davidpuentez" }
+ ],
+ "lya": [
+  { "profile": "kulturverein-merlin-ev-GQI0JA", "name": "Kulturverein Merlin" },
+  { "profile": "clubcann-E5JR35", "name": "Next Concerts (clubCANN)" },
+  { "profile": "club-zentral-HJRKP0", "name": "Club Zentral" }
+ ]
+}

@@ -1,6 +1,7 @@
 // Fahrplanauskunft EFA-BW (NVBW), JSON-Schnittstelle. Echtzeit-Abfahrten und Haltestellensuche.
 // Lizenz der Daten: Datenlizenz Deutschland – Namensnennung 2.0 (NVBW / MobiData BW).
 import { cached, fetchJson } from '../cache.mjs';
+import { verspaetungAnHalt } from './gtfsrt.mjs';
 
 const BASE = 'https://www.efa-bw.de/nvbw';
 
@@ -54,14 +55,33 @@ export async function departures(stopId, atIso) {
         cancelled,
         platform: e.location?.properties?.platformName ?? e.location?.disassembledName ?? null,
         notes: (e.hints ?? []).map((h) => h.content).filter(Boolean).slice(0, 2),
+        // Bezug für den Fahrtverlauf (XML_STOPSEQCOORD_REQUEST)
+        trip: t.id && t.properties?.tripCode != null && e.location?.properties?.stopId
+          ? { line: t.id, stop: e.location.properties.stopId, tripCode: t.properties.tripCode, planned }
+          : null,
       };
     });
     const loc = d.locations?.[0];
+    // EFA-BW liefert zeitweise keine Ist-Zeiten; dann zeigt die Oberfläche einen Hinweis
+    const withRt = events.filter((e) => e.estimated).length;
     return {
+      realtimeAvailable: when ? null : events.length < 10 || withRt > 0,
       stop: { id: stopId, name: loc?.disassembledName ?? loc?.name ?? stopId, fullName: loc?.name },
       departures: events,
     };
   });
+  // Ersatz: liefert EFA-BW keine Ist-Zeiten, Verspätung aus dem landesweiten Echtzeitfeed (NVBW über gtfs.de)
+  if (value.realtimeAvailable === false) {
+    let n = 0;
+    const deps = value.departures.map((d) => {
+      if (d.estimated) return d;
+      const min = verspaetungAnHalt(value.stop.fullName ?? value.stop.name, d.line, d.planned);
+      if (min == null) return d;
+      n++;
+      return { ...d, estimated: new Date(Date.parse(d.planned) + min * 60_000).toISOString(), delayMin: min, realtime: true, rtQuelle: 'gtfs.de' };
+    });
+    if (n) return { ...value, departures: deps, ersatzEchtzeit: n, fetchedAt: new Date(fetchedAt).toISOString(), fresh };
+  }
   return { ...value, fetchedAt: new Date(fetchedAt).toISOString(), fresh };
 }
 

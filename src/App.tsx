@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapView, type MapHandle } from './map/MapView';
+import { MapView, type MapData, type MapHandle } from './map/MapView';
 import type { Theme } from './map/mapStyle';
 import { AERIAL_YEARS, type OverlayKey } from './map/overlays';
 import { MODULES } from './modules';
@@ -12,9 +12,14 @@ import { BigEventBanner } from './components/BigEvent';
 import { AIR_COLOR, AIR_LABEL, fmtDec } from './lib/format';
 import { loadStops } from './lib/stops';
 import { nowFrame, radarCoords, radarImage } from './lib/rain';
+import { InfoProvider, type InfoPage } from './lib/info';
+import { useLive } from './lib/live';
+import { RouteProvider, type Place as RoutePlace } from './lib/routeCtx';
+import { LANGS, setLang, tr, useLang } from './lib/i18n';
+import { InfoPages } from './components/InfoPages';
 
 const DEFAULT_VISIBLE: Record<OverlayKey, boolean> = {
-  network: true, stops: true, parking: true, sharing: false, roadworks: true, bike: false, air: true, water: true, events: true, places: true, sun: false, radar: true, aerial: false,
+  network: true, stops: true, parking: true, sharing: false, roadworks: true, bike: false, air: true, water: true, events: true, places: true, sun: false, radar: true, aerial: false, nearby: true, live: true, route: true, vehicles: true, traffic: false,
 };
 
 function readPref<T>(key: string, fallback: T): T {
@@ -52,6 +57,9 @@ function Shell() {
   const [center, setCenter] = useState<[number, number]>([9.18, 48.779]);
   const [sunImage, setSunImage] = useState<string | null>(null);
   const [radarFrame, setRadarFrame] = useState<number | null>(null);
+  const [nearby, setNearby] = useState<MapData['nearby']>(null);
+  const [info, setInfo] = useState<{ page: InfoPage; anchor?: string } | null>(null);
+  const openInfo = useCallback((page: InfoPage, anchor?: string) => setInfo({ page, anchor }), []);
   const [aerial, setAerial] = useState({ year: AERIAL_YEARS[AERIAL_YEARS.length - 1], opacity: 1 });
   const radarImg = useMemo(() => {
     const r = data.radar.data;
@@ -81,6 +89,7 @@ function Shell() {
       case 'sharing': { const s = data.sharing.data?.items.find((x) => x.id === selection.id); return s ? [s.lon, s.lat] : null; }
       case 'water': return data.water.data ? [data.water.data.lon, data.water.data.lat] : null;
       case 'event': { const e = data.events.data?.events.find((x) => x.id === selection.id); return e?.lon != null ? [e.lon, e.lat!] : null; }
+      case 'facility': return [selection.item.lon, selection.item.lat];
       case 'place': { const p = data.places.data?.places.find((x) => x.id === selection.id); return p ? [p.lon, p.lat] : null; }
     }
   }, [selection, data]);
@@ -129,6 +138,11 @@ function Shell() {
   const w = data.weather.data;
   const airWorst = (data.air.data?.stations ?? []).reduce<number | null>((m, s) => (s.index == null ? m : m == null || s.index > m ? s.index : m), null);
 
+  const live = useLive(visible.live);
+  const [routeGeo, setRouteGeo] = useState<GeoJSON.FeatureCollection | null>(null);
+  const [routeTarget, setRouteTarget] = useState<RoutePlace | null>(null);
+  const planRoute = useCallback((p: RoutePlace) => { setRouteTarget(p); setModuleId('route'); setSelection(null); if (mobile) setSheet('open'); }, [mobile]);
+  const lang = useLang();
   const mapData = useMemo(() => ({
     parking: data.parking.data?.sites ?? null,
     sharing: data.sharing.data?.items ?? null,
@@ -140,11 +154,17 @@ function Shell() {
     places: data.places.data?.places ?? null,
     sunImage,
     radarImage: radarImg,
-  }), [sunImage, radarImg, data.parking.data, data.sharing.data, data.roadworks.data, data.air.data, data.water.data, data.bike.data, data.events.data, data.places.data]);
+    nearby,
+    live,
+    route: routeGeo,
+    traffic: data.traffic.data?.items ?? null,
+  }), [data.traffic.data, sunImage, radarImg, nearby, live, routeGeo, data.parking.data, data.sharing.data, data.roadworks.data, data.air.data, data.water.data, data.bike.data, data.events.data, data.places.data]);
 
   const showDetail = !!selection;
 
   return (
+    <InfoProvider open={openInfo}>
+    <RouteProvider plan={planRoute}>
     <div className={`app ${mobile ? 'is-mobile' : ''} sheet-${sheet} ${showDetail ? 'has-detail' : ''}`}>
       <MapView
         ref={mapRef}
@@ -162,6 +182,7 @@ function Shell() {
         detailPadding={detailPadding}
       />
       {!ready && <div className="map-loading" aria-hidden><span /></div>}
+      <a className="skip-link" href="#panel-content">{tr('Zum Inhalt springen')}</a>
 
       <aside className="panel" aria-label="Themen und Ebenen">
         {mobile && (
@@ -173,7 +194,7 @@ function Shell() {
             <img className="brand-logo" src="/logo.svg" alt="" width="40" height="40" />
             <div className="brand-text">
               <h1><em>Open</em> Stuttgart</h1>
-              <p>Offene Daten der Landeshauptstadt auf einer Karte</p>
+              <p>{tr('Offene Daten der Landeshauptstadt auf einer Karte')}</p>
             </div>
             <span className="demo-tag">Demo</span>
           </div>
@@ -189,14 +210,24 @@ function Shell() {
             <button key={m.id} role="tab" type="button" aria-selected={m.id === mod.id} className={m.id === mod.id ? 'active' : ''}
               onClick={() => { setModuleId(m.id); if (mobile) setSheet('open'); }}>
               <Icon name={m.icon} size={18} />
-              <span>{m.label}</span>
+              <span>{tr(m.label)}</span>
               {m.status === 'soon' && <small className="soon">bald</small>}
             </button>
           ))}
         </nav>
 
-        <div className="panel-scroll">
-          <mod.Panel visible={visible} toggle={toggle} select={select} flyTo={flyTo} setLayer={setLayer} center={center} setSunImage={setSunImage} radarFrame={radarFrame} setRadarFrame={setRadarFrame} />
+        <div className="panel-scroll" id="panel-content" tabIndex={-1}>
+          <mod.Panel visible={visible} toggle={toggle} select={select} flyTo={flyTo} setLayer={setLayer} center={center} setSunImage={setSunImage} radarFrame={radarFrame} setRadarFrame={setRadarFrame} setNearby={setNearby} setRoute={setRouteGeo} routeTarget={routeTarget} />
+          <nav className="about-links" aria-label="Über diese Anwendung">
+            <button type="button" onClick={() => openInfo('grundsaetze')}>{tr('Grundsätze')}</button>
+            <button type="button" onClick={() => openInfo('werte')}>{tr('Wie entstehen die Werte?')}</button>
+            <button type="button" onClick={() => openInfo('daten')}>{tr('Offene Daten')}</button>
+            <button type="button" onClick={() => openInfo('barrierefreiheit')}>{tr('Barrierefreiheit')}</button>
+            <button type="button" onClick={() => openInfo('leicht')}>{tr('Leichte Sprache')}</button>
+            {LANGS.filter((l) => l.id !== lang).map((l) => (
+              <button key={l.id} type="button" lang={l.id} onClick={() => setLang(l.id)}>{l.label}</button>
+            ))}
+          </nav>
         </div>
       </aside>
 
@@ -256,7 +287,10 @@ function Shell() {
           <DetailSheet sel={selection!} onClose={() => setSelection(null)} select={select} flyTo={flyTo} />
         </aside>
       )}
+      {info && <InfoPages page={info.page} anchor={info.anchor} onPage={(page) => setInfo({ page })} onClose={() => setInfo(null)} />}
     </div>
+    </RouteProvider>
+    </InfoProvider>
   );
 }
 

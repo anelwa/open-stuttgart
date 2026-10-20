@@ -140,7 +140,7 @@ export function SunPanel({ visible, toggle, setLayer, setSunImage, flyTo, select
 
       {error && <ErrorNote text={`Höhenmodell nicht verfügbar: ${error}`} />}
 
-      <Section title="Verschattung durch das Gelände" aside={day ? `${(day.cols * day.rows).toLocaleString("de-DE")} Punkte gerechnet` : undefined}>
+      <Section title="Verschattung durch das Gelände" explain="sonne" aside={day ? `${(day.cols * day.rows).toLocaleString("de-DE")} Punkte gerechnet` : undefined}>
         <div className="seg sun-seg" role="tablist" aria-label="Tageszeit">
           <button role="tab" aria-selected={mode === 'abend'} className={mode === 'abend' ? 'active' : ''} onClick={() => setMode('abend')}>Abend</button>
           <button role="tab" aria-selected={mode === 'morgen'} className={mode === 'morgen' ? 'active' : ''} onClick={() => setMode('morgen')}>Morgen</button>

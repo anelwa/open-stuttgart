@@ -6,18 +6,19 @@
 //   Hintergrund, jede Seite höchstens alle 7 Tage. Gesperrte Pfade laut robots.txt werden nicht verwendet.
 //   Abschaltbar mit OS_MARKETING=0.
 // Abgleich mit dem Stadtkalender nach stuttgart-api-recherche/kultur (Abschnitt 4): Zeit, Ort und Titel.
+import { readFileSync } from 'node:fs';
 import { cached, diskStore, fetchJson, fetchText } from '../cache.mjs';
 
 const berlinDate = (d) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(d);
 const berlinHM = (d) => new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' }).format(d);
-const short = (s, n = 260) => { const t = (s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n).replace(/\s\S*$/, '')} …` : t; };
+export const short = (s, n = 260) => { const t = (s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n).replace(/\s\S*$/, '')} …` : t; };
 /** Ortszeit ohne Zonenangabe (Europe/Berlin) in einen Zeitpunkt umrechnen, unabhängig von der Zeitzone des Servers. */
-function berlinLocal(s) {
+export function berlinLocal(s) {
   const d = new Date(`${s.slice(0, 19)}Z`);
   const off = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Berlin' })) - new Date(d.toLocaleString('en-US', { timeZone: 'UTC' }));
   return new Date(+d - off);
 }
-const ldBlocks = (html) => [...html.matchAll(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/g)]
+export const ldBlocks = (html) => [...html.matchAll(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/g)]
   .flatMap((m) => { try { const d = JSON.parse(m[1]); return Array.isArray(d) ? d : [d]; } catch { return []; } });
 
 // ---------- OpenLigaDB ----------
@@ -108,6 +109,99 @@ function bibDay(day, geocode) {
     })().catch(() => {}).finally(() => bibLoading.delete(day)));
   }
   return list === undefined ? null : list.map((e) => ({ ...e, date: day, ready: true }));
+}
+
+// ---------- StadtPalais und Stadtmuseen (WordPress-REST, ohne Schlüssel) ----------
+const SP = 'https://www.stadtpalais-stuttgart.de/wp-json/wp/v2';
+const SP_PLACES = {
+  26: { venue: 'StadtPalais', location: 'Konrad-Adenauer-Straße 2, 70173 Stuttgart' },
+  27: { venue: 'Städtisches Lapidarium', location: 'Mörikestraße 24/1, 70178 Stuttgart' },
+  28: { venue: 'Museum Hegel-Haus', location: 'Eberhardstraße 53, 70173 Stuttgart' },
+  29: { venue: 'Museum Bad Cannstatt', location: 'Marktstraße 71/1, 70372 Stuttgart' },
+  30: { venue: 'Museum Möhringen', location: 'Filderbahnplatz 32, 70567 Stuttgart' },
+  31: { venue: 'Museum Plieningen', location: 'Neuhauser Straße 1, 70599 Stuttgart' },
+};
+export const deEnt = (t) => (t ?? '').replace(/<[^>]+>/g, ' ').replace(/&#8211;/g, '–').replace(/&#8222;|&#8220;/g, '"').replace(/&#038;|&amp;/g, '&').replace(/&#\d+;/g, '').replace(/\s+/g, ' ').trim();
+
+/** Zuletzt geänderte Einträge, bis eine Seite keinen künftigen Termin mehr enthält (höchstens 5 Seiten), 1x täglich. */
+async function stadtpalais(geocode) {
+  const { value } = await cached('stadtpalais', 24 * 3600_000, async () => {
+    const [cats, groups] = await Promise.all([
+      fetchJson(`${SP}/event-categories?per_page=100`), fetchJson(`${SP}/event-target-groups?per_page=100`)]);
+    const catName = Object.fromEntries(cats.map((c) => [c.id, deEnt(c.name)]));
+    const groupName = Object.fromEntries(groups.map((c) => [c.id, deEnt(c.name)]));
+    const today = berlinDate(new Date()).replace(/-/g, '');
+    const out = [];
+    for (let page = 1; page <= 5; page += 1) {
+      const list = await fetchJson(`${SP}/veranstaltungen?per_page=100&page=${page}&orderby=modified&order=desc&_fields=id,link,title,acf`);
+      const fut = list.filter((e) => (e.acf?.date ?? '') >= today);
+      for (const e of fut) {
+        const a = e.acf; const d = `${a.date.slice(0, 4)}-${a.date.slice(4, 6)}-${a.date.slice(6, 8)}`;
+        const pl = SP_PLACES[a.location] ?? SP_PLACES[26];
+        const cs = (a['event-categories'] ?? []).map((c) => catName[c]).filter(Boolean);
+        const gs = (a['target-groups'] ?? []).map((c) => groupName[c]).filter(Boolean);
+        out.push({
+          id: `sp-${e.id}`, title: deEnt(e.title?.rendered), teaser: short(deEnt(a.excerpt)), url: e.link, date: d,
+          start: a['time-from'] ? berlinLocal(`${d}T${a['time-from']}`).toISOString() : null,
+          end: a['time-to'] && !a['hide-time-to'] ? berlinLocal(`${d}T${a['time-to']}`).toISOString() : null,
+          allDay: !a['time-from'],
+          category: `${cs.join(' ')} ${a.kids ? 'Kinder' : ''} Museum`,
+          tags: cs,
+          audience: gs.join(', ') || null,
+          status: a.disruptor?.active ? (/verschoben/i.test(a.disruptor.text ?? '') ? 'verschoben' : 'abgesagt') : null,
+          ...pl, ready: true,
+          sources: [{ name: 'StadtPalais Stuttgart', url: e.link }],
+        });
+      }
+      if (!fut.length || list.length < 100) break;
+    }
+    const geo = {};
+    for (const [id, p] of Object.entries(SP_PLACES)) geo[p.venue] = await geocode(p.location);
+    for (const e of out) { const g = geo[e.venue]; if (g) Object.assign(e, { lat: g.lat, lon: g.lon }); }
+    return out;
+  });
+  return value;
+}
+
+// ---------- LKA Longhorn (schema.org auf der Startseite, ohne Uhrzeit) ----------
+const LKA = { venue: 'LKA Longhorn', location: 'Heiligenwiesen 6, 70327 Stuttgart', lat: 48.7838, lon: 9.2468 };
+async function lka() {
+  const { value } = await cached('lka', 24 * 3600_000, async () => {
+    const html = await fetchText('https://lka-longhorn.de/', { timeout: 30000 });
+    return ldBlocks(html).filter((b) => b['@type'] === 'Event' && b.startDate).map((e) => {
+      const title = deEnt(e.name);
+      return {
+        id: `lka-${e.url}`, title: title.replace(/\s*[–-]\s*KONZERT WURDE ABGESAGT/i, ''), teaser: '', url: e.url,
+        date: e.startDate.slice(0, 10), start: null, end: null, allDay: true, noTime: true,
+        category: 'Musik Konzert', status: /abgesagt/i.test(title) ? 'abgesagt' : /verlegt|verschoben/i.test(title) ? 'verschoben' : null,
+        ...LKA, ready: true, sources: [{ name: 'LKA Longhorn', url: e.url }],
+      };
+    });
+  });
+  return value;
+}
+
+// ---------- Märkte und Feste (gepflegte Tabelle server/data/feste-maerkte.json) ----------
+const MARKETS = JSON.parse(readFileSync(new URL('../data/feste-maerkte.json', import.meta.url), 'utf8'));
+function markets(day) {
+  const wd = new Date(`${day}T12:00:00Z`).getUTCDay();
+  const out = [];
+  for (const m of MARKETS.weekly) {
+    m.slots.filter((x) => x.weekday === wd).forEach((x, i) => out.push({
+      id: `markt-${m.url.split('/').filter(Boolean).pop()}-${i}`, title: m.name,
+      teaser: 'Fällt der Markttag auf einen Feiertag, findet der Markt laut Betreiber am Vortag statt.',
+      url: m.url, date: day, start: berlinLocal(`${day}T${x.from.padStart(5, '0')}:00`).toISOString(),
+      end: berlinLocal(`${day}T${x.to.padStart(5, '0')}:00`).toISOString(), allDay: false,
+      category: m.category, venue: m.name.replace(/^Wochenmarkt /, ''), location: m.address, lat: m.lat, lon: m.lon,
+      free: true, ready: true, sources: [{ name: m.source, url: m.url }],
+    }));
+  }
+  for (const f of MARKETS.periods) {
+    if (f.from > day || (f.to && f.to < day)) continue;
+    out.push({ id: `fest-${f.url}`, title: f.name, teaser: f.note ?? '', url: f.url, date: day, start: null, end: null, allDay: true,
+      category: f.category, venue: f.name, location: f.address, lat: f.lat, lon: f.lon, ready: true, sources: [{ name: f.source, url: f.url }] });
+  }
+  return out;
 }
 
 // ---------- Stuttgart-Marketing ----------
@@ -226,7 +320,7 @@ export function marketingStatus() {
 const norm = (s) => (s ?? '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
   .replace(/[^a-z0-9 ]+/g, ' ');
 const tokens = (s) => new Set(norm(s).split(/\s+/).filter((w) => w.length > 3));
-function titleSim(a, b) {
+export function titleSim(a, b) {
   const na = norm(a).replace(/\s+/g, ' ').trim(); const nb = norm(b).replace(/\s+/g, ' ').trim();
   if (na && nb && (na.includes(nb) || nb.includes(na))) return 1;
   const A = tokens(a); const B = tokens(b);
@@ -235,12 +329,12 @@ function titleSim(a, b) {
   return inter / (A.size + B.size - inter);
 }
 const placeName = (s) => norm(s).replace(/\b(stuttgart|saal|grosses haus|kleines haus)\b/g, '').replace(/\s+/g, ' ').trim();
-function dist(a, b) {
+export function dist(a, b) {
   const k = Math.PI / 180; const x = (b.lon - a.lon) * k * Math.cos(((a.lat + b.lat) / 2) * k); const y = (b.lat - a.lat) * k;
   return Math.hypot(x, y) * 6371000;
 }
 
-function same(a, b) {
+export function same(a, b) {
   // Zeit
   if (a.date !== b.date) return false;
   if (a.start && b.start && !a.allDay && !b.allDay && Math.abs(Date.parse(a.start) - Date.parse(b.start)) > 30 * 60_000) return false;
@@ -259,8 +353,9 @@ function same(a, b) {
 export async function mergeExtra(day, city, geocode, { withBib = true } = {}) {
   const list = city.map((c) => ({ ...c, sources: [{ name: 'Stadt Stuttgart', url: c.url }] }));
   const extra = [];
-  const [l] = await Promise.allSettled([liga()]);
-  if (l.status === 'fulfilled') extra.push(...l.value.filter((e) => e.date === day));
+  const [l, sp, lk] = await Promise.allSettled([liga(), stadtpalais(geocode), lka()]);
+  for (const r of [l, sp, lk]) if (r.status === 'fulfilled') extra.push(...r.value.filter((e) => e.date === day));
+  extra.push(...markets(day));
   const bib = withBib ? bibDay(day, geocode) : [];
   if (bib) extra.push(...bib);
   extra.push(...marketingDay(day));
@@ -276,11 +371,11 @@ export async function mergeExtra(day, city, geocode, { withBib = true } = {}) {
     if (e.status === 'abgesagt' || (e.status && !hit.status)) hit.status = e.status;
     if (e.endEstimated && !hit.end) { hit.end = e.end; hit.endEstimated = true; }
   }
-  return { events: list, pending: bib === null ? 1 : 0, errors: [l].filter((r) => r.status === 'rejected').map((r) => String(r.reason?.message ?? r.reason)) };
+  return { events: list, pending: bib === null ? 1 : 0, errors: [l, sp, lk].filter((r) => r.status === 'rejected').map((r) => String(r.reason?.message ?? r.reason)) };
 }
 
 /** Anzahl zusätzlicher Termine je Tag aus Quellen, die ohne Abruf bekannt sind (VfB, Stuttgart-Marketing). */
 export async function extraCounts(days) {
-  const l = await liga().catch(() => []);
-  return Object.fromEntries(days.map((d) => [d, l.filter((e) => e.date === d).length + marketingDay(d).length]));
+  const known = (await Promise.all([liga(), lka()].map((p) => p.catch(() => [])))).flat();
+  return Object.fromEntries(days.map((d) => [d, known.filter((e) => e.date === d).length + marketingDay(d).length + markets(d).length]));
 }

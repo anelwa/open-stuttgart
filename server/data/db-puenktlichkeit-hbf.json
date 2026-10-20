@@ -1,0 +1,753 @@
+{
+ "station": "Stuttgart Hbf (EVA 8000096 und 8098096)",
+ "quelle": "piebro/deutsche-bahn-data (Hugging Face), Monatsdateien monthly_processed_data",
+ "quelleUrl": "https://huggingface.co/datasets/piebro/deutsche-bahn-data",
+ "lizenz": "Verspätungsdaten DB: Deutsche Bahn (CC BY 4.0)",
+ "erzeugt": "2026-10-20",
+ "erzeugtMit": "scripts/db-puenktlichkeit-hbf.py",
+ "definitionen": {
+  "halte": "Anzahl Halte (Ankunft und/oder Abfahrt eines Zuges) am Hbf oben und tief",
+  "puenktlich": "Anteil der Halte mit weniger als 6 Minuten Verspätung (ohne Ausfälle)",
+  "ankunftPuenktlich": "Anteil der Ankünfte mit höchstens 5 vollen Minuten Verspätung (ohne Ausfälle)",
+  "ausfaelle": "Halte mit stornierter Ankunft oder Abfahrt",
+  "mittelMin": "mittlere Verspätung in Minuten (ohne Ausfälle)",
+  "gattungen": "S = S-Bahn; RE-RB = RE, RB, MEX, IRE, IR, ARV; Fern = ICE, IC, EC, ECE, TGV, RJ, RJX, NJ, EN, FLX, WB"
+ },
+ "grenzen": [
+  "Die Monatsdateien beginnen im Juli 2024.",
+  "Gezählt wird nur Stuttgart Hbf, nicht das ganze S-Bahn-Netz. Die amtlichen Werte der S-Bahn Stuttgart beziehen alle Stationen ein und weichen deshalb ab.",
+  "In Monaten mit Streckensperrungen (etwa August) sind weniger Halte enthalten.",
+  "Der Datensatz beruht auf regelmäßigen Abrufen der DB-Schnittstelle; Lücken in der Erfassung sind möglich."
+ ],
+ "monate": [
+  {
+   "monat": "2024-07",
+   "S": {
+    "halte": 22855,
+    "puenktlich": 0.8839,
+    "ankunftPuenktlich": 0.891,
+    "ausfaelle": 1047,
+    "ausfallAnteil": 0.0458,
+    "mittelMin": 2.42
+   },
+   "RE-RB": {
+    "halte": 18314,
+    "puenktlich": 0.7775,
+    "ankunftPuenktlich": 0.6588,
+    "ausfaelle": 447,
+    "ausfallAnteil": 0.0244,
+    "mittelMin": 3.96
+   },
+   "Fern": {
+    "halte": 6029,
+    "puenktlich": 0.6429,
+    "ankunftPuenktlich": 0.5589,
+    "ausfaelle": 369,
+    "ausfallAnteil": 0.0612,
+    "mittelMin": 8.75
+   }
+  },
+  {
+   "monat": "2024-08",
+   "S": {
+    "halte": 15434,
+    "puenktlich": 0.9765,
+    "ankunftPuenktlich": 0.9704,
+    "ausfaelle": 88,
+    "ausfallAnteil": 0.0057,
+    "mittelMin": 0.52
+   },
+   "RE-RB": {
+    "halte": 14690,
+    "puenktlich": 0.8563,
+    "ankunftPuenktlich": 0.7987,
+    "ausfaelle": 336,
+    "ausfallAnteil": 0.0229,
+    "mittelMin": 2.62
+   },
+   "Fern": {
+    "halte": 4635,
+    "puenktlich": 0.6998,
+    "ankunftPuenktlich": 0.6511,
+    "ausfaelle": 271,
+    "ausfallAnteil": 0.0585,
+    "mittelMin": 7.87
+   }
+  },
+  {
+   "monat": "2024-09",
+   "S": {
+    "halte": 21102,
+    "puenktlich": 0.9208,
+    "ankunftPuenktlich": 0.9206,
+    "ausfaelle": 719,
+    "ausfallAnteil": 0.0341,
+    "mittelMin": 1.86
+   },
+   "RE-RB": {
+    "halte": 18068,
+    "puenktlich": 0.8162,
+    "ankunftPuenktlich": 0.718,
+    "ausfaelle": 510,
+    "ausfallAnteil": 0.0282,
+    "mittelMin": 3.65
+   },
+   "Fern": {
+    "halte": 5549,
+    "puenktlich": 0.7246,
+    "ankunftPuenktlich": 0.6584,
+    "ausfaelle": 574,
+    "ausfallAnteil": 0.1034,
+    "mittelMin": 6.91
+   }
+  },
+  {
+   "monat": "2024-10",
+   "S": {
+    "halte": 24665,
+    "puenktlich": 0.8686,
+    "ankunftPuenktlich": 0.8823,
+    "ausfaelle": 1313,
+    "ausfallAnteil": 0.0532,
+    "mittelMin": 2.93
+   },
+   "RE-RB": {
+    "halte": 19266,
+    "puenktlich": 0.7986,
+    "ankunftPuenktlich": 0.6833,
+    "ausfaelle": 343,
+    "ausfallAnteil": 0.0178,
+    "mittelMin": 3.76
+   },
+   "Fern": {
+    "halte": 5119,
+    "puenktlich": 0.7034,
+    "ankunftPuenktlich": 0.6296,
+    "ausfaelle": 267,
+    "ausfallAnteil": 0.0522,
+    "mittelMin": 6.87
+   }
+  },
+  {
+   "monat": "2024-11",
+   "S": {
+    "halte": 22055,
+    "puenktlich": 0.8612,
+    "ankunftPuenktlich": 0.871,
+    "ausfaelle": 1116,
+    "ausfallAnteil": 0.0506,
+    "mittelMin": 2.9
+   },
+   "RE-RB": {
+    "halte": 18592,
+    "puenktlich": 0.8157,
+    "ankunftPuenktlich": 0.7037,
+    "ausfaelle": 279,
+    "ausfallAnteil": 0.015,
+    "mittelMin": 3.52
+   },
+   "Fern": {
+    "halte": 5361,
+    "puenktlich": 0.7237,
+    "ankunftPuenktlich": 0.6415,
+    "ausfaelle": 266,
+    "ausfallAnteil": 0.0496,
+    "mittelMin": 7.14
+   }
+  },
+  {
+   "monat": "2024-12",
+   "S": {
+    "halte": 24336,
+    "puenktlich": 0.8719,
+    "ankunftPuenktlich": 0.8829,
+    "ausfaelle": 1197,
+    "ausfallAnteil": 0.0492,
+    "mittelMin": 2.64
+   },
+   "RE-RB": {
+    "halte": 19324,
+    "puenktlich": 0.837,
+    "ankunftPuenktlich": 0.7475,
+    "ausfaelle": 359,
+    "ausfallAnteil": 0.0186,
+    "mittelMin": 3.2
+   },
+   "Fern": {
+    "halte": 6022,
+    "puenktlich": 0.7328,
+    "ankunftPuenktlich": 0.6719,
+    "ausfaelle": 213,
+    "ausfallAnteil": 0.0354,
+    "mittelMin": 6.04
+   }
+  },
+  {
+   "monat": "2025-01",
+   "S": {
+    "halte": 24219,
+    "puenktlich": 0.868,
+    "ankunftPuenktlich": 0.8786,
+    "ausfaelle": 1601,
+    "ausfallAnteil": 0.0661,
+    "mittelMin": 2.78
+   },
+   "RE-RB": {
+    "halte": 18305,
+    "puenktlich": 0.7971,
+    "ankunftPuenktlich": 0.7122,
+    "ausfaelle": 421,
+    "ausfallAnteil": 0.023,
+    "mittelMin": 3.93
+   },
+   "Fern": {
+    "halte": 6377,
+    "puenktlich": 0.713,
+    "ankunftPuenktlich": 0.6542,
+    "ausfaelle": 234,
+    "ausfallAnteil": 0.0367,
+    "mittelMin": 7.0
+   }
+  },
+  {
+   "monat": "2025-02",
+   "S": {
+    "halte": 19832,
+    "puenktlich": 0.864,
+    "ankunftPuenktlich": 0.8727,
+    "ausfaelle": 1563,
+    "ausfallAnteil": 0.0788,
+    "mittelMin": 3.06
+   },
+   "RE-RB": {
+    "halte": 16533,
+    "puenktlich": 0.8063,
+    "ankunftPuenktlich": 0.7249,
+    "ausfaelle": 524,
+    "ausfallAnteil": 0.0317,
+    "mittelMin": 3.86
+   },
+   "Fern": {
+    "halte": 5314,
+    "puenktlich": 0.6797,
+    "ankunftPuenktlich": 0.6125,
+    "ausfaelle": 257,
+    "ausfallAnteil": 0.0484,
+    "mittelMin": 7.49
+   }
+  },
+  {
+   "monat": "2025-03",
+   "S": {
+    "halte": 24388,
+    "puenktlich": 0.7216,
+    "ankunftPuenktlich": 0.7365,
+    "ausfaelle": 1787,
+    "ausfallAnteil": 0.0733,
+    "mittelMin": 4.25
+   },
+   "RE-RB": {
+    "halte": 15788,
+    "puenktlich": 0.8017,
+    "ankunftPuenktlich": 0.6897,
+    "ausfaelle": 232,
+    "ausfallAnteil": 0.0147,
+    "mittelMin": 3.67
+   },
+   "Fern": {
+    "halte": 5984,
+    "puenktlich": 0.6607,
+    "ankunftPuenktlich": 0.5717,
+    "ausfaelle": 290,
+    "ausfallAnteil": 0.0485,
+    "mittelMin": 7.76
+   }
+  },
+  {
+   "monat": "2025-04",
+   "S": {
+    "halte": 24871,
+    "puenktlich": 0.7323,
+    "ankunftPuenktlich": 0.755,
+    "ausfaelle": 1774,
+    "ausfallAnteil": 0.0713,
+    "mittelMin": 4.31
+   },
+   "RE-RB": {
+    "halte": 16982,
+    "puenktlich": 0.7668,
+    "ankunftPuenktlich": 0.6468,
+    "ausfaelle": 414,
+    "ausfallAnteil": 0.0244,
+    "mittelMin": 4.33
+   },
+   "Fern": {
+    "halte": 5680,
+    "puenktlich": 0.6523,
+    "ankunftPuenktlich": 0.5573,
+    "ausfaelle": 296,
+    "ausfallAnteil": 0.0521,
+    "mittelMin": 8.16
+   }
+  },
+  {
+   "monat": "2025-05",
+   "S": {
+    "halte": 25193,
+    "puenktlich": 0.768,
+    "ankunftPuenktlich": 0.7877,
+    "ausfaelle": 1628,
+    "ausfallAnteil": 0.0646,
+    "mittelMin": 3.82
+   },
+   "RE-RB": {
+    "halte": 19451,
+    "puenktlich": 0.815,
+    "ankunftPuenktlich": 0.7156,
+    "ausfaelle": 258,
+    "ausfallAnteil": 0.0133,
+    "mittelMin": 3.64
+   },
+   "Fern": {
+    "halte": 5182,
+    "puenktlich": 0.7428,
+    "ankunftPuenktlich": 0.657,
+    "ausfaelle": 171,
+    "ausfallAnteil": 0.033,
+    "mittelMin": 6.26
+   }
+  },
+  {
+   "monat": "2025-06",
+   "S": {
+    "halte": 20539,
+    "puenktlich": 0.8694,
+    "ankunftPuenktlich": 0.8826,
+    "ausfaelle": 1050,
+    "ausfallAnteil": 0.0511,
+    "mittelMin": 2.54
+   },
+   "RE-RB": {
+    "halte": 16512,
+    "puenktlich": 0.7501,
+    "ankunftPuenktlich": 0.6314,
+    "ausfaelle": 369,
+    "ausfallAnteil": 0.0223,
+    "mittelMin": 4.65
+   },
+   "Fern": {
+    "halte": 5565,
+    "puenktlich": 0.5757,
+    "ankunftPuenktlich": 0.4882,
+    "ausfaelle": 552,
+    "ausfallAnteil": 0.0992,
+    "mittelMin": 10.91
+   }
+  },
+  {
+   "monat": "2025-07",
+   "S": {
+    "halte": 18691,
+    "puenktlich": 0.8803,
+    "ankunftPuenktlich": 0.8915,
+    "ausfaelle": 544,
+    "ausfallAnteil": 0.0291,
+    "mittelMin": 2.52
+   },
+   "RE-RB": {
+    "halte": 16522,
+    "puenktlich": 0.7311,
+    "ankunftPuenktlich": 0.6198,
+    "ausfaelle": 545,
+    "ausfallAnteil": 0.033,
+    "mittelMin": 4.78
+   },
+   "Fern": {
+    "halte": 4653,
+    "puenktlich": 0.5226,
+    "ankunftPuenktlich": 0.4037,
+    "ausfaelle": 302,
+    "ausfallAnteil": 0.0649,
+    "mittelMin": 13.62
+   }
+  },
+  {
+   "monat": "2025-08",
+   "S": {
+    "halte": 12375,
+    "puenktlich": 0.9041,
+    "ankunftPuenktlich": 0.8596,
+    "ausfaelle": 190,
+    "ausfallAnteil": 0.0154,
+    "mittelMin": 1.84
+   },
+   "RE-RB": {
+    "halte": 12251,
+    "puenktlich": 0.7625,
+    "ankunftPuenktlich": 0.6705,
+    "ausfaelle": 247,
+    "ausfallAnteil": 0.0202,
+    "mittelMin": 4.5
+   },
+   "Fern": {
+    "halte": 4293,
+    "puenktlich": 0.6009,
+    "ankunftPuenktlich": 0.4723,
+    "ausfaelle": 176,
+    "ausfallAnteil": 0.041,
+    "mittelMin": 10.7
+   }
+  },
+  {
+   "monat": "2025-09",
+   "S": {
+    "halte": 18482,
+    "puenktlich": 0.8499,
+    "ankunftPuenktlich": 0.8626,
+    "ausfaelle": 623,
+    "ausfallAnteil": 0.0337,
+    "mittelMin": 2.91
+   },
+   "RE-RB": {
+    "halte": 15253,
+    "puenktlich": 0.7021,
+    "ankunftPuenktlich": 0.5793,
+    "ausfaelle": 355,
+    "ausfallAnteil": 0.0233,
+    "mittelMin": 5.65
+   },
+   "Fern": {
+    "halte": 5270,
+    "puenktlich": 0.5774,
+    "ankunftPuenktlich": 0.4484,
+    "ausfaelle": 244,
+    "ausfallAnteil": 0.0463,
+    "mittelMin": 11.24
+   }
+  },
+  {
+   "monat": "2025-10",
+   "S": {
+    "halte": 24423,
+    "puenktlich": 0.6856,
+    "ankunftPuenktlich": 0.7106,
+    "ausfaelle": 1702,
+    "ausfallAnteil": 0.0697,
+    "mittelMin": 4.77
+   },
+   "RE-RB": {
+    "halte": 18171,
+    "puenktlich": 0.652,
+    "ankunftPuenktlich": 0.5062,
+    "ausfaelle": 682,
+    "ausfallAnteil": 0.0375,
+    "mittelMin": 6.28
+   },
+   "Fern": {
+    "halte": 5877,
+    "puenktlich": 0.4931,
+    "ankunftPuenktlich": 0.3422,
+    "ausfaelle": 343,
+    "ausfallAnteil": 0.0584,
+    "mittelMin": 13.16
+   }
+  },
+  {
+   "monat": "2025-11",
+   "S": {
+    "halte": 23516,
+    "puenktlich": 0.7555,
+    "ankunftPuenktlich": 0.7755,
+    "ausfaelle": 1633,
+    "ausfallAnteil": 0.0694,
+    "mittelMin": 3.87
+   },
+   "RE-RB": {
+    "halte": 18120,
+    "puenktlich": 0.7163,
+    "ankunftPuenktlich": 0.5919,
+    "ausfaelle": 401,
+    "ausfallAnteil": 0.0221,
+    "mittelMin": 5.2
+   },
+   "Fern": {
+    "halte": 5887,
+    "puenktlich": 0.5689,
+    "ankunftPuenktlich": 0.486,
+    "ausfaelle": 234,
+    "ausfallAnteil": 0.0397,
+    "mittelMin": 10.69
+   }
+  },
+  {
+   "monat": "2025-12",
+   "S": {
+    "halte": 21538,
+    "puenktlich": 0.846,
+    "ankunftPuenktlich": 0.8578,
+    "ausfaelle": 999,
+    "ausfallAnteil": 0.0464,
+    "mittelMin": 2.94
+   },
+   "RE-RB": {
+    "halte": 15052,
+    "puenktlich": 0.7696,
+    "ankunftPuenktlich": 0.6761,
+    "ausfaelle": 395,
+    "ausfallAnteil": 0.0262,
+    "mittelMin": 4.41
+   },
+   "Fern": {
+    "halte": 6166,
+    "puenktlich": 0.6408,
+    "ankunftPuenktlich": 0.5525,
+    "ausfaelle": 281,
+    "ausfallAnteil": 0.0456,
+    "mittelMin": 8.34
+   }
+  },
+  {
+   "monat": "2026-01",
+   "S": {
+    "halte": 24888,
+    "puenktlich": 0.7695,
+    "ankunftPuenktlich": 0.79,
+    "ausfaelle": 2162,
+    "ausfallAnteil": 0.0869,
+    "mittelMin": 3.9
+   },
+   "RE-RB": {
+    "halte": 18362,
+    "puenktlich": 0.7905,
+    "ankunftPuenktlich": 0.7138,
+    "ausfaelle": 634,
+    "ausfallAnteil": 0.0345,
+    "mittelMin": 3.92
+   },
+   "Fern": {
+    "halte": 6274,
+    "puenktlich": 0.5587,
+    "ankunftPuenktlich": 0.488,
+    "ausfaelle": 579,
+    "ausfallAnteil": 0.0923,
+    "mittelMin": 12.15
+   }
+  },
+  {
+   "monat": "2026-02",
+   "S": {
+    "halte": 22558,
+    "puenktlich": 0.81,
+    "ankunftPuenktlich": 0.8277,
+    "ausfaelle": 1273,
+    "ausfallAnteil": 0.0564,
+    "mittelMin": 3.32
+   },
+   "RE-RB": {
+    "halte": 15498,
+    "puenktlich": 0.7833,
+    "ankunftPuenktlich": 0.6934,
+    "ausfaelle": 565,
+    "ausfallAnteil": 0.0365,
+    "mittelMin": 3.99
+   },
+   "Fern": {
+    "halte": 5663,
+    "puenktlich": 0.5722,
+    "ankunftPuenktlich": 0.4823,
+    "ausfaelle": 385,
+    "ausfallAnteil": 0.068,
+    "mittelMin": 10.94
+   }
+  },
+  {
+   "monat": "2026-03",
+   "S": {
+    "halte": 21926,
+    "puenktlich": 0.8317,
+    "ankunftPuenktlich": 0.8423,
+    "ausfaelle": 1306,
+    "ausfallAnteil": 0.0596,
+    "mittelMin": 3.12
+   },
+   "RE-RB": {
+    "halte": 14273,
+    "puenktlich": 0.7444,
+    "ankunftPuenktlich": 0.6394,
+    "ausfaelle": 505,
+    "ausfallAnteil": 0.0354,
+    "mittelMin": 4.74
+   },
+   "Fern": {
+    "halte": 5976,
+    "puenktlich": 0.6065,
+    "ankunftPuenktlich": 0.5085,
+    "ausfaelle": 284,
+    "ausfallAnteil": 0.0475,
+    "mittelMin": 9.81
+   }
+  },
+  {
+   "monat": "2026-04",
+   "S": {
+    "halte": 22803,
+    "puenktlich": 0.7634,
+    "ankunftPuenktlich": 0.7826,
+    "ausfaelle": 1522,
+    "ausfallAnteil": 0.0667,
+    "mittelMin": 3.85
+   },
+   "RE-RB": {
+    "halte": 16077,
+    "puenktlich": 0.7298,
+    "ankunftPuenktlich": 0.6346,
+    "ausfaelle": 819,
+    "ausfallAnteil": 0.0509,
+    "mittelMin": 5.01
+   },
+   "Fern": {
+    "halte": 5981,
+    "puenktlich": 0.6193,
+    "ankunftPuenktlich": 0.5336,
+    "ausfaelle": 242,
+    "ausfallAnteil": 0.0405,
+    "mittelMin": 9.33
+   }
+  },
+  {
+   "monat": "2026-05",
+   "S": {
+    "halte": 19497,
+    "puenktlich": 0.8526,
+    "ankunftPuenktlich": 0.8705,
+    "ausfaelle": 762,
+    "ausfallAnteil": 0.0391,
+    "mittelMin": 2.89
+   },
+   "RE-RB": {
+    "halte": 14160,
+    "puenktlich": 0.7603,
+    "ankunftPuenktlich": 0.6645,
+    "ausfaelle": 442,
+    "ausfallAnteil": 0.0312,
+    "mittelMin": 4.63
+   },
+   "Fern": {
+    "halte": 5331,
+    "puenktlich": 0.6036,
+    "ankunftPuenktlich": 0.5235,
+    "ausfaelle": 276,
+    "ausfallAnteil": 0.0518,
+    "mittelMin": 10.46
+   }
+  },
+  {
+   "monat": "2026-06",
+   "S": {
+    "halte": 24703,
+    "puenktlich": 0.7711,
+    "ankunftPuenktlich": 0.7894,
+    "ausfaelle": 2735,
+    "ausfallAnteil": 0.1107,
+    "mittelMin": 4.19
+   },
+   "RE-RB": {
+    "halte": 16540,
+    "puenktlich": 0.7632,
+    "ankunftPuenktlich": 0.6776,
+    "ausfaelle": 769,
+    "ausfallAnteil": 0.0465,
+    "mittelMin": 4.96
+   },
+   "Fern": {
+    "halte": 6024,
+    "puenktlich": 0.5659,
+    "ankunftPuenktlich": 0.4809,
+    "ausfaelle": 542,
+    "ausfallAnteil": 0.09,
+    "mittelMin": 12.76
+   }
+  },
+  {
+   "monat": "2026-07",
+   "S": {
+    "halte": 20980,
+    "puenktlich": 0.8187,
+    "ankunftPuenktlich": 0.8105,
+    "ausfaelle": 1645,
+    "ausfallAnteil": 0.0784,
+    "mittelMin": 3.16
+   },
+   "RE-RB": {
+    "halte": 15470,
+    "puenktlich": 0.7598,
+    "ankunftPuenktlich": 0.6721,
+    "ausfaelle": 568,
+    "ausfallAnteil": 0.0367,
+    "mittelMin": 4.73
+   },
+   "Fern": {
+    "halte": 5504,
+    "puenktlich": 0.5926,
+    "ankunftPuenktlich": 0.5126,
+    "ausfaelle": 384,
+    "ausfallAnteil": 0.0698,
+    "mittelMin": 11.42
+   }
+  },
+  {
+   "monat": "2026-08",
+   "S": {
+    "halte": 14717,
+    "puenktlich": 0.9673,
+    "ankunftPuenktlich": 0.9604,
+    "ausfaelle": 137,
+    "ausfallAnteil": 0.0093,
+    "mittelMin": 0.81
+   },
+   "RE-RB": {
+    "halte": 14316,
+    "puenktlich": 0.73,
+    "ankunftPuenktlich": 0.633,
+    "ausfaelle": 783,
+    "ausfallAnteil": 0.0547,
+    "mittelMin": 5.03
+   },
+   "Fern": {
+    "halte": 5079,
+    "puenktlich": 0.5573,
+    "ankunftPuenktlich": 0.4492,
+    "ausfaelle": 457,
+    "ausfallAnteil": 0.09,
+    "mittelMin": 13.06
+   }
+  },
+  {
+   "monat": "2026-09",
+   "S": {
+    "halte": 21514,
+    "puenktlich": 0.7895,
+    "ankunftPuenktlich": 0.7763,
+    "ausfaelle": 1798,
+    "ausfallAnteil": 0.0836,
+    "mittelMin": 3.53
+   },
+   "RE-RB": {
+    "halte": 16473,
+    "puenktlich": 0.6954,
+    "ankunftPuenktlich": 0.5904,
+    "ausfaelle": 869,
+    "ausfallAnteil": 0.0528,
+    "mittelMin": 5.67
+   },
+   "Fern": {
+    "halte": 5845,
+    "puenktlich": 0.5545,
+    "ankunftPuenktlich": 0.4516,
+    "ausfaelle": 388,
+    "ausfallAnteil": 0.0664,
+    "mittelMin": 11.8
+   }
+  }
+ ]
+}

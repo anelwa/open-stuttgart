@@ -39,7 +39,7 @@ async function feed() {
   return value;
 }
 
-function parseIcs(text) {
+export function parseIcs(text) {
   const unfolded = text.replace(/\r?\n[ \t]/g, '');
   return [...unfolded.matchAll(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/g)].map((m) => {
     const ev = {};
@@ -53,7 +53,7 @@ function parseIcs(text) {
   });
 }
 
-const icsDate = (s) => {
+export const icsDate = (s) => {
   const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?/.exec(s ?? '');
   if (!m) return null;
   if (!m[4]) return new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00`);
@@ -74,7 +74,7 @@ async function nominatim(q) {
 }
 
 /** Verortet eine Freitext-Adresse; bei unsauberen Angaben schrittweise vereinfacht, zuletzt nur die Postleitzahl. */
-async function geocode(address) {
+export async function geocode(address) {
   if (!address) return null;
   const clean = address.split(/\s\/\s|\s+–\s+/)[0].trim();
   const plz = /\b(70\d{3})\b/.exec(address)?.[1];

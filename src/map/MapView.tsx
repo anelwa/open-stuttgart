@@ -6,8 +6,9 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { buildStyle, type Theme } from './mapStyle';
 import { BLANK_PNG, aerialTiles, addOverlays, setOverlayVisibility, INTERACTIVE_LAYERS, OVERLAY_LAYERS, type OverlayKey } from './overlays';
 import { registerIcons } from './icons';
+import { getVehicleTrips, subscribeVehicles, vehiclePaths, vehiclePositions } from '../lib/vehicles';
 import { fmtTime, occupancy } from '../lib/format';
-import type { AirStation, CultureEvent, ParkingSite, Place, Roadwork, Selection, SharingItem, Water } from '../lib/types';
+import type { AirStation, CultureEvent, Facility, ParkingSite, Place, Roadwork, Selection, SharingItem, TrafficItem, Water } from '../lib/types';
 
 export interface MapData {
   parking: ParkingSite[] | null;
@@ -19,6 +20,10 @@ export interface MapData {
   events: CultureEvent[] | null;
   places: Place[] | null;
   sunImage: string | null;
+  nearby: { items: Facility[]; color: Record<string, string> } | null;
+  live: (Facility & { level: string; short: string })[] | null;
+  route: GeoJSON.FeatureCollection | null;
+  traffic: TrafficItem[] | null;
   radarImage: { url: string; coords: [[number, number], [number, number], [number, number], [number, number]] } | null;
 }
 
@@ -72,7 +77,14 @@ function toGeo(data: MapData) {
     water: fc(data.water ? [pt(data.water.lon, data.water.lat, { value: data.water.value })] : []),
     bike: data.bike ?? fc([]),
     places: fc((data.places ?? []).map((p) => pt(p.lon, p.lat, { id: p.id, name: p.name, kind: p.kind, rank: p.rank }))),
+    nearby: fc((data.nearby?.items ?? []).map((f, i) => pt(f.lon, f.lat, { id: f.id, i, name: f.name, closed: !!f.closed, rank: i, color: data.nearby?.color[f.cat] ?? '#26262C' }))),
     events: fc(eventVenues(data.events ?? [])),
+    live: fc((data.live ?? []).map((f, i) => pt(f.lon, f.lat, { i, name: f.name, level: f.level, short: f.short, live: f.live ?? '' }))),
+    traffic: fc((data.traffic ?? []).flatMap((t) => {
+      const props = { typ: t.typ, text: `${t.typ}: ${t.text}` };
+      const p = pt(t.lon, t.lat, props);
+      return t.linie ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: t.linie }, properties: props } as GeoJSON.Feature, p] : [p];
+    })),
   };
 }
 
@@ -120,6 +132,22 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
     getMap: () => mapRef.current,
   }));
 
+  // Fahrzeuge: Positionen jede Sekunde neu berechnen, Linienverläufe nur bei neuen Daten
+  const pushVehicles = (withPaths = false) => {
+    const m = mapRef.current;
+    const src = m?.getSource('vehicles') as GeoJSONSource | undefined;
+    if (!m || !src) return;
+    const list = getVehicleTrips();
+    src.setData(vehiclePositions(list));
+    if (withPaths) (m.getSource('vehicle-paths') as GeoJSONSource | undefined)?.setData(vehiclePaths(list));
+  };
+  useEffect(() => {
+    const off = subscribeVehicles(() => pushVehicles(true));
+    const id = setInterval(() => { if (getVehicleTrips().length) pushVehicles(); }, 1000);
+    return () => { off(); clearInterval(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Daten in die Quellen schreiben (nach jedem Stilwechsel erneut)
   const pushData = () => {
     const m = mapRef.current;
@@ -133,6 +161,11 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
     (m.getSource('bike') as GeoJSONSource).setData(g.bike);
     (m.getSource('places') as GeoJSONSource).setData(g.places);
     (m.getSource('events') as GeoJSONSource).setData(g.events);
+    (m.getSource('nearby') as GeoJSONSource).setData(g.nearby);
+    (m.getSource('live') as GeoJSONSource | undefined)?.setData(g.live);
+    (m.getSource('route') as GeoJSONSource | undefined)?.setData(propsRef.current.data.route ?? fc([]));
+    (m.getSource('traffic') as GeoJSONSource | undefined)?.setData(g.traffic);
+    pushVehicles(true);
     const sun = m.getSource('sun') as ImageSource | undefined;
     const img = propsRef.current.data.sunImage ?? BLANK_PNG;
     if (sun && sunUrl.current !== img) { sunUrl.current = img; sun.updateImage({ url: img }); }
@@ -231,6 +264,9 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
         case 'air-circle': return `Luft ${pr.name}: ${pr.label}`;
         case 'water-gauge': return `Neckar Pegel Cannstatt: ${pr.value} cm`;
         case 'places-icon': return String(pr.name);
+        case 'nearby-dot': return String(pr.name);
+        case 'live-dot': return `${pr.name}: ${pr.live}`;
+        case 'vehicles-dot': case 'traffic-dot': case 'traffic-line': return String(pr.text);
         case 'events-pin': return `${pr.time} · ${pr.title}${Number(pr.count) > 1 ? ` (und ${Number(pr.count) - 1} weitere hier)` : ''}`;
         default: return null;
       }
@@ -254,6 +290,11 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
       popup.remove();
       if (!f) { propsRef.current.onSelect(null); return; }
       const pr = f.properties as Record<string, unknown>;
+      // Fahrzeuge und Verkehrsmeldungen: Text am Ort, ohne Detailansicht
+      if (f.layer.id === 'vehicles-dot' || f.layer.id.startsWith('traffic-')) {
+        new maplibregl.Popup({ offset: 12, maxWidth: '280px', className: 'info-pop' }).setLngLat(e.lngLat).setText(String(pr.text)).addTo(m);
+        return;
+      }
       const coord = (f.geometry as GeoJSON.Point).coordinates as [number, number];
       switch (f.layer.id) {
         case 'stops-rail': case 'stops-bus': {
@@ -268,6 +309,16 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
         case 'share-point': propsRef.current.onSelect({ type: 'sharing', id: String(pr.id) }); break;
         case 'events-pin': propsRef.current.onSelect({ type: 'event', id: String(pr.id) }); break;
         case 'places-icon': propsRef.current.onSelect({ type: 'place', id: String(pr.id) }); break;
+        case 'nearby-dot': {
+          const item = propsRef.current.data.nearby?.items[Number(pr.i)];
+          if (item) propsRef.current.onSelect({ type: 'facility', item });
+          break;
+        }
+        case 'live-dot': {
+          const item = propsRef.current.data.live?.[Number(pr.i)];
+          if (item) propsRef.current.onSelect({ type: 'facility', item });
+          break;
+        }
         case 'share-cluster': {
           const src = m.getSource('sharing') as GeoJSONSource;
           const zoom = await src.getClusterExpansionZoom(pr.cluster_id as number);

@@ -6,6 +6,7 @@ import { Sparkline } from '../../components/Sparkline';
 import type { ModuleProps } from '../types';
 import { RadarSection } from '../../components/Rain';
 import { KesselSection } from '../../components/Kessel';
+import { HealthEnergy } from '../../components/HealthEnergy';
 
 export function EnvironmentPanel({ visible, toggle, select, flyTo, center, radarFrame, setRadarFrame }: ModuleProps) {
   const { weather, air, water } = useData();
@@ -16,7 +17,7 @@ export function EnvironmentPanel({ visible, toggle, select, flyTo, center, radar
 
   return (
     <div className="module">
-      <Section title="Wetter, aktuelle Messung" aside={w ? `${w.station.replace(/\s*\(.*/, '')}, ${fmtTime(w.measuredAt)}` : undefined}>
+      <Section title="Wetter, aktuelle Messung" explain="wetter" aside={w ? `${w.station.replace(/\s*\(.*/, '')}, ${fmtTime(w.measuredAt)}` : undefined}>
         {weather.error && !w && <ErrorNote text="Wetterdaten gerade nicht erreichbar." onRetry={weather.reload} />}
         {!w && !weather.error && <div className="skeleton block" />}
         {w && (
@@ -56,7 +57,7 @@ export function EnvironmentPanel({ visible, toggle, select, flyTo, center, radar
 
       <RadarSection visible={visible} toggle={toggle} center={center} radarFrame={radarFrame} setRadarFrame={setRadarFrame} />
 
-      <Section title="Luftqualität" aside={air.updatedAt ? ago(air.updatedAt) : undefined}>
+      <Section title="Luftqualität" explain="luft" aside={air.updatedAt ? ago(air.updatedAt) : undefined}>
         {air.error && !air.data && <ErrorNote text="Luftdaten gerade nicht erreichbar." onRetry={air.reload} />}
         {worst != null && (
           <p className="air-summary">
@@ -84,8 +85,9 @@ export function EnvironmentPanel({ visible, toggle, select, flyTo, center, radar
       </Section>
 
       <KesselSection />
+      <HealthEnergy />
 
-      <Section title="Neckar" aside={water.data ? `Pegel Cannstatt, ${fmtTime(water.data.measuredAt)}` : undefined}>
+      <Section title="Neckar" explain="pegel" aside={water.data ? `Pegel Cannstatt, ${fmtTime(water.data.measuredAt)}` : undefined}>
         {water.error && !water.data && <ErrorNote text="Pegeldaten gerade nicht erreichbar." onRetry={water.reload} />}
         {water.data && (
           <button type="button" className="water-card" onClick={() => { select({ type: 'water' }); flyTo([water.data!.lon, water.data!.lat], 14); }}>

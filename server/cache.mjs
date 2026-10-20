@@ -17,6 +17,38 @@ const HOST_GAP = {
   'query.wikidata.org': 2000,
   'veranstaltungen-stadtbibliothek-stuttgart.de': 2000,
   'www.stuttgart-tourist.de': 5000, // Übergangsweise Detailseiten, siehe sources/events-extra.mjs
+  'valhalla1.openstreetmap.de': 1100, // FOSSGIS: höchstens 1 Anfrage pro Sekunde
+  'routing.openstreetmap.de': 1100, // FOSSGIS (OSRM): höchstens 1 Anfrage pro Sekunde
+  'brouter.de': 1100, // Community-Server, sparsam nutzen
+  'realtime.gtfs.de': 180_000, // GTFS-RT-Feed (rund 29 MB): höchstens alle 3 Minuten
+  'iris.noncd.db.de': 2000, // DB IRIS (inoffiziell, Übergang bis zur DB-Timetables-API), siehe sources/db.mjs
+  'apis.deutschebahn.com': 2000, // DB API Marketplace (Timetables)
+  // Modul „Was geht“ (sources/wasgeht/): Termine höchstens alle 3–6 h je Quelle, Meldungen alle 15 min
+  'www.theaterhaus.com': 2000,
+  'www.imwizemann.de': 3000,
+  'www.bix-stuttgart.de': 3000,
+  'wagenhallen.de': 3000,
+  'lka-longhorn.de': 3000,
+  'loveyourartist.com': 3000,
+  'lehmannclub.ticket.io': 3000,
+  'protontheclub.ticket.io': 3000,
+  'proton-the-club.ticket.io': 3000,
+  'lehmann-discotronic.ticket.io': 3000,
+  'clubkowalskistuttgart.ticket.io': 3000,
+  'schonnice.ticket.io': 3000,
+  'davidpuentez.ticket.io': 3000,
+  'stuvus.uni-stuttgart.de': 3000,
+  'www.uni-stuttgart.de': 3000,
+  'www.uni-hohenheim.de': 5000, // robots.txt: Crawl-delay 5 für einzelne Bots, hier für alle angewandt
+  'www.hft-stuttgart.de': 3000,
+  'hdm-stuttgart.de': 3000,
+  'www.abk-stuttgart.de': 10_000, // robots.txt: Crawl-delay 10
+  'feuerwehr.stuttgart.de': 1000,
+  'www.swr.de': 2000,
+  'www.presseportal.de': 2000, // nur RSS, HTML-Seiten haben Bot-Schutz
+  'kessel.tv': 2000,
+  'api.openstreetmap.org': 1500, // OSM-API: Änderungssätze für „Neu in der Stadt“, sparsam
+  'geoserver.stuttgart.de': 500,
   default: 120,
 };
 
@@ -98,4 +130,10 @@ export function diskStore(name) {
 export async function fetchText(url, init) {
   const res = await politeFetch(url, { ...init, headers: { Accept: '*/*', ...(init?.headers ?? {}) } });
   return res.text();
+}
+
+/** Binärer Abruf (z. B. Protobuf), liefert einen ArrayBuffer. */
+export async function fetchBuffer(url, init) {
+  const res = await politeFetch(url, { ...init, headers: { Accept: 'application/octet-stream, */*', ...(init?.headers ?? {}) } });
+  return res.arrayBuffer();
 }

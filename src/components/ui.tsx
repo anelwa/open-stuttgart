@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { Icon } from './Icon';
+import { Explain } from '../lib/info';
+import { tr, useLang } from '../lib/i18n';
 
 export function Switch({ on, onChange, label }: { on: boolean; onChange: () => void; label: string }) {
   return (
@@ -12,6 +14,8 @@ export function Switch({ on, onChange, label }: { on: boolean; onChange: () => v
 export function LayerRow({ icon, tone, title, meta, on, onToggle, loading }: {
   icon: string; tone: string; title: string; meta: ReactNode; on: boolean; onToggle: () => void; loading?: boolean;
 }) {
+  useLang();
+  title = tr(title);
   return (
     <div className={`layer-row ${on ? 'is-on' : ''}`}>
       <span className={`tile tone-${tone}`}><Icon name={icon} size={20} /></span>
@@ -24,12 +28,13 @@ export function LayerRow({ icon, tone, title, meta, on, onToggle, loading }: {
   );
 }
 
-export function Section({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
+export function Section({ title, aside, explain, children }: { title: string; aside?: ReactNode; explain?: string; children: ReactNode }) {
+  useLang();
   return (
     <section className="section">
       <header className="section-head">
-        <h3>{title}</h3>
-        {aside && <span className="section-aside">{aside}</span>}
+        <h3>{tr(title)}</h3>
+        {(aside || explain) && <span className="section-aside">{aside}{explain && <Explain id={explain} />}</span>}
       </header>
       {children}
     </section>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePolling, useNow } from '../lib/api';
 import { useData } from '../lib/data';
 import { AIR_COLOR, AIR_LABEL, ago, fmtDate, fmtNum, fmtTime, occupancy, openingHours, ubaHour } from '../lib/format';
@@ -10,6 +10,9 @@ import { Sparkline } from './Sparkline';
 import { AroundStop, EventDetail, PlaceDetail } from './CultureDetails';
 import { RainLine } from './Rain';
 import { PlanB } from './PlanB';
+import { FacilityDetail } from './FacilityDetail';
+import { Explain } from '../lib/info';
+import { setVehicleTrips, type VehicleTrip } from '../lib/vehicles';
 
 type Close = { onClose: () => void };
 type Nav = { select: (s: Selection) => void; flyTo: (c: [number, number], z?: number) => void };
@@ -65,7 +68,7 @@ export function StopDetail({ sel, onClose, select, flyTo }: Close & Nav & { sel:
       <div className="sheet-body">
         <RainLine lngLat={sel.lngLat} departures={deps} />
         <div className="dep-toolbar">
-          <span className="live-label"><LiveDot stale={!!error} /> {updatedAt ? `Echtzeit, ${ago(updatedAt, now)}` : 'Lade Abfahrten …'}</span>
+          <span className="live-label"><LiveDot stale={!!error || data?.realtimeAvailable === false} /> {updatedAt ? `${data?.realtimeAvailable === false ? (data.ersatzEchtzeit ? 'Echtzeit (Ersatzquelle)' : 'Fahrplan') : 'Echtzeit'}, ${ago(updatedAt, now)}` : 'Lade Abfahrten …'}</span>
           {kinds.length > 1 && (
             <div className="seg small" role="tablist" aria-label="Verkehrsmittel filtern">
               <button role="tab" aria-selected={filter === 'all'} className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Alle</button>
@@ -76,6 +79,11 @@ export function StopDetail({ sel, onClose, select, flyTo }: Close & Nav & { sel:
           )}
         </div>
         {error && !data && <ErrorNote text={`Abfahrten nicht verfügbar: ${error}`} onRetry={reload} />}
+        {data?.realtimeAvailable === false && (
+          <p className="notice small">{data.ersatzEchtzeit
+            ? `Die Fahrplanauskunft EFA-BW liefert derzeit keine Echtzeitdaten. Verspätungen für ${data.ersatzEchtzeit} Abfahrten stammen ersatzweise aus dem landesweiten Echtzeitfeed (NVBW über gtfs.de, CC BY-SA 4.0); übrige Zeiten nach Fahrplan.`
+            : 'Für diese Haltestelle liegen derzeit keine Echtzeitdaten vor. Angezeigt werden Fahrplanzeiten.'}</p>
+        )}
         {loading && !data && (
           <ul className="dep-list">{Array.from({ length: 6 }, (_, i) => <li key={i} className="dep-row"><span className="skeleton" style={{ width: '100%', height: 22 }} /></li>)}</ul>
         )}
@@ -97,12 +105,38 @@ export function StopDetail({ sel, onClose, select, flyTo }: Close & Nav & { sel:
             </li>
           ))}
         </ul>
+        <StopVehicles stopId={sel.id} />
         <PlanB deps={deps} here={sel.lngLat} stopName={data?.stop.name ?? sel.name} now={now} select={select} flyTo={flyTo} />
         <LineWorks lines={lines} select={select} flyTo={flyTo} />
         <AroundStop lngLat={sel.lngLat} select={select} flyTo={flyTo} />
         <p className="source"><Icon name="info" size={14} /> Abfahrten: EFA-BW (NVBW), dl-de/by-2-0. Abfrage höchstens alle 20 Sekunden.</p>
       </div>
     </div>
+  );
+}
+
+/** Fahrzeuge, die diese Haltestelle anfahren, als berechnete Position auf der Karte */
+function StopVehicles({ stopId }: { stopId: string }) {
+  const [on, setOn] = useState(false);
+  const { data, error, loading } = usePolling<{ available: boolean; trips: VehicleTrip[]; realtimeAvailable?: boolean | null; hinweis: string }>(on ? `/api/vehicles?stop=${encodeURIComponent(stopId)}` : null, 30_000);
+  useEffect(() => { setVehicleTrips(on && data?.trips ? data.trips : []); }, [on, data]);
+  useEffect(() => () => setVehicleTrips([]), [stopId]);
+  return (
+    <section className="section">
+      <header className="section-head"><h3>Fahrzeuge auf dem Weg hierher</h3><Explain id="fahrzeuge" /></header>
+      <button type="button" className={`chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setOn((v) => !v)}>
+        {on ? 'Fahrzeuge ausblenden' : 'Auf der Karte zeigen'}
+      </button>
+      {on && loading && !data && <p className="muted small">Lade Fahrtverläufe …</p>}
+      {on && error && !data && <p className="muted small">Fahrtverläufe gerade nicht verfügbar.</p>}
+      {on && data && (
+        <p className="muted small">
+          {data.trips.length ? `${data.trips.length} ${data.trips.length === 1 ? 'Fahrt' : 'Fahrten'} der nächsten 30 Minuten. ` : 'Keine Fahrt in den nächsten 30 Minuten. '}
+          {data.realtimeAvailable === false ? 'Ohne Echtzeitdaten, Positionen nach Fahrplan. ' : ''}
+          {data.hinweis}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -295,6 +329,7 @@ export function DetailSheet({ sel, onClose, select, flyTo }: Close & Nav & { sel
   switch (sel.type) {
     case 'stop': return <StopDetail key={sel.id} sel={sel} onClose={onClose} select={select} flyTo={flyTo} />;
     case 'event': return <EventDetail key={sel.id} id={sel.id} onClose={onClose} select={select} flyTo={flyTo} />;
+    case 'facility': return <FacilityDetail key={sel.item.id} f={sel.item} onClose={onClose} select={select} flyTo={flyTo} />;
     case 'place': return <PlaceDetail key={sel.id} id={sel.id} onClose={onClose} select={select} flyTo={flyTo} />;
     case 'parking': return <ParkingDetail id={sel.id} onClose={onClose} />;
     case 'roadwork': return <RoadworkDetail id={sel.id} onClose={onClose} />;

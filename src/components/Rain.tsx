@@ -81,7 +81,7 @@ export function RadarSection({ visible, toggle, center, radarFrame, setRadarFram
   const o = series ? rainOutlook(series, now) : null;
   const anyRain = r.frames.some((f) => f.v.some((row) => row.some((v) => v * 0.12 >= RAIN_MMH)));
   return (
-    <Section title="Niederschlagsradar" aside={`${fmtTime(r.frames[0].t)} bis ${fmtTime(r.frames[n - 1].t)} Uhr`}>
+    <Section title="Niederschlagsradar" explain="radar" aside={`${fmtTime(r.frames[0].t)} bis ${fmtTime(r.frames[n - 1].t)} Uhr`}>
       <p className="muted small">
         {!anyRain
           ? 'Im Stadtgebiet derzeit kein Niederschlag gemessen und keiner vorhergesagt.'

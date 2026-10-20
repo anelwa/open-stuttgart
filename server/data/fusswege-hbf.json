@@ -1,0 +1,30 @@
+{
+  "_beschreibung": "Fußwege zwischen den Teilhaltestellen am Stuttgarter Hauptbahnhof in Minuten (ohne Zuschlag für das Aussteigen). Grundlage für sources/anschluss.mjs. Werte aus der Recherche „Verspätungen, Laufwege und historische Daten“ vom 20.10.2026, Abschnitte 2.5 und 3 sowie Teilbericht Laufwege.",
+  "_stand": "2026-10-20",
+  "teile": {
+    "oben": { "name": "Stuttgart Hauptbahnhof", "beschreibung": "Kopfbahnhof, Gleise 1 bis 16", "stopId": "de:08111:6115" },
+    "tief": { "name": "Stuttgart Hauptbahnhof (tief)", "beschreibung": "S-Bahn, Gleise 101 und 102", "stopId": "de:08111:6118" },
+    "klett": { "name": "Hauptbahnhof (A.-Klett-Platz)", "beschreibung": "Stadtbahn und Bus am Arnulf-Klett-Platz", "stopId": "de:08111:6112" }
+  },
+  "aussteigenMin": 1,
+  "aufzugGestoertZuschlagMin": 2,
+  "wege": [
+    { "von": "tief", "nach": "tief", "minuten": 2, "geschaetzt": false,
+      "quelle": "VVS-GTFS transfers.txt (101↔102: 0 s), aufgerundet für Bahnsteigwechsel; Annahme der Anschlussauswertung (Abschnitt 2.5)" },
+    { "von": "klett", "nach": "klett", "minuten": 2, "geschaetzt": false,
+      "quelle": "VVS-GTFS transfers.txt (innerhalb eines Bereichs 30 s, zwischen Bereichen bis 150 s); Annahme der Anschlussauswertung (Abschnitt 2.5)" },
+    { "von": "tief", "nach": "klett", "minuten": 4, "geschaetzt": false,
+      "quelle": "EFA-BW XML_TRIP_REQUEST2 footPathInfo 240 s (pathDescriptions 184 s, 130 m, Treppen −3→−1→−2), Abruf 20.10.2026" },
+    { "von": "oben", "nach": "oben", "minuten": 6, "geschaetzt": false,
+      "quelle": "VVS-GTFS transfers.txt: innerhalb eines Bahnsteigs 360 s (Gl. 1↔2, 3↔4 usw.); zwischen Bahnsteigen keine Angabe" },
+    { "von": "oben", "nach": "tief", "minuten": 8, "geschaetzt": true,
+      "quelle": "Schätzung (kein Transfer im VVS-GTFS); abgeleitet aus Gl. 13 → Klett-Platz 600 s und tief → Klett-Platz 240 s" },
+    { "von": "oben", "nach": "klett", "minuten": 9, "geschaetzt": false,
+      "quelle": "EFA-BW XML_TRIP_REQUEST2: Gl. 13 → Klett-Platz footPathInfo 600 s (Pfad 642 s, 690 m), Gl. 4 → Klett-Platz 600 s (Pfad 565 s), Abruf 20.10.2026; Mittelwert der Anschlussauswertung 9 min" }
+  ],
+  "grenzen": [
+    "Die Werte gelten je Teilhaltestelle, nicht je Gleis- oder Steigpaar.",
+    "Die Bahnsteige oben sind bis 443 m lang. Wer am falschen Ende aussteigt, braucht 2 bis 4 Minuten mehr.",
+    "Für Personen, die auf Aufzüge angewiesen sind, können die Wege deutlich länger sein."
+  ]
+}

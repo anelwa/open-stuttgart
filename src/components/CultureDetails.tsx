@@ -10,6 +10,7 @@ import { fernsicht, isRainy, weatherAt } from '../lib/weather';
 import type { CultureEvent, DeparturesResponse, Place, Selection, WikiSummary } from '../lib/types';
 import { EVENT_GROUPS, eventGroup, PLACE_KINDS } from '../modules/culture/kinds';
 import { Icon, weatherIconName } from './Icon';
+import { RouteButtons } from './RouteButtons';
 import { LineBadge } from './LineBadge';
 import { SheetHead } from './Details';
 import { Section, Source } from './ui';
@@ -21,6 +22,7 @@ const railLines = (lines: string[]) => lines.filter((l) => /^(S\d+|U\d+|\d+|N\d+
 
 /** Termin-Zeitraum lesbar: "19:30–22:00 Uhr", "ab 19:30 Uhr" oder "ganztägig" */
 export function eventTime(e: CultureEvent) {
+  if (e.noTime) return 'Uhrzeit laut Veranstalter';
   if (e.allDay || !e.start) return 'ganztägig';
   if (e.times && e.times.length > 1) return `${e.times.length} Termine, ${fmtTime(e.times[0])} bis ${fmtTime(e.times[e.times.length - 1])} Uhr`;
   return e.end && Date.parse(e.end) > Date.parse(e.start) ? `${fmtTime(e.start)}–${fmtTime(e.end)} Uhr` : `ab ${fmtTime(e.start)} Uhr`;
@@ -35,7 +37,7 @@ function eventEnd(e: CultureEvent): { t: number; estimated: boolean } | null {
   return { t: s + 150 * 60_000, estimated: true };
 }
 
-export function GettingThere({ lngLat, select, flyTo, exclude }: Nav & { lngLat: [number, number]; exclude?: string }) {
+export function GettingThere({ lngLat, select, flyTo, exclude, label }: Nav & { lngLat: [number, number]; exclude?: string; label?: string }) {
   const stops = useStops();
   const { parking } = useData();
   const [lon, lat] = lngLat;
@@ -44,6 +46,7 @@ export function GettingThere({ lngLat, select, flyTo, exclude }: Nav & { lngLat:
   if (!stops.length) return null;
   return (
     <Section title="Anreise">
+      <RouteButtons to={{ lat, lon, label: label ?? 'Ziel' }} />
       {near.length === 0 && <p className="muted small">Keine Haltestelle im Umkreis von 1,5 km.</p>}
       <ul className="near-list">
         {near.map(({ stop, walk }) => {
@@ -246,7 +249,7 @@ export function EventDetail({ id, onClose, select, flyTo }: Close & Nav & { id: 
           <a key={src.url} className="link-btn" href={src.url} target="_blank" rel="noreferrer">Eintrag bei {src.name} <Icon name="external" size={16} /></a>
         ))}
         {e.start && !e.allDay && <WeatherAt iso={e.start} outdoorish={group === 'sport' || group === 'fest'} />}
-        {lngLat && <GettingThere lngLat={lngLat} select={select} flyTo={flyTo} />}
+        {lngLat && <GettingThere lngLat={lngLat} select={select} flyTo={flyTo} label={e.location ?? e.title} />}
         <WayHome e={e} />
         {same.length > 0 && (
           <Section title="Weitere Veranstaltungen am selben Ort">
@@ -296,7 +299,7 @@ export function PlaceDetail({ id, onClose, select, flyTo }: Close & Nav & { id: 
           </>
         )}
         {wiki.loading && !wiki.data && <span className="skeleton block" style={{ height: 90 }} />}
-        <GettingThere lngLat={lngLat} select={select} flyTo={flyTo} />
+        <GettingThere lngLat={lngLat} select={select} flyTo={flyTo} label={p.name} />
         <NearbyEvents lngLat={lngLat} select={select} flyTo={flyTo} title="Veranstaltungen heute in der Umgebung" />
         <NearbyPlaces lngLat={lngLat} select={select} flyTo={flyTo} skip={p.id} />
         <Source>Wikidata (CC0), Text Wikipedia (CC BY-SA 4.0), Bild Wikimedia Commons (Lizenz auf der Bildseite).</Source>

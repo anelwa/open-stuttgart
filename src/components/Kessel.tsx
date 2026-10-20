@@ -34,7 +34,7 @@ export function KesselSection() {
   const worst = (air.data?.stations ?? []).reduce<number | null>((m, s) => (s.index == null ? m : m == null || s.index > m ? s.index : m), null);
 
   return (
-    <Section title="Luftaustausch im Talkessel" aside={cur ? `Stand ${fmtTime(cur.t)} Uhr` : undefined}>
+    <Section title="Luftaustausch im Talkessel" explain="kessel" aside={cur ? `Stand ${fmtTime(cur.t)} Uhr` : undefined}>
       <p className="muted small kessel-intro">
         Liegt wärmere Luft über kälterer Luft (Inversion), werden Luftschadstoffe im Talkessel schlechter abtransportiert.
       </p>

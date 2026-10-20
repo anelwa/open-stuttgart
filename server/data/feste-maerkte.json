@@ -1,0 +1,632 @@
+{
+ "_hinweis": "Gepflegte Tabelle ohne Schnittstelle. Jede Zeile mit Quelle und Prüfdatum; bei Änderungen der Quellseite von Hand nachtragen. Wochenmarkt-Koordinaten über Nominatim (© OpenStreetMap-Mitwirkende). Fällt ein Markttag auf einen Feiertag, wird er laut Betreiber einen Tag vorgezogen; Markt- und Schillerplatz weichen während Weindorf und Weihnachtsmarkt auf die Königstraße aus.",
+ "weekly": [
+  {
+   "name": "Wochenmarkt Marktplatz",
+   "address": "Marktplatz, Stuttgart-Mitte, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/stuttgart-mitte-marktplatz-1/",
+   "slots": [
+    {
+     "weekday": 2,
+     "from": "07:00",
+     "to": "13:00"
+    },
+    {
+     "weekday": 4,
+     "from": "07:00",
+     "to": "13:00"
+    },
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "13:30"
+    }
+   ],
+   "lat": 48.77519,
+   "lon": 9.17852,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Schillerplatz",
+   "address": "Schillerplatz, Stuttgart-Mitte, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/stuttgart-mitte-schillerplatz-1/",
+   "slots": [
+    {
+     "weekday": 2,
+     "from": "07:00",
+     "to": "13:00"
+    },
+    {
+     "weekday": 4,
+     "from": "07:00",
+     "to": "13:00"
+    },
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "13:30"
+    }
+   ],
+   "lat": 48.77716,
+   "lon": 9.17849,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Wilhelmsplatz",
+   "address": "Wilhelmsplatz, Stuttgart-Mitte, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/stuttgart-mitte-wilhelmsplatz-1/",
+   "slots": [
+    {
+     "weekday": 5,
+     "from": "12:00",
+     "to": "18:00"
+    }
+   ],
+   "lat": 48.77123,
+   "lon": 9.17842,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Mittnachtstraße",
+   "address": "Nordbahnhofstraße 78, 70191 Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/stuttgart-nord-mittnachtstrasse-1/",
+   "slots": [
+    {
+     "weekday": 5,
+     "from": "11:00",
+     "to": "18:00"
+    }
+   ],
+   "lat": 48.79723,
+   "lon": 9.19038,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Schönbühlstrasse",
+   "address": "Stuttgart, Schönbühlstrasse",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/stuttgart-ost-schoenbuehlstrasse-1/",
+   "slots": [
+    {
+     "weekday": 5,
+     "from": "09:00",
+     "to": "16:00"
+    }
+   ],
+   "lat": 48.78328,
+   "lon": 9.20947,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Gablenberg, Schmalzmarkt",
+   "address": "48.774785, 9.203675",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/stuttgart-ost-gablenberg-schmalzmarkt-1/",
+   "slots": [
+    {
+     "weekday": 3,
+     "from": "07:00",
+     "to": "12:00"
+    }
+   ],
+   "lat": 48.774785,
+   "lon": 9.203675,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Marienplatz",
+   "address": "Marienplatz, Stuttgart-Süd, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/stuttgart-sued-marienplatz-1/",
+   "slots": [
+    {
+     "weekday": 3,
+     "from": "10:00",
+     "to": "18:00"
+    }
+   ],
+   "lat": 48.76421,
+   "lon": 9.16824,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Heslach, Bihlplatz",
+   "address": "Bihlplatz, Heslach, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/stuttgart-sued-heslach-bihlplatz-1/",
+   "slots": [
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "12:00"
+    }
+   ],
+   "lat": 48.7602,
+   "lon": 9.15263,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Bismarckplatz",
+   "address": "Bismarckplatz, West, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/stuttgart-west-bismarckplatz-1/",
+   "slots": [
+    {
+     "weekday": 2,
+     "from": "07:00",
+     "to": "12:30"
+    },
+    {
+     "weekday": 4,
+     "from": "07:00",
+     "to": "12:30"
+    },
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "12:30"
+    }
+   ],
+   "lat": 48.77381,
+   "lon": 9.15574,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Feuersee",
+   "address": "Feuerseepl., 70176 Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/stuttgart-west-feuersee/",
+   "slots": [
+    {
+     "weekday": 4,
+     "from": "15:00",
+     "to": "21:00"
+    }
+   ],
+   "lat": 48.77373,
+   "lon": 9.16515,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Bad Cannstatt, Marktplatz",
+   "address": "Marktplatz, Bad Cannstatt, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/bad-cannstatt-marktplatz-1/",
+   "slots": [
+    {
+     "weekday": 2,
+     "from": "07:00",
+     "to": "13:00"
+    },
+    {
+     "weekday": 4,
+     "from": "07:00",
+     "to": "13:00"
+    },
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "13:00"
+    }
+   ],
+   "lat": 48.80494,
+   "lon": 9.21464,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Botnang, Griegstrasse",
+   "address": "Regerstraße, Botnang, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/botnang-griegstrasse-1/",
+   "slots": [
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "12:30"
+    }
+   ],
+   "lat": 48.77934,
+   "lon": 9.13371,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Degerloch, Rathausplatz",
+   "address": "Große Falterstraße 4, 70597 Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/degerloch-rathausplatz-1/",
+   "slots": [
+    {
+     "weekday": 3,
+     "from": "07:00",
+     "to": "13:00"
+    },
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "13:00"
+    }
+   ],
+   "lat": 48.74614,
+   "lon": 9.1709,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Feuerbach, Rudolf-Gehring-Platz",
+   "address": "Rudolf-Gehring-Platz 5, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/feuerbach-rudolf-gehring-platz-1/",
+   "slots": [
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "12:30"
+    }
+   ],
+   "lat": 48.80818,
+   "lon": 9.15885,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Freiberg, LVA Parkplatz",
+   "address": "Adalbert-Stifter-Straße 103, 70437 Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/freiberg-lva-parkplatz/",
+   "slots": [
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "11:30"
+    }
+   ],
+   "lat": 48.83541,
+   "lon": 9.20189,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Giebel, Ernst-Reuter-Platz",
+   "address": "Ernst-Reuter-Platz, Giebel, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/giebel-ernst-reuter-platz-1/",
+   "slots": [
+    {
+     "weekday": 4,
+     "from": "08:00",
+     "to": "12:00"
+    }
+   ],
+   "lat": 48.80326,
+   "lon": 9.09164,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Hedelfingen, Platz vor dem Alten Haus",
+   "address": "Rohrackerstraße 9, 70329 Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/hedelfingen-platz-vor-dem-alten-haus-1/",
+   "slots": [
+    {
+     "weekday": 4,
+     "from": "08:00",
+     "to": "13:00"
+    }
+   ],
+   "lat": 48.7585,
+   "lon": 9.25442,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Heumaden, Dorfplatz",
+   "address": "Bildäckerstraße 4 70619 Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/heumaden-dorfplatz-1/",
+   "slots": [
+    {
+     "weekday": 3,
+     "from": "07:00",
+     "to": "13:00"
+    }
+   ],
+   "lat": 48.74592,
+   "lon": 9.23245,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Hofen",
+   "address": "Kelterplatz Hofen, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/stuttgart-hofen-1/",
+   "slots": [
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "13:00"
+    }
+   ],
+   "lat": 48.83571,
+   "lon": 9.22504,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Möhringen, Spitalhof",
+   "address": "Spitalhof, Möhringen, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/moehringen-oberdorfplatz-1/",
+   "slots": [
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "12:30"
+    }
+   ],
+   "lat": 48.72742,
+   "lon": 9.14613,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Neugereut, Markplatz",
+   "address": "48.831398, 9.230893",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/neugereut-markplatz-1/",
+   "slots": [
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "12:00"
+    }
+   ],
+   "lat": 48.831398,
+   "lon": 9.230893,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Rot, Hans-Scharoun-Platz",
+   "address": "Hans-Scharoun-Platz, Haldenrainstraße, Rot, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/rot-hans-scharoun-platz-1/",
+   "slots": [
+    {
+     "weekday": 3,
+     "from": "08:00",
+     "to": "13:00"
+    }
+   ],
+   "lat": 48.83137,
+   "lon": 9.18685,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Sillenbuch, Kirchheimer Str., Ecke Schemppstr.",
+   "address": "Kirchheimer Straße, Sillenbuch 70619 Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/sillenbuch-kirchheimer-str-ecke-schemppstr-1/",
+   "slots": [
+    {
+     "weekday": 5,
+     "from": "10:30",
+     "to": "17:30"
+    }
+   ],
+   "lat": 48.7365,
+   "lon": 9.23715,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Stammheim, Kirchplatz",
+   "address": "Korntaler Straße, Korntaler Str. 2 70439 StuttgartStammheim, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/stammheim-kirchplatz-1/",
+   "slots": [
+    {
+     "weekday": 5,
+     "from": "07:00",
+     "to": "13:00"
+    }
+   ],
+   "lat": 48.84838,
+   "lon": 9.15985,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Steinhaldenfeld, Marktplatz U-Bahn-Haltestelle",
+   "address": "Steinhaldenstraße 167 70378 Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/steinhaldenfeld-marktplatz-u-bahn-haltestelle-1/",
+   "slots": [
+    {
+     "weekday": 3,
+     "from": "08:00",
+     "to": "12:00"
+    }
+   ],
+   "lat": 48.82692,
+   "lon": 9.23153,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Uhlbach",
+   "address": "Weinbaumuseum Stuttgart, Uhlbacher Platz, Uhlbach, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/uhlbach-1/",
+   "slots": [
+    {
+     "weekday": 3,
+     "from": "08:00",
+     "to": "14:00"
+    }
+   ],
+   "lat": 48.77637,
+   "lon": 9.27912,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Untertürkheim, Bahnhofsplatz, Widdersteinstraße",
+   "address": "Augsburger Str. 369, 70327, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/untertuerkheim-bahnhofsplatz-widdersteinstrasse-1/",
+   "slots": [
+    {
+     "weekday": 5,
+     "from": "08:00",
+     "to": "15:00"
+    }
+   ],
+   "lat": 48.78003,
+   "lon": 9.25176,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Vaihingen, Rathausplatz",
+   "address": "Rathausplatz, Vaihingen, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/vaihingen-rathausplatz-1/",
+   "slots": [
+    {
+     "weekday": 3,
+     "from": "07:00",
+     "to": "12:30"
+    },
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "12:30"
+    }
+   ],
+   "lat": 48.7312,
+   "lon": 9.10975,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Wangen, Kelter",
+   "address": "Kelter Wangen, Ulmer Straße, Wangen, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/wangen-kelter-1/",
+   "slots": [
+    {
+     "weekday": 3,
+     "from": "07:00",
+     "to": "12:00"
+    }
+   ],
+   "lat": 48.77314,
+   "lon": 9.24207,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Weilimdorf, Löwen-Markt",
+   "address": "Löwen-Markt, Weilimdorf, Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/weilimdorf-loewen-markt-1/",
+   "slots": [
+    {
+     "weekday": 2,
+     "from": "07:00",
+     "to": "12:30"
+    },
+    {
+     "weekday": 5,
+     "from": "11:00",
+     "to": "18:00"
+    }
+   ],
+   "lat": 48.81387,
+   "lon": 9.11228,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Wochenmarkt Zuffenhausen, Festplatz",
+   "address": "Hohenloher Straße 4/1, 70435 Stuttgart",
+   "url": "https://www.stuttgarter-wochenmaerkte.de/maerkte-staende/detail/zuffenhausen-festplatz-1/",
+   "slots": [
+    {
+     "weekday": 6,
+     "from": "07:00",
+     "to": "12:30"
+    }
+   ],
+   "lat": 48.83024,
+   "lon": 9.17803,
+   "source": "Märkte Stuttgart GmbH",
+   "checked": "2026-10-20",
+   "category": "Markt"
+  },
+  {
+   "name": "Flohmarkt Karlsplatz",
+   "address": "Karlsplatz, 70173 Stuttgart",
+   "lat": 48.77596,
+   "lon": 9.18028,
+   "url": "https://www.flohmarkt-karlsplatz.de/",
+   "slots": [
+    {
+     "weekday": 6,
+     "from": "08:00",
+     "to": "16:00"
+    }
+   ],
+   "source": "Flohmarkt Karlsplatz",
+   "checked": "2026-10-20",
+   "category": "Markt Flohmarkt"
+  }
+ ],
+ "periods": [
+  {
+   "name": "Stuttgarter Weihnachtsmarkt",
+   "address": "Marktplatz, Schillerplatz, Schlossplatz, 70173 Stuttgart",
+   "lat": 48.7765,
+   "lon": 9.179,
+   "url": "https://www.stuttgarter-weihnachtsmarkt.de/",
+   "from": "2026-11-25",
+   "to": "2026-12-23",
+   "source": "in.Stuttgart Veranstaltungsgesellschaft",
+   "checked": "2026-10-20",
+   "category": "Fest Markt",
+   "note": "Öffnungszeiten laut Veranstalter."
+  },
+  {
+   "name": "Punschwald Berliner Platz",
+   "address": "Berliner Platz, 70174 Stuttgart",
+   "lat": 48.7787,
+   "lon": 9.169,
+   "url": "https://www.punschwald.de/",
+   "from": "2026-10-30",
+   "to": null,
+   "source": "Punschwald (Betreiber)",
+   "checked": "2026-10-20",
+   "category": "Fest",
+   "note": "Laut Betreiber bis Anfang 2027; Enddatum nicht veröffentlicht."
+  }
+ ]
+}

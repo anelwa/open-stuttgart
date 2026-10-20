@@ -9,11 +9,16 @@ export interface Departure {
   cancelled: boolean;
   platform: string | null;
   notes: string[];
+  trip?: { line: string; stop: string; tripCode: number; planned: string } | null;
 }
 
 export interface DeparturesResponse {
   stop: { id: string; name: string; fullName?: string };
   departures: Departure[];
+  /** false, wenn EFA-BW für keine Abfahrt Ist-Zeiten liefert */
+  realtimeAvailable?: boolean | null;
+  /** Anzahl Abfahrten mit Verspätung aus dem Ersatzfeed (gtfs.de), wenn EFA-BW keine Ist-Zeiten liefert */
+  ersatzEchtzeit?: number;
   fetchedAt: string;
 }
 
@@ -133,6 +138,7 @@ export type Selection =
   | { type: 'sharing'; id: string }
   | { type: 'water' }
   | { type: 'event'; id: string }
+  | { type: 'facility'; item: Facility }
   | { type: 'place'; id: string };
 
 export interface CultureEvent {
@@ -162,6 +168,8 @@ export interface CultureEvent {
   /** weitere Beginnzeiten am selben Tag (Führungen, Zeitfenster) */
   times?: string[];
   endEstimated?: boolean;
+  /** Quelle nennt keine Uhrzeit */
+  noTime?: boolean;
 }
 
 export interface EventsResponse {
@@ -192,4 +200,42 @@ export interface WikiSummary {
   extract: string;
   url: string | null;
   thumbnail: string | null;
+}
+
+/** Einrichtung aus der Nähe-Suche (Geoserver der Stadt) */
+export interface Facility {
+  id: string;
+  cat: string;
+  name: string;
+  lat: number;
+  lon: number;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  web?: string | null;
+  booking?: string | null;
+  hours?: string | null;
+  closed?: boolean;
+  info?: string[];
+  /** zusätzliche Live-Angabe, z. B. Wartezeit oder Auslastung */
+  live?: string | null;
+  /** Rollstuhlangabe aus OpenStreetMap: yes, limited, no */
+  wheelchair?: string | null;
+  /** OpenStreetMap-Objekt, z. B. n29283708 */
+  osm?: string | null;
+}
+
+export interface TrafficItem {
+  id: string;
+  quelle: string;
+  typ: 'Unfall' | 'Stau' | 'Sperrung' | 'Baustelle' | 'Straßenzustand' | 'Veranstaltung' | 'Sonstiges';
+  rang: number;
+  text: string;
+  lat: number;
+  lon: number;
+  linie: [number, number][] | null;
+  geschwindigkeit?: number | null;
+  zeitverlust?: number | null;
+  seit: string | null;
+  bis: string | null;
 }

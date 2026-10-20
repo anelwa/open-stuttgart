@@ -106,7 +106,7 @@ export function CulturePanel({ visible, toggle, select, flyTo }: ModuleProps) {
         </div>
       )}
 
-      <Section title="Veranstaltungen" aside={events.data && events.data.pending > 0 ? `Verortung läuft, ${events.data.pending} ausstehend` : undefined}>
+      <Section title="Veranstaltungen" explain="termine" aside={events.data && events.data.pending > 0 ? `Verortung läuft, ${events.data.pending} ausstehend` : undefined}>
         {groups.length > 0 && (
           <div className="chips filter-chips">
             <button type="button" className={`chip ${filter === 'all' ? 'on' : ''}`} onClick={() => setFilter('all')}>Alle</button>
