@@ -1,0 +1,61 @@
+import { useEffect, useRef, useState } from 'react';
+
+export async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(url, { signal });
+  if (!res.ok) {
+    let msg = `Fehler ${res.status}`;
+    try { msg = (await res.json()).error ?? msg; } catch { /* leer */ }
+    throw new Error(msg);
+  }
+  return res.json() as Promise<T>;
+}
+
+export interface Polled<T> {
+  data: T | null;
+  error: string | null;
+  loading: boolean;
+  updatedAt: number | null;
+  reload: () => void;
+}
+
+/** Holt `url` sofort und danach alle `intervalMs`, pausiert bei verborgenem Tab. */
+export function usePolling<T>(url: string | null, intervalMs: number): Polled<T> {
+  const [state, setState] = useState<Omit<Polled<T>, 'reload'>>({ data: null, error: null, loading: !!url, updatedAt: null });
+  const [tick, setTick] = useState(0);
+  const urlRef = useRef(url);
+
+  useEffect(() => {
+    if (urlRef.current !== url) {
+      urlRef.current = url;
+      setState({ data: null, error: null, loading: !!url, updatedAt: null });
+    }
+    if (!url) return;
+    const ctrl = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    const run = async () => {
+      if (document.hidden) { timer = setTimeout(run, 5000); return; }
+      setState((s) => ({ ...s, loading: true }));
+      try {
+        const data = await getJson<T>(url, ctrl.signal);
+        setState({ data, error: null, loading: false, updatedAt: Date.now() });
+      } catch (e) {
+        if (ctrl.signal.aborted) return;
+        setState((s) => ({ ...s, error: (e as Error).message, loading: false }));
+      }
+      timer = setTimeout(run, intervalMs);
+    };
+    run();
+    return () => { ctrl.abort(); clearTimeout(timer); };
+  }, [url, intervalMs, tick]);
+
+  return { ...state, reload: () => setTick((t) => t + 1) };
+}
+
+export function useNow(intervalMs = 15000) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}

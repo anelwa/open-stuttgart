@@ -1,0 +1,322 @@
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import * as maplibregl from 'maplibre-gl';
+import type { Map as MlMap, GeoJSONSource, ImageSource, RasterTileSource, MapGeoJSONFeature, MapMouseEvent } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
+import { buildStyle, type Theme } from './mapStyle';
+import { BLANK_PNG, aerialTiles, addOverlays, setOverlayVisibility, INTERACTIVE_LAYERS, OVERLAY_LAYERS, type OverlayKey } from './overlays';
+import { registerIcons } from './icons';
+import { fmtTime, occupancy } from '../lib/format';
+import type { AirStation, CultureEvent, ParkingSite, Place, Roadwork, Selection, SharingItem, Water } from '../lib/types';
+
+export interface MapData {
+  parking: ParkingSite[] | null;
+  sharing: SharingItem[] | null;
+  roadworks: Roadwork[] | null;
+  air: AirStation[] | null;
+  water: Water | null;
+  bike: GeoJSON.FeatureCollection | null;
+  events: CultureEvent[] | null;
+  places: Place[] | null;
+  sunImage: string | null;
+  radarImage: { url: string; coords: [[number, number], [number, number], [number, number], [number, number]] } | null;
+}
+
+export interface MapHandle {
+  flyTo: (lngLat: [number, number], zoom?: number) => void;
+  zoomBy: (d: number) => void;
+  resetNorth: () => void;
+  getMap: () => MlMap | null;
+}
+
+interface Props {
+  theme: Theme;
+  visible: Record<OverlayKey, boolean>;
+  data: MapData;
+  selection: Selection | null;
+  selectedPoint: [number, number] | null;
+  terrain: boolean;
+  onSelect: (s: Selection | null) => void;
+  onReady?: () => void;
+  onMove?: (center: [number, number]) => void;
+  /** Luftbild-Jahrgang und Deckkraft */
+  aerial: { year: string; opacity: number };
+  /** Aktuell verdeckte Ränder (Seitenleiste, Detailansicht, Bottom Sheet) */
+  padding: { left: number; right: number; bottom: number };
+  /** Ränder, sobald eine Detailansicht offen ist; Kamerafahrten zu Objekten zielen darauf */
+  detailPadding: { left: number; right: number; bottom: number };
+}
+
+// Vite kann den dynamisch berechneten Worker-Pfad von MapLibre nicht erkennen, daher explizit setzen.
+maplibregl.setWorkerUrl(workerUrl);
+
+const HOME: [number, number] = [9.1800, 48.7790];
+
+const fc = (features: GeoJSON.Feature[]): GeoJSON.FeatureCollection => ({ type: 'FeatureCollection', features });
+const pt = (lon: number, lat: number, properties: Record<string, unknown>): GeoJSON.Feature => ({
+  type: 'Feature', geometry: { type: 'Point', coordinates: [lon, lat] }, properties,
+});
+
+function toGeo(data: MapData) {
+  return {
+    parking: fc((data.parking ?? []).map((p) => pt(p.lon, p.lat, {
+      id: p.id, name: p.name, occ: occupancy(p.free, p.capacity), ...(p.free != null ? { free: p.free } : {}),
+    }))),
+    sharing: fc((data.sharing ?? []).map((s) => pt(s.lon, s.lat, {
+      id: s.id, kind: s.kind, station: s.station, available: s.available ?? 1, system: s.system, name: s.name ?? '',
+    }))),
+    roadworks: fc((data.roadworks ?? []).map((r) => pt(r.lon, r.lat, { id: r.id, status: r.status, street: r.street }))),
+    air: fc((data.air ?? []).map((a) => pt(a.lon, a.lat, {
+      id: a.id, name: a.name, index: a.index ?? -1, label: a.label ?? 'keine aktuellen Werte',
+    }))),
+    water: fc(data.water ? [pt(data.water.lon, data.water.lat, { value: data.water.value })] : []),
+    bike: data.bike ?? fc([]),
+    places: fc((data.places ?? []).map((p) => pt(p.lon, p.lat, { id: p.id, name: p.name, kind: p.kind, rank: p.rank }))),
+    events: fc(eventVenues(data.events ?? [])),
+  };
+}
+
+/** Termine am selben Ort zu einem Punkt bündeln; angezeigt wird der nächste Beginn. */
+function eventVenues(events: CultureEvent[]) {
+  const now = Date.now();
+  const endOf = (e: CultureEvent) => (e.end ? Date.parse(e.end) : Date.parse(e.start!) + 150 * 60_000);
+  const groups = new Map<string, CultureEvent[]>();
+  for (const e of events) {
+    if (e.lat == null || e.lon == null) continue;
+    // Vorbei ist vorbei: beendete Termine verschwinden von der Karte
+    if (!e.allDay && e.start && endOf(e) < now) continue;
+    const k = `${e.lat.toFixed(4)},${e.lon.toFixed(4)}`;
+    groups.set(k, [...(groups.get(k) ?? []), e]);
+  }
+  return [...groups.values()].map((list) => {
+    const timed = list.filter((e) => !e.allDay && e.start).sort((a, b) => Date.parse(a.start!) - Date.parse(b.start!));
+    const next = timed.find((e) => Date.parse(e.start!) > now) ?? timed[0] ?? list[0];
+    const started = !next.allDay && next.start && Date.parse(next.start) <= now;
+    const time = next.allDay || !next.start ? 'ganztägig' : started ? (next.end ? `bis ${fmtTime(next.end)}` : 'läuft') : fmtTime(next.start);
+    return pt(next.lon!, next.lat!, {
+      id: next.id, title: next.title, allDay: !!next.allDay || !next.start || !!started, count: list.length,
+      time: list.length > 1 ? `${time} +${list.length - 1}` : time,
+    });
+  });
+}
+
+export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref) {
+  const el = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<MlMap | null>(null);
+  const propsRef = useRef(props);
+  propsRef.current = props;
+  const hoverPopup = useRef<maplibregl.Popup | null>(null);
+  const sunUrl = useRef<string | null>(null);
+  const radarUrl = useRef<string | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    flyTo: (lngLat, zoom = 15) => {
+      const m = mapRef.current;
+      if (!m) return;
+      m.flyTo({ center: lngLat, zoom: Math.max(m.getZoom(), zoom), padding: { top: 0, ...propsRef.current.detailPadding }, speed: 1.2, essential: true });
+    },
+    zoomBy: (d) => mapRef.current?.easeTo({ zoom: mapRef.current.getZoom() + d, duration: 300 }),
+    resetNorth: () => mapRef.current?.easeTo({ bearing: 0, pitch: propsRef.current.terrain ? 55 : 0, duration: 500 }),
+    getMap: () => mapRef.current,
+  }));
+
+  // Daten in die Quellen schreiben (nach jedem Stilwechsel erneut)
+  const pushData = () => {
+    const m = mapRef.current;
+    if (!m || !m.getSource('parking')) return;
+    const g = toGeo(propsRef.current.data);
+    (m.getSource('parking') as GeoJSONSource).setData(g.parking);
+    (m.getSource('sharing') as GeoJSONSource).setData(g.sharing);
+    (m.getSource('roadworks') as GeoJSONSource).setData(g.roadworks);
+    (m.getSource('air') as GeoJSONSource).setData(g.air);
+    (m.getSource('water') as GeoJSONSource).setData(g.water);
+    (m.getSource('bike') as GeoJSONSource).setData(g.bike);
+    (m.getSource('places') as GeoJSONSource).setData(g.places);
+    (m.getSource('events') as GeoJSONSource).setData(g.events);
+    const sun = m.getSource('sun') as ImageSource | undefined;
+    const img = propsRef.current.data.sunImage ?? BLANK_PNG;
+    if (sun && sunUrl.current !== img) { sunUrl.current = img; sun.updateImage({ url: img }); }
+    const rad = m.getSource('radar') as ImageSource | undefined;
+    const ri = propsRef.current.data.radarImage;
+    if (rad && radarUrl.current !== (ri?.url ?? null)) {
+      radarUrl.current = ri?.url ?? null;
+      rad.updateImage(ri ? { url: ri.url, coordinates: ri.coords } : { url: BLANK_PNG });
+    }
+    const sp = propsRef.current.selectedPoint;
+    (m.getSource('selected') as GeoJSONSource).setData(fc(sp ? [pt(sp[0], sp[1], {})] : []));
+  };
+
+  const applyTerrain = (on: boolean, animate: boolean) => {
+    const m = mapRef.current;
+    if (!m) return;
+    if (on) {
+      m.setTerrain({ source: 'terrain', exaggeration: 1.6 });
+      if (animate) m.easeTo({ pitch: 58, bearing: -20, duration: 1200 });
+    } else {
+      m.setTerrain(null);
+      if (animate) m.easeTo({ pitch: 0, bearing: 0, duration: 900 });
+    }
+  };
+
+  const aerialYear = useRef<string | null>(null);
+  const applyAerial = () => {
+    const m = mapRef.current;
+    const src = m?.getSource('aerial') as RasterTileSource | undefined;
+    if (!m || !src) return;
+    const { year, opacity } = propsRef.current.aerial;
+    if (aerialYear.current !== year) { aerialYear.current = year; src.setTiles([aerialTiles(year)]); }
+    m.setPaintProperty('aerial', 'raster-opacity', opacity);
+  };
+
+  // Karte einmalig anlegen
+  useEffect(() => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const m = new maplibregl.Map({
+      container: el.current!,
+      center: HOME,
+      zoom: window.innerWidth < 700 ? 11.6 : 12.6,
+      minZoom: 8,
+      maxZoom: 19,
+      maxPitch: 75,
+      attributionControl: false,
+      hash: 'karte', // Kartenausschnitt in der Adresse, damit Links teilbar sind
+      fadeDuration: reduced ? 0 : 250,
+      locale: {
+        'NavigationControl.ZoomIn': 'Hineinzoomen',
+        'NavigationControl.ZoomOut': 'Herauszoomen',
+        'NavigationControl.ResetBearing': 'Nach Norden ausrichten',
+        'GeolocateControl.FindMyLocation': 'Meinen Standort zeigen',
+        'AttributionControl.ToggleAttribution': 'Quellen anzeigen',
+      },
+    });
+    mapRef.current = m;
+    m.setPadding({ top: 0, ...props.padding });
+    m.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+
+    // 3D-Gebäude nur bei geneigter Karte, von oben wirken die Wände unruhig
+    const syncBuildings = () => {
+      if (m.getLayer('building-3d')) m.setLayoutProperty('building-3d', 'visibility', m.getPitch() > 12 ? 'visible' : 'none');
+    };
+    m.on('pitchend', syncBuildings);
+    m.on('moveend', () => { const c = m.getCenter(); propsRef.current.onMove?.([c.lng, c.lat]); });
+
+    m.on('style.load', () => {
+      syncBuildings();
+      const p = propsRef.current;
+      registerIcons(m, p.theme === 'dark');
+      aerialYear.current = null;
+      sunUrl.current = null;
+      radarUrl.current = null;
+      addOverlays(m, p.theme, p.visible);
+      pushData();
+      applyAerial();
+      if (p.terrain) applyTerrain(true, false);
+      p.onReady?.();
+    });
+
+    // Stil erst setzen, wenn der Listener hängt (ein Stilobjekt kann sofort fertig sein)
+    m.setStyle(buildStyle(props.theme));
+
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 14, className: 'hover-pop', maxWidth: '260px' });
+    hoverPopup.current = popup;
+
+    const label = (f: MapGeoJSONFeature): string | null => {
+      const pr = f.properties as Record<string, unknown>;
+      switch (f.layer.id) {
+        case 'stops-rail': case 'stops-bus': return String(pr.name);
+        case 'parking-icon': case 'parking-dot': return `${pr.name}${pr.free != null ? ` · ${pr.free} frei` : ''}`;
+        case 'roadworks': return `Baustelle ${pr.street}`;
+        case 'share-point': return pr.name ? `${pr.system} · ${pr.name} · ${pr.available} verfügbar` : `${pr.system}`;
+        case 'share-cluster': return `${pr.point_count} Sharing-Angebote, zum Vergrößern antippen`;
+        case 'air-circle': return `Luft ${pr.name}: ${pr.label}`;
+        case 'water-gauge': return `Neckar Pegel Cannstatt: ${pr.value} cm`;
+        case 'places-icon': return String(pr.name);
+        case 'events-pin': return `${pr.time} · ${pr.title}${Number(pr.count) > 1 ? ` (und ${Number(pr.count) - 1} weitere hier)` : ''}`;
+        default: return null;
+      }
+    };
+
+    m.on('mousemove', (e: MapMouseEvent) => {
+      const layers = INTERACTIVE_LAYERS.filter((id) => m.getLayer(id));
+      const f = m.queryRenderedFeatures(e.point, { layers })[0];
+      m.getCanvas().style.cursor = f ? 'pointer' : '';
+      const text = f && label(f);
+      if (text && window.matchMedia('(hover: hover)').matches) {
+        popup.setLngLat(e.lngLat).setText(text).addTo(m);
+      } else popup.remove();
+    });
+    m.on('mouseout', () => popup.remove());
+
+    m.on('click', async (e: MapMouseEvent) => {
+      const layers = INTERACTIVE_LAYERS.filter((id) => m.getLayer(id));
+      const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]];
+      const f = m.queryRenderedFeatures(bbox, { layers })[0];
+      popup.remove();
+      if (!f) { propsRef.current.onSelect(null); return; }
+      const pr = f.properties as Record<string, unknown>;
+      const coord = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+      switch (f.layer.id) {
+        case 'stops-rail': case 'stops-bus': {
+          const lines = typeof pr.lines === 'string' ? JSON.parse(pr.lines as string) : pr.lines;
+          propsRef.current.onSelect({ type: 'stop', id: String(pr.id), name: String(pr.name), lngLat: coord, lines });
+          break;
+        }
+        case 'parking-icon': case 'parking-dot': propsRef.current.onSelect({ type: 'parking', id: Number(pr.id) }); break;
+        case 'roadworks': propsRef.current.onSelect({ type: 'roadwork', id: String(pr.id) }); break;
+        case 'air-circle': propsRef.current.onSelect({ type: 'air', id: String(pr.id) }); break;
+        case 'water-gauge': propsRef.current.onSelect({ type: 'water' }); break;
+        case 'share-point': propsRef.current.onSelect({ type: 'sharing', id: String(pr.id) }); break;
+        case 'events-pin': propsRef.current.onSelect({ type: 'event', id: String(pr.id) }); break;
+        case 'places-icon': propsRef.current.onSelect({ type: 'place', id: String(pr.id) }); break;
+        case 'share-cluster': {
+          const src = m.getSource('sharing') as GeoJSONSource;
+          const zoom = await src.getClusterExpansionZoom(pr.cluster_id as number);
+          m.easeTo({ center: coord, zoom: Math.min(zoom + 0.3, 18) });
+          return;
+        }
+      }
+      m.easeTo({ center: coord, zoom: Math.max(m.getZoom(), 14.5), padding: { top: 0, ...propsRef.current.detailPadding }, duration: reduced ? 0 : 700 });
+    });
+
+    return () => { m.remove(); mapRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Farbschema wechseln
+  const themeRef = useRef(props.theme);
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m || themeRef.current === props.theme) return;
+    themeRef.current = props.theme;
+    m.setStyle(buildStyle(props.theme), { diff: false });
+  }, [props.theme]);
+
+  useEffect(() => { pushData(); }, [props.data, props.selectedPoint]);
+  useEffect(() => { applyAerial(); }, [props.aerial.year, props.aerial.opacity]);
+
+  // Seitenleiste und Detailansicht verdecken Teile der Karte: Mittelpunkt entsprechend verschieben
+  const { left, right, bottom } = props.padding;
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m) return;
+    const pad = { top: 0, left, right, bottom };
+    // Läuft gerade eine Kamerafahrt zu einem Objekt, bringt sie ihre Ränder schon mit
+    if (m.isMoving()) m.once('moveend', () => m.setPadding(pad));
+    else m.easeTo({ padding: pad, duration: 350 });
+  }, [left, right, bottom]);
+
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m || !m.getLayer('net-line')) return;
+    (Object.keys(OVERLAY_LAYERS) as OverlayKey[]).forEach((k) => setOverlayVisibility(m, k, props.visible[k]));
+  }, [props.visible]);
+
+  const terrainRef = useRef(props.terrain);
+  useEffect(() => {
+    if (terrainRef.current === props.terrain) return;
+    terrainRef.current = props.terrain;
+    applyTerrain(props.terrain, true);
+  }, [props.terrain]);
+
+  return <div ref={el} className="map" role="region" aria-label="Karte von Stuttgart" />;
+});
