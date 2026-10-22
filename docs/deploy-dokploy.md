@@ -9,8 +9,9 @@ stehen bewusst nicht im Git und werden direkt auf den Server gespielt.
 
 - Server (VPS) mit Docker und einer laufenden Dokploy-Instanz
 - Domain (z. B. `open-stuttgart.example.de`) mit **A-Record auf die VPS-IP** — muss vor dem Deploy gesetzt sein,
-  sonst kann Let's Encrypt kein Zertifikat ausstellen
-- SSH-Zugang zum VPS für die Daten (rsync)
+  sonst kann Let's Encrypt kein Zertifikat ausstellen. Ein proxied Record bei Cloudflare (orange Cloud) funktioniert:
+  die HTTP-01-Challenges laufen durch den Proxy durch, die SSL-Stufe sollte „Full (strict)" sein
+- SSH-Zugang zum VPS für die Daten (tar- oder rsync-Transfer)
 - Ein GitHub-Push auf `main` löst später das Build aus
 
 ## Was wohin kommt
@@ -36,13 +37,17 @@ sudo chown -R 1000:1000 /opt/open-stuttgart   # UID des Container-Nutzers „nod
 Die kleinen Grunddaten (`venues.json`, `iris-codes.json`, `feste-maerkte.json`, …) legt der Container beim ersten
 Start selbst im Volume nach (`docker-entrypoint.sh`); rsync muss nur die erzeugten Datenbestände liefern.
 
-Daten aus dem Entwicklungsverzeichnis hochladen (Datenbestände, die vor Ort erzeugt wurden):
+Daten aus dem Entwicklungsverzeichnis hochladen (Datenbestände, die vor Ort erzeugt wurden). Da auf dem Server
+oft kein `rsync` installiert ist, geht der Transfer auch als `tar`-Pipe ohne Zusatzsoftware:
 
 ```bash
 # vorher sicherstellen, dass die Bestände aktuell sind:
 npm run data:verwaltung && npm run data:search   # verwaltung.sqlite + suche.sqlite
 
-rsync -av --exclude='*-wal' --exclude='*-shm' server/data/ user@vps:/opt/open-stuttgart/data/
+cd server && tar czf - --exclude='*-wal' --exclude='*-shm' data \
+  | ssh root@vps 'tar xzf - -C /opt/open-stuttgart && chown -R 1000:1000 /opt/open-stuttgart'
+# Alternative mit rsync (braucht rsync auf beiden Seiten):
+# rsync -av --exclude='*-wal' --exclude='*-shm' server/data/ root@vps:/opt/open-stuttgart/data/
 ```
 
 Die Suchdatenbank `suche.sqlite` liegt in `server/data/` und wird mitgespielt. Alternativ kann sie auf dem Server
