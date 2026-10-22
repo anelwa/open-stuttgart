@@ -109,7 +109,8 @@ function saveBudget() {
 }
 
 function priceFor(model) {
-  return PRICES[model] ?? FALLBACK_PRICE;
+  // Modell-IDs können einen Provider-Präfix tragen (z. B. „google/gemini-3.1-flash-lite").
+  return PRICES[model] ?? PRICES[String(model).split('/').pop()] ?? FALLBACK_PRICE;
 }
 
 function trackUsage(usage) {
@@ -221,7 +222,10 @@ async function callGemini({ system, user, schema, maxOutputTokens = 400, tempera
   };
   let res;
   try {
-    res = await fetch(`${API_BASE}/models/${encodeURIComponent(model)}:generateContent`, {
+    // Modell-IDs dürfen einen Provider-Präfix enthalten (z. B. „google/gemini-2.5-flash-lite"
+    // bei Atlas Cloud). Nur die Segmente kodieren, damit der Schrägstrich erhalten bleibt.
+    const modelPath = String(model).split('/').map(encodeURIComponent).join('/');
+    res = await fetch(`${API_BASE}/models/${modelPath}:generateContent`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify(body),

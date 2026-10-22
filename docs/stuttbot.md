@@ -241,6 +241,11 @@ OS_BOT_DAILY_USD=0.50
 OS_BOT_RATE=40
 OS_BOT_STATE=server/.cache/     # Budgetdatei
 OS_BOT_API_BASE=https://generativelanguage.googleapis.com/v1beta   # für Tests/Proxy
+# Alternativ Atlas Cloud (Prepaid, ein Key für viele Modelle):
+# GEMINI_API_KEY=apikey-…
+# OS_BOT_API_BASE=https://api.atlascloud.ai/v1
+# OS_BOT_MODEL=google/gemini-3.1-flash-lite        # Provider-Präfix gehört zur ID
+# OS_BOT_MODEL_FALLBACK=google/gemini-2.5-flash-lite
 OS_BOT=1                        # 0 = Kill-Switch
 OS_BOT_LOG=0                    # 1 = Intent/Latenz/Fehler loggen
 OS_TRUST_PROXY=1                # hinter Dokploy/nginx
