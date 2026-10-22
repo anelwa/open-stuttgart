@@ -878,3 +878,18 @@
   background: rgba(38, 38, 44, .45);
   color: #fff;
 }
+
+.wiss-resources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.wiss-link-list .wiss-resources a {
+  display: inline-flex;
+  width: auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-decoration: none;
+}

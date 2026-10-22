@@ -160,6 +160,7 @@ function newSession(id) {
     topic: '',
     lastServiceUrl: null,
     lastFacts: null,
+    history: [],
     busy: false,
   };
 }
@@ -207,6 +208,11 @@ function llmAllowed() {
     && budget.spentUsd < DAILY_USD;
 }
 
+function modelPath(model) {
+  // Provider-Präfixe wie „google/gemini-…“ erhalten den Schrägstrich, nur Segmente kodieren.
+  return String(model).split('/').map(encodeURIComponent).join('/');
+}
+
 async function callGemini({ system, user, schema, maxOutputTokens = 400, temperature = 0.2, model = MODEL }) {
   if (!llmAllowed()) return null;
   const key = apiKey();
@@ -224,8 +230,7 @@ async function callGemini({ system, user, schema, maxOutputTokens = 400, tempera
   try {
     // Modell-IDs dürfen einen Provider-Präfix enthalten (z. B. „google/gemini-2.5-flash-lite"
     // bei Atlas Cloud). Nur die Segmente kodieren, damit der Schrägstrich erhalten bleibt.
-    const modelPath = String(model).split('/').map(encodeURIComponent).join('/');
-    res = await fetch(`${API_BASE}/models/${modelPath}:generateContent`, {
+    res = await fetch(`${API_BASE}/models/${modelPath(model)}:generateContent`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify(body),
@@ -684,6 +689,285 @@ async function composeAnswer(facts, question, askLocation) {
   return guardAnswer(raw, facts);
 }
 
+// ---------- Tool-Calling-Agent ----------
+
+const AGENT_SYSTEM = `Du bist StuttBot, der Bürgeranliegen-Assistent von Open Stuttgart.
+Du hilfst bei Ämtern, Terminen und Wegen in Stuttgart. Du hast Werkzeuge – nutze sie, statt zu raten:
+- suche_leistung: Verwaltungsleistung zu einem Anliegen finden
+- leistung_details: Unterlagen, Gebühren, Termin- und Online-Link einer Leistung
+- buergerbuero: bestes Bürgerbüro mit Wartezeit und Anfahrt
+- route: Weg zu einem Ziel vom Standort der Person
+- ort_suchen: Ortsnamen und Adressen auflösen
+
+Regeln:
+- Erfinde keine Fakten, Preise, Zeiten oder Links. Zahlen nur aus Werkzeugergebnissen.
+- Angaben zu Unterlagen, Gebühren und Fristen ausschließlich aus Werkzeugergebnissen. Fehlt ein Feld (z. B. leere Unterlagen), sage offen, dass dazu keine Angaben hinterlegt sind, und verweise auf die Leistungsseite — kein Allgemeinwissen ergänzen.
+- Fehlt der Standort für eine Anfahrt, frage kurz danach; die Oberfläche bietet „Standort freigeben“ an.
+- Antworte auf Deutsch, knapp (2–4 Sätze), ohne Aufzählungen und ohne URLs im Text — die Oberfläche zeigt Termin-, Online- und Routen-Schaltflächen aus den Werkzeugen.
+- Bei reinen Wegefragen („Ich muss zum Marienplatz“) nutze route und nenne Dauer und Verkehrsmittel.
+- Keine Rechtsberatung, keine Terminbuchung, keine erfundenen Öffnungszeiten.`;
+
+const AGENT_TOOLS = [{
+  functionDeclarations: [
+    {
+      name: 'suche_leistung',
+      description: 'Sucht eine Verwaltungsleistung der Stadt Stuttgart zu einem Anliegen, z. B. Personalausweis oder Wohnsitz anmelden.',
+      parameters: {
+        type: 'object',
+        properties: { query: { type: 'string', description: 'Anliegen in Stichworten' } },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'leistung_details',
+      description: 'Lädt Details zu einer Leistungs-URL: Unterlagen, Gebühr, Terminbuchung, Online-Dienst.',
+      parameters: {
+        type: 'object',
+        properties: { url: { type: 'string', description: 'URL aus suche_leistung' } },
+        required: ['url'],
+      },
+    },
+    {
+      name: 'buergerbuero',
+      description: 'Findet das beste Bürgerbüro für eine Leistung: Öffnung, Wartezeit, Anfahrt und Alternativen.',
+      parameters: {
+        type: 'object',
+        properties: { leistung_url: { type: 'string', description: 'URL der Leistung' } },
+        required: ['leistung_url'],
+      },
+    },
+    {
+      name: 'route',
+      description: 'Berechnet den Weg vom Standort der Person zu einem Ziel.',
+      parameters: {
+        type: 'object',
+        properties: {
+          ziel: { type: 'string', description: 'Ziel, z. B. „Marienplatz“ oder eine Adresse' },
+          modus: { type: 'string', enum: ['fuss', 'oepnv', 'auto'], description: 'Verkehrsmittel' },
+        },
+        required: ['ziel'],
+      },
+    },
+    {
+      name: 'ort_suchen',
+      description: 'Löst einen Orts- oder Adressnamen in Koordinaten auf.',
+      parameters: {
+        type: 'object',
+        properties: { query: { type: 'string' } },
+        required: ['query'],
+      },
+    },
+  ],
+}];
+
+async function callGeminiAgent({ contents, model = MODEL }) {
+  if (!llmAllowed()) return null;
+  const body = {
+    system_instruction: { parts: [{ text: AGENT_SYSTEM }] },
+    contents,
+    tools: AGENT_TOOLS,
+    toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 600 },
+  };
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/models/${modelPath(model)}:generateContent`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey() },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (err) {
+    lastLlmError = err.message;
+    return null;
+  }
+  const data = await res.json().catch(() => null);
+  if (data?.usageMetadata) trackUsage(data.usageMetadata);
+  if (!res.ok) {
+    lastLlmError = data?.error?.message ?? `HTTP ${res.status}`;
+    if (res.status === 429) quotaBlockedUntil = Date.now() + 5 * 60_000;
+    else if ([400, 401, 403].includes(res.status)) {
+      keyBrokenUntil = Date.now() + 10 * 60_000;
+      console.warn('StuttBot: Modell oder Key abgelehnt; nutze den deterministischen Fallback.');
+    }
+    return null;
+  }
+  return data;
+}
+
+/** Führt einen Werkzeugaufruf des Modells aus und sammelt die Belege im Kontext. */
+async function execTool(name, args, ctx) {
+  const a = args ?? {};
+  const note = (result) => {
+    ctx.toolLog.push(result);
+    return result;
+  };
+  switch (name) {
+    case 'suche_leistung': {
+      const r = await verwaltungSuche(String(a.query ?? '')).catch(() => null);
+      const treffer = (r?.leistungen ?? []).slice(0, 5).map((x) => ({ name: x.name, url: x.url, kurz: x.kurz ?? null }));
+      return note({ treffer });
+    }
+    case 'leistung_details': {
+      const url = String(a.url ?? '');
+      if (!/^https?:\/\//.test(url)) return note({ fehler: 'ungültige_url' });
+      const service = await verwaltungLeistung(url).catch(() => null);
+      if (!service) return note({ fehler: 'nicht_gefunden' });
+      ctx.service = service;
+      return note({
+        leistung: {
+          name: service.name,
+          unterlagen: service.docs ?? service.unterlagen ?? null,
+          gebuehr: service.fee ?? null,
+          termin: service.booking ?? null,
+          online: service.onlineUrl ?? null,
+          url: service.url ?? url,
+          stand: service.stand ?? null,
+        },
+      });
+    }
+    case 'buergerbuero': {
+      if (!ctx.loc) {
+        ctx.needsLocation = true;
+        return note({ fehler: 'standort_fehlt', hinweis: 'Nach Adresse, PLZ oder Standortfreigabe fragen.' });
+      }
+      const url = String(a.leistung_url ?? ctx.service?.url ?? '');
+      let service = ctx.service;
+      if (!service || service.url !== url) service = await verwaltungLeistung(url).catch(() => null);
+      if (!service) return note({ fehler: 'leistung_nicht_gefunden' });
+      ctx.service = service;
+      const data = await findBestOffice(service, ctx.loc);
+      if (!data) return note({ fehler: 'kein_buergerbuero' });
+      ctx.officeData = data;
+      return note({ bester: data.best, alternativen: data.alternatives });
+    }
+    case 'route': {
+      if (!ctx.loc) {
+        ctx.needsLocation = true;
+        return note({ fehler: 'standort_fehlt', hinweis: 'Nach Adresse, PLZ oder Standortfreigabe fragen.' });
+      }
+      const ziel = await geocode(String(a.ziel ?? ''));
+      if (!ziel) return note({ fehler: 'ziel_nicht_gefunden' });
+      const modus = ['fuss', 'oepnv', 'auto'].includes(a.modus) ? a.modus : 'oepnv';
+      const r = await route({
+        von: `${ctx.loc.lat},${ctx.loc.lon}`,
+        nach: `${ziel.lat},${ziel.lon}`,
+        modus,
+      }).catch(() => null);
+      const varianten = (r?.varianten ?? [])
+        .filter((v) => Number.isFinite(v.dauerMin))
+        .sort((x, y) => x.dauerMin - y.dauerMin)
+        .slice(0, 3)
+        .map((v) => ({ dauerMin: v.dauerMin, umstiege: v.umstiege ?? null, linien: v.linien ?? null }));
+      const best = varianten[0] ?? null;
+      ctx.routeTarget = { lat: ziel.lat, lon: ziel.lon, name: ziel.label, min: best?.dauerMin ?? null, modus };
+      return note({
+        ziel: { label: ziel.label, lat: ziel.lat, lon: ziel.lon },
+        modus,
+        dauerMin: best?.dauerMin ?? null,
+        varianten,
+        quelle: r?.quelle ?? null,
+      });
+    }
+    case 'ort_suchen': {
+      const r = await ortSuche(String(a.query ?? '')).catch(() => null);
+      const treffer = (r?.results ?? []).slice(0, 3)
+        .filter((x) => Number.isFinite(x.lat) && Number.isFinite(x.lon))
+        .map((x) => ({ label: x.label, lat: r4(x.lat), lon: r4(x.lon) }));
+      return note({ treffer });
+    }
+    default:
+      return note({ fehler: 'unbekanntes_werkzeug' });
+  }
+}
+
+/** Erdung der Agentenantwort: keine erfundenen Beträge, Büronamen oder Links. */
+function guardAgentText(text, ctx) {
+  const answer = cleanAnswer(text);
+  if (!answer || answer.length > 900) return null;
+  if (/\b(gebucht|reserviert|bestätigt|beantragt habe)\b/i.test(answer) && !/nicht|kein/i.test(answer)) return null;
+  const factText = JSON.stringify(ctx.toolLog);
+  const money = [...answer.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:Euro|€)/gi)].map((m) => m[1].replace(',', '.'));
+  for (const n of money) {
+    if (!factText.includes(n) && !factText.includes(n.replace('.', ','))) return null;
+  }
+  const offices = [...answer.matchAll(/Bürgerbüro\s+[A-ZÄÖÜ][\wÄÖÜäöüß-]*/g)].map((m) => m[0]);
+  for (const name of offices) {
+    if (!factText.includes(name)) return null;
+  }
+  const urls = [...answer.matchAll(/https?:\/\/[^\s)"']+/g)].map((m) => m[0].replace(/[.,;:]$/, ''));
+  if (urls.length) return null; // Links gehören in die Schaltflächen, nicht in den Text
+  return answer;
+}
+
+const AGENT_SUGGESTIONS = ['Welche Unterlagen brauche ich?', 'Kann ich das online erledigen?'];
+
+async function agentTurn({ text, s, loc, meta }) {
+  if (!llmAllowed()) return null;
+  const ctx = { loc, service: null, officeData: null, routeTarget: null, needsLocation: false, toolLog: [] };
+  const contents = [
+    ...(s.history ?? []),
+    { role: 'user', parts: [{ text: text || 'Ich habe meinen Standort freigegeben.' }] },
+  ];
+  let reply = '';
+  let rounds = 0;
+  while (rounds < 5) {
+    rounds += 1;
+    const data = await callGeminiAgent({ contents });
+    if (!data) return null;
+    const parts = data?.candidates?.[0]?.content?.parts ?? [];
+    const calls = parts.filter((p) => p.functionCall);
+    const textParts = parts.filter((p) => p.text).map((p) => p.text).join(' ').trim();
+    if (textParts) reply = textParts;
+    if (!calls.length) break;
+    contents.push({ role: 'model', parts });
+    const responses = [];
+    for (const c of calls) {
+      const result = await execTool(c.functionCall?.name, c.functionCall?.args, ctx).catch(() => ({ fehler: 'werkzeugfehler' }));
+      responses.push({ functionResponse: { name: c.functionCall?.name, response: result } });
+    }
+    contents.push({ role: 'user', parts: responses });
+  }
+  const answer = reply ? guardAgentText(reply, ctx) : null;
+  if (!answer) return null;
+
+  s.history = [
+    ...(s.history ?? []),
+    { role: 'user', parts: [{ text }] },
+    { role: 'model', parts: [{ text: answer }] },
+  ].slice(-12);
+
+  const facts = ctx.service
+    ? {
+        service: ctx.service,
+        recommended: ctx.officeData?.best ?? null,
+        alternatives: ctx.officeData?.alternatives ?? [],
+        location: loc ? { label: loc.label } : null,
+        appointmentNeeded: !!(ctx.service.booking || ctx.service.termin),
+        stand: ctx.service.stand ?? null,
+      }
+    : null;
+  const actions = [];
+  if (facts) actions.push(...actionsFor(facts, false));
+  if (ctx.routeTarget && !actions.some((x) => x.type === 'route')) {
+    actions.push({ type: 'route', label: 'Route öffnen', lat: ctx.routeTarget.lat, lon: ctx.routeTarget.lon, name: ctx.routeTarget.name });
+  }
+  if (ctx.needsLocation && !actions.some((x) => x.type === 'location')) {
+    actions.unshift({ type: 'location', label: 'Standort freigeben' });
+  }
+  s.lastFacts = facts;
+  s.lastServiceUrl = ctx.service?.url ?? s.lastServiceUrl;
+  return {
+    sessionId: s.id,
+    reply: answer,
+    suggestions: facts ? AGENT_SUGGESTIONS : ['Personalausweis beantragen', 'Wohnsitz anmelden'],
+    actions: actions.slice(0, 5),
+    office: facts?.recommended ?? null,
+    alternatives: facts?.alternatives ?? [],
+    meta: { ...meta, fallback: false },
+  };
+}
+
 // ---------- Gespräch ----------
 
 function resetState(s, keepLocation = true) {
@@ -695,6 +979,7 @@ function resetState(s, keepLocation = true) {
   s.topic = '';
   s.lastServiceUrl = null;
   s.lastFacts = null;
+  s.history = [];
   if (!keepLocation) s.location = null;
 }
 
@@ -914,6 +1199,16 @@ export async function botReply({ sessionId, message, location, ip } = {}) {
       if (talk) {
         s.turns += 1;
         return { sessionId: s.id, ...talk, actions: [], office: null, alternatives: [], meta: { ...meta, fallback: true } };
+      }
+    }
+
+    // Tool-Calling-Agent: Wenn ein Modell konfiguriert ist, entscheidet es über die Werkzeuge.
+    // Der Regelpfad darunter bleibt nur Fallback (kein Key, Modellfehler, Erdung schlägt fehl).
+    if (text && llmAllowed()) {
+      const agent = await agentTurn({ text, s, loc, meta });
+      if (agent) {
+        s.turns += 1;
+        return agent;
       }
     }
 

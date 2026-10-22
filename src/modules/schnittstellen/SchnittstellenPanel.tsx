@@ -321,6 +321,15 @@ export function SchnittstellenPanel({ center, flyTo, setWissen, setLayer }: Modu
                         {d.title}
                         <small>{[d.organization, d.modified ? fmtDay(d.modified) : null, d.license].filter(Boolean).join(' · ')}</small>
                       </a>
+                      {d.resources.length > 0 && (
+                        <span className="wiss-resources">
+                          {d.resources.slice(0, 3).map((r) => (
+                            <a key={r.url} className="chip wiss-mini" href={r.url} target="_blank" rel="noreferrer" title={r.name}>
+                              {r.format || 'Download'}
+                            </a>
+                          ))}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>

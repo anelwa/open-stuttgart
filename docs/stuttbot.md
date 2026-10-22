@@ -33,33 +33,43 @@ Ein günstiges Flash-Lite-Modell entscheidet nicht selbst, welche Gebühr gilt o
 
 Das ist billiger, schneller und deutlich verlässlicher als ein Agent, der frei Werkzeuge auswählt. Es verhindert außerdem, dass das Modell erfundene URLs aufruft oder erfundene Gebühren nennt.
 
-### Werkzeuge laufen serverseitig und deterministisch
+### Das Modell ruft Werkzeuge selbst auf (Function Calling)
 
-Der Server entscheidet anhand des Katalogs und der Slot-Werte, welche Werkzeuge in welcher Reihenfolge laufen. Das Modell sieht nur das Ergebnis als kompaktes Fakten-JSON. Dadurch bleiben die Antworten reproduzierbar, und der API-Key wird nie an den Browser ausgeliefert.
+Ist ein Modell konfiguriert, arbeitet StuttBot als Tool-Calling-Agent: Das Modell entscheidet pro Runde selbst, ob es
+`suche_leistung`, `leistung_details`, `buergerbuero`, `route` oder `ort_suchen` aufruft, und formuliert die Antwort aus
+den Ergebnissen. Der Server führt die Werkzeuge aus, begrenzt die Schleife auf fünf Runden und erdet die Antwort
+anschließend hart. Ohne Key oder bei Modellfehlern greift der deterministische Regelpfad (Katalog, Slots, feste
+Reihenfolge). Der API-Key bleibt in beiden Fällen serverseitig.
 
 ### Ohne Key bleibt der Bot benutzbar
 
-Fehlt der Gemini-Key, ist das Tagesbudget aufgebraucht oder antwortet Google mit 429/5xx, greift derselbe Werkzeugpfad mit einer deterministischen Antwort. Die Oberfläche kennzeichnet das mit „Regelbasiert beantwortet“. Ein budgetlimitierter Key macht den Bot also nicht unbrauchbar, sondern nur weniger flüssig.
+Fehlt der Gemini-Key, ist das Tagesbudget aufgebraucht oder antwortet der Anbieter mit 429/5xx, greift der
+deterministische Regelpfad mit einer festen Antwort. Die Oberfläche kennzeichnet das mit „Regelbasiert beantwortet“.
+Ein budgetlimitierter Key macht den Bot also nicht unbrauchbar, sondern nur weniger flüssig.
 
 ## 3. Modell und Kosten
 
-Standardmodell ist **Gemini 2.5 Flash-Lite**. Es ist das günstigste Modell der Gemini-Familie und für Intent-Erkennung, Slot-Extraktion und kurze deutsche Antworten ausreichend. Über `OS_BOT_MODEL` lässt sich ohne Codeänderung auf ein stärkeres Flash-Lite wechseln.
+Im Betrieb läuft StuttBot über Atlas Cloud mit **`google/gemini-3.1-flash-lite`** (0,25 / 1,50 USD pro 1 Mio. Token,
+Prepaid). Ohne Provider-Präfix gilt Googles Standardmodell **Gemini 2.5 Flash-Lite**; über `OS_BOT_MODEL` lässt sich
+jedes kompatible Modell einsetzen, `OS_BOT_MODEL_FALLBACK` fängt Fehler des Hauptmodells ab.
 
 | Modell | Eingabe / 1 Mio. Token | Ausgabe / 1 Mio. Token | Einsatz |
 |---|---:|---:|---|
-| `gemini-2.5-flash-lite` | 0,10 USD | 0,40 USD | Standard, günstigster Pfad |
-| `gemini-3.1-flash-lite` | 0,25 USD | 1,50 USD | mehr Sprachqualität |
+| `gemini-2.5-flash-lite` | 0,10 USD | 0,40 USD | günstigster Pfad |
+| `gemini-3.1-flash-lite` | 0,25 USD | 1,50 USD | Standard im Betrieb (Atlas) |
 | `gemini-3.5-flash-lite` | 0,15 USD | 1,25 USD | neuere Generation, gute Balance |
 | `gemini-2.5-flash` | 0,30 USD | 2,50 USD | nur falls Flash-Lite zu schwach ist |
 
-Preise Stand 10/2026, maßgeblich ist die [Gemini-Preisseite](https://ai.google.dev/gemini-api/docs/pricing).
+Preise Stand 10/2026, maßgeblich sind die Preislisten von Google bzw. Atlas Cloud.
 
-Eine Runde besteht aus höchstens zwei Modellaufrufen:
+Je nach Anliegen braucht eine Runde **1–5 Modellaufrufe**: Eine reine Wegefrage ist nach einem Werkzeugaufruf
+beantwortet, ein Personalausweis-Anliegen typischerweise nach drei (Suche → Details → Bürgerbüro).
 
-- **Verstehen**: Intent + Slots + optional Ortsangabe, etwa 0,8–1,2k Eingabe-Token und 100 Ausgabe-Token.
-- **Formulieren**: Fakten-JSON + Regeln, etwa 1,3–1,8k Eingabe-Token und 150–250 Ausgabe-Token.
-
-Damit kostet eine Runde mit 2.5 Flash-Lite rund **0,03 bis 0,05 US-Cent**. Ein Gespräch mit drei Runden liegt bei etwa 0,1 US-Cent; 1.000 solcher Gespräche kosten rund 1 US-Dollar. Das Standard-Tagesbudget von 0,50 USD reicht damit für etwa 1.500 Runden pro Tag. Der echte Verbrauch wird aus `usageMetadata` der Gemini-Antwort berechnet und in `server/.cache/bot-budget.json` tagesgenau (Europe/Berlin) fortgeschrieben.
+Ein Modellaufruf liegt bei etwa 1,5–3k Eingabe- und 100–250 Ausgabe-Token, mit `gemini-3.1-flash-lite` also rund
+0,04–0,11 US-Cent. Eine Agentenrunde mit drei Aufrufen kostet damit **0,15–0,35 US-Cent**; 1.000 Gespräche mit je drei
+Runden liegen bei etwa 5–10 US-Dollar. Das Standard-Tagesbudget von 0,50 USD reicht für etwa 150–300 Runden pro Tag.
+Der echte Verbrauch wird aus `usageMetadata` der Antwort berechnet und in `server/.cache/bot-budget.json` tagesgenau
+(Europe/Berlin) fortgeschrieben — die Preise stehen in der `PRICES`-Tabelle in `server/sources/bot.mjs`.
 
 Der Key sollte auf Google-Seite zusätzlich ein hartes Tageslimit haben. Das lokale Budget ist der zweite Schutz, nicht der einzige.
 
@@ -68,45 +78,48 @@ Der Key sollte auf Google-Seite zusätzlich ein hartes Tageslimit haben. Das lok
 ```text
 Nutzertext
    │
-   ├─ Reset / Smalltalk / letzte Nachfrage?  → direkte Antwort
+   ├─ Reset / Smalltalk?                    → direkte Antwort
    │
-   ├─ Anliegen im Katalog? ──nein──> Gemini „Verstehen“ ──> Katalog
-   │                                      │
-   │                                      └─ kein Treffer → Verwaltungssuche
+   ├─ Modell verfügbar? ──ja──> Tool-Calling-Agent (max. 5 Runden)
+   │                             ├─ suche_leistung
+   │                             ├─ leistung_details
+   │                             ├─ buergerbuero (Wartezeit + Anfahrt)
+   │                             ├─ route (Wegefragen)
+   │                             └─ ort_suchen
+   │                             └─ Erdung: Beträge/Büronamen/URLs nur aus Werkzeugen
    │
-   ├─ fehlende Slot-Frage?  → eine Frage + Antwortchips
-   │
-   ├─ Standort fehlt?       → Adresse, PLZ oder „Standort freigeben“
-   │
-   ├─ Leistung laden        → verwaltungLeistung(url)
-   ├─ Orte + Wartezeit      → verwaltungWo(url, lat, lon)
-   ├─ Anfahrt               → route(von, nach, modus)
-   ├─ Fakten bauen          → Gebühr, Unterlagen, Terminlink, bester Ort
-   └─ Antwort               → Gemini „Formulieren“ oder deterministischer Text
+   └─ sonst / Modellfehler / Erdung fehlgeschlagen → deterministischer Regelpfad
+                                 ├─ Katalog + Slots
+                                 ├─ verwaltungLeistung / verwaltungWo
+                                 └─ route
 ```
 
 ### Beispiel: Personalausweis
 
 | Schritt | Nutzer | StuttBot |
 |---|---|---|
-| 1 | „Ich will einen Personalausweis beantragen“ | „Worum geht es beim Personalausweis?“ (Erstmalig/abgelaufen, verloren, Kind unter 16, Adresse ändern) |
-| 2 | „abgelaufen“ | „Wie alt bist du? Das entscheidet über die Gebühr.“ |
-| 3 | „34“ | „Wo startest du? Adresse, PLZ oder Standort.“ |
-| 4 | Standort Möhringen | „Bürgerbüro Vaihingen: nur mit Termin, mit Bahn/Bus 24 Minuten. Gebühr 46 Euro. Termin buchen …“ |
+| 1 | „Ich brauche einen neuen Personalausweis“ | Agent ruft `suche_leistung` und `leistung_details` auf, findet den Terminlink |
+| 2 | (Standort fehlt) | „Wo startest du? Adresse, PLZ oder Standort.“ |
+| 3 | Standort Möhringen | Agent ruft `buergerbuero` auf: „Bürgerbüro Vaihingen, mit Bahn/Bus 24 Minuten — Termin buchen …“ |
 
-Die Reihenfolge ist bewusst: erst die fachliche Einordnung, dann die Gebühr, dann der Ort. So muss der Bot nicht alle 23 Bürgerbüros anfragen, bevor klar ist, welche Leistung überhaupt gebraucht wird.
+Der Agent entscheidet selbst, in welcher Reihenfolge er sucht, Details lädt und den Ort auswertet. Beim reinen
+Personenausweis reicht oft ein Schritt; bei Sonderfällen (verloren, Kind unter 16) fragt das Modell nach.
 
 ## 5. Werkzeuge und Daten
 
 | Werkzeug | Eingabe | Ausgabe | Verwendung |
 |---|---|---|---|
-| Katalog / `detectIntent` | Freitext | Anliegen-ID | schnelle, kostenlose Ersterkennung |
-| Gemini `understand` | Freitext + Katalog | Intent, Slots, Ortsangabe | Paraphrasen und unklare Formulierungen |
-| `verwaltungSuche` | Freitext | Leistungen, Einheiten, Gebäude | Fallback für nicht kuratierte Anliegen |
-| `verwaltungLeistung` | URL | Abschnitte, Gebühren, Unterlagen, Online-Angebote, Terminlink | Faktenbasis |
-| `verwaltungWo` | Leistungs-URL + Koordinate | Orte mit Entfernung, „jetzt geöffnet“, Wartezeit, Terminlink | Ortsauswahl |
+| `suche_leistung` | Freitext | Leistungen mit URL | Agent: Einstieg in ein Anliegen |
+| `leistung_details` | URL | Unterlagen, Gebühren, Terminlink, Online-Dienst | Agent: Faktenbasis |
+| `buergerbuero` | Leistungs-URL | bestes Bürgerbüro, Wartezeit, Anfahrt, Alternativen | Agent: Ortswahl (intern `verwaltungWo` + `route`) |
+| `route` | Ziel, Modus | Varianten mit Dauer und Umstiegen | Agent: reine Wegefragen |
+| `ort_suchen` | Adresse, PLZ oder Ortsname | Koordinate + Label | Agent: Standort auflösen |
+| `detectIntent` / `understand` | Freitext + Katalog | Anliegen-ID, Slots | Regelpfad (Fallback) |
+| `verwaltungSuche` | Freitext | Leistungen, Einheiten, Gebäude | Regelpfad und `suche_leistung` |
+| `verwaltungLeistung` | URL | Abschnitte, Gebühren, Unterlagen, Online-Angebote, Terminlink | Regelpfad und `leistung_details` |
+| `verwaltungWo` | Leistungs-URL + Koordinate | Orte mit Entfernung, „jetzt geöffnet“, Wartezeit, Terminlink | Regelpfad und `buergerbuero` |
 | `buergerbueros` | – | Live-Ampel aller Bürgerbüros | Wartezeit |
-| `route` | von, nach, Modus | Varianten mit Dauer, Umstiegen, Echtzeit | Anfahrt |
+| `route` (intern) | von, nach, Modus | Varianten mit Dauer, Umstiegen, Echtzeit | Anfahrt |
 | `ortSuche` / `adresse` | Adresse oder PLZ | Koordinate + Label | Standort auflösen |
 
 ### Ortsauswahl
@@ -125,23 +138,26 @@ Der beste Treffer bekommt eine echte EFA-Route (ÖPNV) bzw. Valhalla-Route (zu F
 
 ## 6. Prompting und Erdung
 
-Der Systemprompt für die Antwort enthält nur wenige Regeln:
+Der Systemprompt des Agenten enthält nur wenige Regeln:
 
-- Deutsch, per „du“, 2 bis 4 Sätze,
-- ausschließlich Fakten aus dem JSON,
+- Deutsch, 2 bis 4 Sätze, keine Aufzählungen,
+- Werkzeuge nutzen statt raten,
+- ausschließlich Fakten aus den Werkzeugergebnissen,
+- fehlende Felder offen benennen (kein Allgemeinwissen zu Unterlagen, Preisen, Fristen),
 - keine erfundenen Gebühren, Fristen, Adressen oder Öffnungszeiten,
 - keine Behauptung, einen Termin gebucht zu haben,
-- höchstens ein Terminlink und ein Leistungslink,
+- keine URLs im Text (Links nur über Schaltflächen),
 - bei Notfällen 112, keine Rechtsberatung.
 
-Nach der Modellantwort prüft der Server hart:
+Nach der Modellantwort prüft der Server hart gegen die Werkzeugergebnisse:
 
-- jede Zahl mit „Euro“/„€“ muss im Fakten-JSON vorkommen,
-- jeder genannte Bürgerbüro-Name muss im Fakten-JSON vorkommen,
-- jede URL muss im Fakten-JSON vorkommen,
+- jede Zahl mit „Euro“/„€“ muss in den Werkzeugergebnissen vorkommen,
+- jeder genannte Bürgerbüro-Name muss dort vorkommen,
+- URLs im Fließtext führen zur Verwerfung (Links gehören in die Aktionen),
 - Formulierungen wie „gebucht“ oder „reserviert“ führen zur Verwerfung.
 
-Wenn eine Prüfung fehlschlägt, wird die deterministische Antwort verwendet. Das Modell kann damit im schlechtesten Fall schlechter formulieren, aber keine falschen Fakten in die Welt setzen.
+Wenn eine Prüfung fehlschlägt, greift der deterministische Regelpfad. Das Modell kann damit im schlechtesten Fall
+schlechter formulieren, aber keine falschen Fakten in die Welt setzen.
 
 ## 7. Budget, Missbrauch und Betrieb
 
