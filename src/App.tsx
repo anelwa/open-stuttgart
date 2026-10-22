@@ -23,6 +23,7 @@ import { StartPanel } from './components/StartPanel';
 import { QuickActions } from './components/QuickActions';
 import { ANLIEGEN, type Anliegen } from './lib/anliegen';
 import { Disclosure } from './components/ui';
+import { StuttBot } from './components/StuttBot';
 
 const DEFAULT_VISIBLE: Record<OverlayKey, boolean> = {
   network: true, stops: true, parking: true, sharing: false, roadworks: true, bike: false, air: true, water: true, events: true, places: true, sun: false, radar: true, aerial: false, nearby: true, live: true, route: true, vehicles: true, traffic: false, warnung: true, flug: false, kaltluft: false, unfall: false, hike: false,
@@ -73,6 +74,7 @@ function Shell() {
   const [info, setInfo] = useState<{ page: InfoPage; anchor?: string } | null>(null);
   const [docId, setDocId] = useState<number | null>(null);
   const [layersOpen, setLayersOpen] = useState(false);
+  const [botOpen, setBotOpen] = useState(false);
   const [locateMsg, setLocateMsg] = useState<string | null>(null);
   const openInfo = useCallback((page: InfoPage, anchor?: string) => setInfo({ page, anchor }), []);
   const [aerial, setAerial] = useState({ year: AERIAL_YEARS[AERIAL_YEARS.length - 1], opacity: 1 });
@@ -159,7 +161,7 @@ function Shell() {
     }
   };
 
-  const sheetBottom = sheet === 'mini' ? 0.1 : sheet === 'open' ? 0.86 : 0.46;
+  const sheetBottom = sheet === 'mini' ? 0.1 : sheet === 'open' ? 0.86 : 0.42;
 
   useEffect(() => {
     if (!locateMsg) return;
@@ -194,7 +196,7 @@ function Shell() {
       : { left: 440, right: 440, bottom: 0 }, [mobile, compact]);
   const padding = useMemo(() => selection ? detailPadding : mobile
     ? { left: 0, right: 0, bottom: Math.round(window.innerHeight * sheetBottom) }
-    : { left: compact ? 396 : 440, right: 0, bottom: 0 }, [mobile, compact, selection, detailPadding, sheetBottom]);
+    : { left: compact ? 396 : 440, right: botOpen ? 436 : 0, bottom: 0 }, [mobile, compact, selection, detailPadding, sheetBottom, botOpen]);
 
   const flyTo = useCallback((c: [number, number], z?: number) => mapRef.current?.flyTo(c, z), []);
   const fitBounds = useCallback((bounds: [[number, number], [number, number]], opts?: { maxZoom?: number }) => mapRef.current?.fitBounds(bounds, opts), []);
@@ -304,7 +306,7 @@ function Shell() {
   return (
     <InfoProvider open={openInfo}>
     <RouteProvider plan={planRoute}>
-    <div className={`app ${mobile ? 'is-mobile' : ''} ${mod ? 'has-module' : ''} sheet-${sheet} ${showDetail ? 'has-detail' : ''}`}>
+    <div className={`app ${mobile ? 'is-mobile' : ''} ${mod ? 'has-module' : ''} sheet-${sheet} ${showDetail ? 'has-detail' : ''} ${botOpen ? 'bot-open' : ''}`}>
       <MapView
         ref={mapRef}
         theme={theme}
@@ -331,6 +333,7 @@ function Shell() {
       <QuickActions
         active={anliegenId}
         onPick={(a) => { setAnliegenId(a.id); openAnliegen(a); }}
+        onBot={() => { setBotOpen(true); setSelection(null); }}
       />
 
       <aside className={`panel ${mod ? 'has-module' : ''}`} aria-label="Themen und Ebenen">
@@ -379,6 +382,18 @@ function Shell() {
               <h1><em>Open</em> Stuttgart</h1>
               <p>{tr('Offene Daten der Landeshauptstadt auf einer Karte')}</p>
             </div>
+            {w && (
+              <button
+                type="button"
+                className="brand-weather"
+                onClick={() => openModule('environment', 'wetter', 'wetter')}
+                aria-label={`Wetter ${fmtDec(w.temperature)} Grad, Luftqualität und Vorhersage`}
+                title="Wetter und Luftqualität"
+              >
+                <Icon name={weatherIconName(w.icon)} size={17} />
+                <strong>{fmtDec(w.temperature)}°</strong>
+              </button>
+            )}
           </div>
         </header>
 
@@ -506,6 +521,15 @@ function Shell() {
         onRoute={() => { setAnliegenId('anreise'); openModule('route', 'route', 'anreise'); }}
       />
       <LayerSheet open={layersOpen} onClose={() => setLayersOpen(false)} visible={visible} toggle={toggle} theme={theme} onTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} terrain={terrain} onTerrain={() => setTerrain((t) => !t)} onResetNorth={() => mapRef.current?.resetNorth()} />
+      <StuttBot
+        open={botOpen}
+        onClose={() => setBotOpen(false)}
+        onMap={(lngLat, _name, id) => {
+          setVisible((v) => (v.nearby ? v : { ...v, nearby: true }));
+          flyTo(lngLat, 16);
+          if (id) select({ type: 'verwaltung_gebaeude', id, lngLat });
+        }}
+      />
       {locateMsg && (
         <div className="app-toast" role="status">
           <Icon name="locate" size={18} />

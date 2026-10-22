@@ -16,7 +16,8 @@
     "data:wanderwege": "node scripts/build-wanderwege.mjs",
     "data:geocaches": "node scripts/build-geocaches.mjs",
     "data:search": "node scripts/build-search-db.mjs",
-    "check:wasgeht": "node scripts/check-wasgeht-quellen.mjs"
+    "check:wasgeht": "node scripts/check-wasgeht-quellen.mjs",
+    "check:bot": "node scripts/bot-eval.mjs"
   },
   "engines": {
     "node": ">=22.5"

@@ -192,12 +192,8 @@ button {
   line-height: 1.35;
 }
 
-.demo-tag {
-  background: rgba(255, 255, 255, .08);
-  border-color: rgba(255, 255, 255, .24);
-  font-size: 10.5px;
-  letter-spacing: .08em;
-  padding: 4px 8px;
+.brand-weather {
+  display: none;
 }
 
 .panel-scroll {
@@ -1607,8 +1603,8 @@ button {
     right: 0;
     bottom: 0;
     width: auto;
-    height: 46vh;
-    height: 46dvh;
+    height: 42vh;
+    height: 42dvh;
     border: 0;
     border-radius: 28px 28px 0 0;
   }
@@ -1668,6 +1664,142 @@ button {
     bottom: calc(94px + env(safe-area-inset-bottom));
   }
 
+  /* Vollbild für Module: eine Aufgabe, eine Fläche, kein Bedienchaos darüber. */
+  .is-mobile.has-module .panel {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  .is-mobile.has-module .panel-scroll {
+    padding-top: calc(env(safe-area-inset-top) + 8px);
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .is-mobile.has-module .sheet-handle {
+    display: none;
+  }
+
+  .is-mobile.has-module .panel-crumb {
+    top: 0;
+    padding-top: calc(env(safe-area-inset-top) + 18px);
+    padding-bottom: 11px;
+    touch-action: none;
+  }
+
+  .is-mobile.has-module .panel-crumb::before {
+    content: '';
+    position: absolute;
+    top: calc(env(safe-area-inset-top) + 7px);
+    left: 50%;
+    width: 44px;
+    height: 4px;
+    border-radius: 99px;
+    background: var(--line-strong);
+    transform: translateX(-50%);
+  }
+
+  /* Auf der Vollbildseite gibt es keine schwebenden Kartenbedienelemente mehr. */
+  .is-mobile.has-module .search-dock,
+  .is-mobile.has-module .quick-actions,
+  .is-mobile.has-module .status-cluster,
+  .is-mobile.has-module .map-controls,
+  .is-mobile.has-module .aerial-card {
+    display: none;
+  }
+
+  /* Auch ein voll aufgezogenes Startblatt ist eine eigene Fläche. */
+  .is-mobile.sheet-open .search-dock,
+  .is-mobile.sheet-open .quick-actions,
+  .is-mobile.sheet-open .status-cluster,
+  .is-mobile.sheet-open .map-controls {
+    display: none;
+  }
+
+  .is-mobile.sheet-open .panel {
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  /* Detailansicht mobil: echtes Vollbild mit festem Kopf und einem Scrollbereich. */
+  .is-mobile.has-detail .detail {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: 100vh;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    z-index: 75;
+    animation: slideUp .24s cubic-bezier(.2, .8, .2, 1);
+  }
+
+  .is-mobile.has-detail .sheet-head {
+    padding-top: calc(env(safe-area-inset-top) + 18px);
+    border-radius: 0 0 0 36px;
+  }
+
+  .is-mobile.has-detail .sheet-body {
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+  }
+
+  .is-mobile.has-detail .search-dock,
+  .is-mobile.has-detail .quick-actions,
+  .is-mobile.has-detail .status-cluster,
+  .is-mobile.has-detail .map-controls,
+  .is-mobile.has-detail .aerial-card {
+    display: none;
+  }
+
+  .mobile-grab {
+    display: none;
+  }
+
+  .is-mobile.has-detail .mobile-grab {
+    display: block;
+    position: absolute;
+    top: calc(env(safe-area-inset-top) + 7px);
+    left: 50%;
+    width: 44px;
+    height: 4px;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, .42);
+    transform: translateX(-50%);
+    z-index: 3;
+  }
+
+  .is-mobile.has-detail .sheet-head {
+    touch-action: none;
+  }
+
+  /* Auf kleinen Bildschirmen bleibt von der Kartensteuerung nur das Nötigste.
+     Darstellung (3D, Luftbild, Dunkelmodus, Norden) liegt im Ebenen-Blatt. */
+  .is-mobile .ctrl--3d,
+  .is-mobile .ctrl--aerial,
+  .is-mobile .ctrl--compass,
+  .is-mobile .ctrl--theme,
+  .is-mobile .ctrl-gap--theme {
+    display: none;
+  }
+
+  .is-mobile .map-controls {
+    gap: 1px;
+  }
+
+  /* Detail gewinnt immer gegen eine eventuell offene Modul-Raste. */
+  .is-mobile.has-detail .panel {
+    height: 0;
+  }
+
   .has-detail .panel {
     height: 0;
   }
@@ -1709,6 +1841,35 @@ button {
     font-size: 19.5px;
   }
 
+  .brand-weather {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    min-height: 38px;
+    padding: 0 11px;
+    border: 1px solid rgba(255, 255, 255, .22);
+    border-radius: 99px;
+    background: rgba(255, 255, 255, .08);
+    color: inherit;
+    font-size: 13px;
+  }
+
+  .brand-weather strong {
+    font-family: var(--font-head);
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  .brand-weather:hover {
+    background: rgba(255, 255, 255, .14);
+    border-color: rgba(255, 255, 255, .38);
+  }
+
+  .is-mobile .status-cluster {
+    display: none;
+  }
+
   .brand p {
     display: none;
   }
@@ -1725,11 +1886,6 @@ button {
 
   .panel.has-module .panel-scroll {
     padding-top: 18px;
-  }
-
-  .demo-tag {
-    font-size: 10px;
-    padding: 3px 8px;
   }
 
   .panel-crumb {
@@ -1906,7 +2062,7 @@ button {
     top: auto;
     left: 12px;
     right: 12px;
-    bottom: calc(46dvh + 12px);
+    bottom: calc(42dvh + 12px);
     width: auto;
     min-width: 0;
     transform: none;
@@ -1948,7 +2104,7 @@ button {
   }
 
   .maplibregl-ctrl-bottom-right {
-    bottom: calc(46dvh + 6px);
+    bottom: calc(42dvh + 6px);
     right: 8px;
   }
 

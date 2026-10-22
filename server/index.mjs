@@ -34,6 +34,7 @@ import { maengelUebergabe, partnerDaten, partnerStatus } from './sources/partner
 import { archivDatei, archivTage, startVerlauf } from './sources/verlauf.mjs';
 import { abfall, adresse, baeder, buergerbueros, categories, facilities, freizeitRouten, gesundheit, gruenstrom, laden, schulbezirk } from './sources/nearby.mjs';
 import { verwaltungGebaeude, verwaltungLeistung, verwaltungSuche, verwaltungWerkzeug, verwaltungWo } from './sources/verwaltung.mjs';
+import { botReply, botStatus } from './sources/bot.mjs';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
@@ -121,12 +122,39 @@ const routes = {
   '/api/geocaches': (q) => geocaches({ lat: q.get('lat'), lon: q.get('lon'), r: q.get('r'), limit: q.get('limit') }),
   '/api/mensa': (q) => mensen(q.get('date')),
   '/api/health': async () => ({ ok: true, time: new Date().toISOString() }),
+  '/api/bot/health': async () => botStatus(),
 };
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
   '.geojson': 'application/geo+json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ico': 'image/x-icon',
 };
+
+/** JSON-Body mit harter Obergrenze; der Bot braucht nur wenige Kilobyte. */
+async function readJsonBody(req, limit = 32_768) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > limit) throw Object.assign(new Error('Anfrage zu groß'), { status: 413 });
+    chunks.push(chunk);
+  }
+  if (!chunks.length) return {};
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    throw Object.assign(new Error('Ungültiges JSON'), { status: 400 });
+  }
+}
+
+/** Hinter Dokploy/nginx steht die echte Adresse im Proxy-Header. */
+function clientIp(req) {
+  if (process.env.OS_TRUST_PROXY === '1') {
+    const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
+    if (forwarded) return forwarded;
+  }
+  return req.socket.remoteAddress ?? 'unbekannt';
+}
 
 async function serveStatic(res, pathname) {
   let file = normalize(join(DIST, decodeURIComponent(pathname)));
@@ -152,6 +180,29 @@ async function serveStatic(res, pathname) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
+
+  if (req.method === 'POST' && url.pathname === '/api/bot') {
+    const t0 = Date.now();
+    try {
+      const body = await readJsonBody(req);
+      const data = await botReply({
+        sessionId: body.sessionId,
+        message: body.message,
+        location: body.location,
+        ip: clientIp(req),
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(data));
+      if (process.env.LOG) console.log(`/api/bot ${Date.now() - t0} ms`);
+    } catch (err) {
+      const status = err.status ?? 502;
+      console.warn(`/api/bot: ${err.message}`);
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: err.message ?? 'StuttBot nicht erreichbar' }));
+    }
+    return;
+  }
+
   const handler = routes[url.pathname];
   if (handler) {
     const t0 = Date.now();
