@@ -196,8 +196,8 @@ export function BahnHbf({ className }: { className?: string }) {
         {hist.error && !hist.data && <ErrorNote text={`Monatswerte nicht verfügbar: ${hist.error}`} onRetry={hist.reload} />}
         {hist.data && <Verlauf h={hist.data} />}
         <Source>Verspätungsdaten DB: Deutsche Bahn (CC BY 4.0), aufbereitet im Datensatz piebro/deutsche-bahn-data; eigene Auswertung für Stuttgart Hbf.</Source>
+        <Source>{data?.quelle ?? 'Verspätungsdaten DB: Deutsche Bahn (CC BY 4.0)'}. Änderungen höchstens alle 3 Minuten, Sollfahrplan stündlich.</Source>
       </Section>
-      <Source>{data?.quelle ?? 'Verspätungsdaten DB: Deutsche Bahn (CC BY 4.0)'}. Änderungen höchstens alle 3 Minuten, Sollfahrplan stündlich.</Source>
     </>
   );
 }

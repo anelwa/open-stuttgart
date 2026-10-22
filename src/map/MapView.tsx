@@ -37,6 +37,8 @@ export interface MapHandle {
   fitBounds: (bounds: [[number, number], [number, number]], opts?: { maxZoom?: number }) => void;
   zoomBy: (d: number) => void;
   resetNorth: () => void;
+  /** Eigenen Standort als Marker setzen und dorthin fahren. */
+  locate: (lngLat: [number, number], zoom?: number) => void;
   getMap: () => MlMap | null;
 }
 
@@ -164,6 +166,7 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
   const hoverPopup = useRef<maplibregl.Popup | null>(null);
   const sunUrl = useRef<string | null>(null);
   const radarUrl = useRef<string | null>(null);
+  const userMarker = useRef<maplibregl.Marker | null>(null);
 
   useImperativeHandle(ref, () => ({
     flyTo: (lngLat, zoom = 15) => {
@@ -192,6 +195,26 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
     },
     zoomBy: (d) => mapRef.current?.easeTo({ zoom: mapRef.current.getZoom() + d, duration: 300 }),
     resetNorth: () => mapRef.current?.easeTo({ bearing: 0, pitch: propsRef.current.terrain ? 55 : 0, duration: 500 }),
+    locate: (lngLat, zoom = 15) => {
+      const m = mapRef.current;
+      if (!m) return;
+      if (!userMarker.current) {
+        const dot = document.createElement('div');
+        dot.className = 'user-location';
+        dot.setAttribute('aria-hidden', 'true');
+        dot.innerHTML = '<span></span>';
+        userMarker.current = new maplibregl.Marker({ element: dot, anchor: 'center' }).setLngLat(lngLat).addTo(m);
+      } else {
+        userMarker.current.setLngLat(lngLat);
+      }
+      m.flyTo({
+        center: lngLat,
+        zoom: Math.max(m.getZoom(), zoom),
+        padding: { top: 0, ...propsRef.current.padding },
+        speed: 1.1,
+        essential: true,
+      });
+    },
     getMap: () => mapRef.current,
   }));
 
@@ -361,7 +384,7 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
 
     m.on('click', async (e: MapMouseEvent) => {
       const layers = INTERACTIVE_LAYERS.filter((id) => m.getLayer(id));
-      const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]];
+      const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [[e.point.x - 12, e.point.y - 12], [e.point.x + 12, e.point.y + 12]];
       const f = m.queryRenderedFeatures(bbox, { layers })[0];
       popup.remove();
       if (!f) { propsRef.current.onSelect(null); return; }

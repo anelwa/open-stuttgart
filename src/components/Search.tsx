@@ -128,7 +128,12 @@ export function Search({
 
   return (
     <div className="search-dock" ref={box}>
-      <div className={`search-pill ${showPanel ? 'is-open' : ''}`}>
+      <div
+        className={`search-pill ${showPanel ? 'is-open' : ''}`}
+        onClick={(e) => {
+          if (!(e.target as HTMLElement).closest('button')) inputRef.current?.focus();
+        }}
+      >
         <Icon name="search" size={19} className="search-icon" />
       <input
         ref={inputRef}

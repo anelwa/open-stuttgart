@@ -73,6 +73,7 @@ function Shell() {
   const [info, setInfo] = useState<{ page: InfoPage; anchor?: string } | null>(null);
   const [docId, setDocId] = useState<number | null>(null);
   const [layersOpen, setLayersOpen] = useState(false);
+  const [locateMsg, setLocateMsg] = useState<string | null>(null);
   const openInfo = useCallback((page: InfoPage, anchor?: string) => setInfo({ page, anchor }), []);
   const [aerial, setAerial] = useState({ year: AERIAL_YEARS[AERIAL_YEARS.length - 1], opacity: 1 });
   const radarImg = useMemo(() => {
@@ -124,6 +125,32 @@ function Shell() {
   }, []);
 
   const sheetBottom = sheet === 'mini' ? 0.1 : sheet === 'open' ? 0.86 : 0.46;
+
+  useEffect(() => {
+    if (!locateMsg) return;
+    const t = setTimeout(() => setLocateMsg(null), 4500);
+    return () => clearTimeout(t);
+  }, [locateMsg]);
+
+  const locateMe = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocateMsg('Dieser Browser kann keinen Standort ermitteln.');
+      return;
+    }
+    setLocateMsg('Standort wird ermittelt …');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        mapRef.current?.locate([pos.coords.longitude, pos.coords.latitude], 15);
+        setLocateMsg(null);
+      },
+      (err) => {
+        setLocateMsg(err.code === err.PERMISSION_DENIED
+          ? 'Standort nicht freigegeben. Bitte in den Browser-Einstellungen erlauben.'
+          : 'Standort konnte nicht ermittelt werden. Bitte erneut versuchen.');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  }, []);
 
   const detailPadding = useMemo(() => mobile
     ? { left: 0, right: 0, bottom: Math.round(window.innerHeight * 0.62) }
@@ -242,7 +269,7 @@ function Shell() {
   return (
     <InfoProvider open={openInfo}>
     <RouteProvider plan={planRoute}>
-    <div className={`app ${mobile ? 'is-mobile' : ''} sheet-${sheet} ${showDetail ? 'has-detail' : ''}`}>
+    <div className={`app ${mobile ? 'is-mobile' : ''} ${mod ? 'has-module' : ''} sheet-${sheet} ${showDetail ? 'has-detail' : ''}`}>
       <MapView
         ref={mapRef}
         theme={theme}
@@ -311,7 +338,6 @@ function Shell() {
               <h1><em>Open</em> Stuttgart</h1>
               <p>{tr('Offene Daten der Landeshauptstadt auf einer Karte')}</p>
             </div>
-            <span className="demo-tag">Demo</span>
           </div>
         </header>
 
@@ -365,21 +391,25 @@ function Shell() {
       </div>
 
       <div className="map-controls" role="group" aria-label="Kartensteuerung">
+        <button type="button" className="ctrl ctrl--locate" data-tip="Mein Standort" onClick={locateMe} aria-label="Mein Standort anzeigen" title="Mein Standort">
+          <Icon name="locate" />
+        </button>
+        <span className="ctrl-gap" />
         <button type="button" className="ctrl" data-tip="Hineinzoomen" onClick={() => mapRef.current?.zoomBy(1)} aria-label="Hineinzoomen"><Icon name="plus" /></button>
         <button type="button" className="ctrl" data-tip="Herauszoomen" onClick={() => mapRef.current?.zoomBy(-1)} aria-label="Herauszoomen"><Icon name="minus" /></button>
         <span className="ctrl-gap" />
         <button type="button" className={`ctrl ${layersOpen ? 'on' : ''}`} data-tip="Kartenebenen" onClick={() => setLayersOpen((v) => !v)} aria-pressed={layersOpen} aria-label="Kartenebenen" title="Ebenen">
           <Icon name="layers" />
         </button>
-        <button type="button" className={`ctrl ${terrain ? 'on' : ''}`} data-tip="3D-Gelände" onClick={() => setTerrain((t) => !t)} aria-pressed={terrain} aria-label="3D-Ansicht mit Gelände" title="3D-Gelände">
+        <button type="button" className={`ctrl ctrl--3d ${terrain ? 'on' : ''}`} data-tip="3D-Gelände" onClick={() => setTerrain((t) => !t)} aria-pressed={terrain} aria-label="3D-Ansicht mit Gelände" title="3D-Gelände">
           <span className="ctrl-txt">3D</span>
         </button>
-        <button type="button" className={`ctrl ${visible.aerial ? 'on' : ''}`} data-tip="Luftbilder" onClick={() => toggle('aerial')} aria-pressed={visible.aerial} aria-label="Luftbilder 2006 bis 2025" title="Luftbilder">
+        <button type="button" className={`ctrl ctrl--aerial ${visible.aerial ? 'on' : ''}`} data-tip="Luftbilder" onClick={() => toggle('aerial')} aria-pressed={visible.aerial} aria-label="Luftbilder 2006 bis 2025" title="Luftbilder">
           <Icon name="image" />
         </button>
-        <button type="button" className="ctrl" data-tip="Nach Norden" onClick={() => mapRef.current?.resetNorth()} aria-label="Nach Norden ausrichten"><Icon name="compass" /></button>
-        <span className="ctrl-gap" />
-        <button type="button" className="ctrl" data-tip={theme === 'dark' ? 'Helle Ansicht' : 'Dunkle Ansicht'} onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} aria-label={theme === 'dark' ? 'Helle Ansicht' : 'Dunkle Ansicht'}>
+        <button type="button" className="ctrl ctrl--compass" data-tip="Nach Norden" onClick={() => mapRef.current?.resetNorth()} aria-label="Nach Norden ausrichten"><Icon name="compass" /></button>
+        <span className="ctrl-gap ctrl-gap--theme" />
+        <button type="button" className="ctrl ctrl--theme" data-tip={theme === 'dark' ? 'Helle Ansicht' : 'Dunkle Ansicht'} onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} aria-label={theme === 'dark' ? 'Helle Ansicht' : 'Dunkle Ansicht'}>
           <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
         </button>
       </div>
@@ -419,7 +449,16 @@ function Shell() {
         onOpenDocument={(id) => setDocId(id)}
         onRoute={() => { setAnliegenId('anreise'); openModule('route', 'route', 'anreise'); }}
       />
-      <LayerSheet open={layersOpen} onClose={() => setLayersOpen(false)} visible={visible} toggle={toggle} />
+      <LayerSheet open={layersOpen} onClose={() => setLayersOpen(false)} visible={visible} toggle={toggle} theme={theme} onTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} terrain={terrain} onTerrain={() => setTerrain((t) => !t)} onResetNorth={() => mapRef.current?.resetNorth()} />
+      {locateMsg && (
+        <div className="app-toast" role="status">
+          <Icon name="locate" size={18} />
+          <span>{locateMsg}</span>
+          <button type="button" className="icon-btn ghost" aria-label="Hinweis schließen" onClick={() => setLocateMsg(null)}>
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+      )}
     </div>
     </RouteProvider>
     </InfoProvider>

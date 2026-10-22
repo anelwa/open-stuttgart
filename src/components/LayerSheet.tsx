@@ -52,8 +52,9 @@ const GROUPS: { label: string; items: Item[] }[] = [
   },
 ];
 
-export function LayerSheet({ open, onClose, visible, toggle }: {
+export function LayerSheet({ open, onClose, visible, toggle, theme, onTheme, terrain, onTerrain, onResetNorth }: {
   open: boolean; onClose: () => void; visible: Record<OverlayKey, boolean>; toggle: (k: OverlayKey) => void;
+  theme: 'light' | 'dark'; onTheme: () => void; terrain: boolean; onTerrain: () => void; onResetNorth: () => void;
 }) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);

@@ -102,22 +102,26 @@ Im Browser öffnen. Fehlt die Suchdatenbank, antwortet `/api/search` mit `503` u
 
 ## Aktualisieren
 
-- **Code:** `git push` auf `main`, danach in Dokploy *Deploy* (oder Auto-Deploy aktivieren). Der Build ist reproduzierbar,
-  die Datenbestände bleiben unangetastet.
-- **Daten:** erneut `rsync` (Schritt 1). Ein Neustart des Containers ist nur nötig, wenn die Suchdatenbank gerade
-  ersetzt wurde (sie wird schreibgeschützt geöffnet); ansonsten liest der Server die Dateien bei Bedarf neu.
+- **Code:** `git push` auf `main` löst über den GitHub-Webhook automatisch ein Deploy aus (Auto-Deploy ist aktiv,
+  Webhook-URL aus den Deployments der Application in Dokploy). Die Datenbestände bleiben dabei unangetastet.
+- **Daten:** `scripts/push-data.sh` erzeugt die Bestände neu (`npm run data:verwaltung`, `npm run data:search`),
+  spielt sie per `tar`-Pipe auf den Server und startet die App neu (die Suchdatenbank wird nur beim Start geöffnet).
+  Von Hand geht es genauso: Schritt 1 ausführen, danach in Dokploy *Reload*. `npm run check:wasgeht` prüft die
+  Event-Quellen.
 - **Zwischenstände:** `server/.cache/` überlebt Deploys (Tagesarchive der Bäder/Bürgerbüros, Pünktlichkeits-Archiv,
   Stadtgedächtnis-Snapshot), weil es ein Volume ist.
 
 ## Optional: Gancio (offenes Veranstaltungsregister)
 
-Gancio läuft als eigener Dienst (siehe [`gancio/`](../gancio/)):
+Gancio läuft als eigener Dienst und ist als Compose-Service in Dokploy eingerichtet (Image `cisti/gancio:1.28.2`,
+Konfiguration unter `/opt/open-stuttgart/gancio/` auf dem Server: `config.json`, `data/`, `user_locale/`):
 
-1. In Dokploy eine *Compose*-Service anlegen und `gancio/docker-compose.yml` verwenden (Image `cisti/gancio:1.28.2`),
-   oder den Container manuell auf dem VPS starten: `cd gancio && cp config.json.example config.json && docker compose up -d`.
-2. Volume für `gancio/data` anlegen, damit Einträge den Neustart überleben.
-3. Domain für Gancio eintragen (z. B. `termine.example.de`, interner Port `13120`).
-4. In der App setzen: `OS_GANCIO_URL=https://termine.example.de` und erneut deployen.
+1. Domain (z. B. `termine.example.de`) als CNAME auf die App-Domain zeigen lassen und in Dokploy beim
+   Compose-Dienst als Domain eintragen (Port `13120`, HTTPS).
+2. In der App setzen: `OS_GANCIO_URL=https://termine.example.de` und einmal neu deployen.
+3. Nach dem ersten Start in der Gancio-Verwaltung (`/admin`) die Grundeinstellungen aus
+   [`docs/gancio-register-und-ansprachen.md`](gancio-register-und-ansprachen.md) setzen (Titel, Zeitzone,
+   Registrierung, Moderation) und einen Admin-Account anlegen.
 
 ## Betrieb und Fehlersuche
 

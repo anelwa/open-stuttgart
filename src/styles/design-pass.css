@@ -121,6 +121,35 @@ button {
   animation: spin .9s linear infinite;
 }
 
+/* Eigener Standort: blauer Punkt mit weißem Ring, gut sichtbar auf hellem und dunklem Kartenstil. */
+.user-location {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--water);
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px rgba(38, 38, 44, .28), 0 3px 10px rgba(0, 0, 0, .28);
+  position: relative;
+}
+
+.user-location::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--water) 55%, transparent);
+  animation: location-pulse 2.4s ease-out infinite;
+}
+
+@keyframes location-pulse {
+  from { transform: scale(.7); opacity: .8; }
+  to { transform: scale(1.35); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-location::after { animation: none; opacity: .45; }
+}
+
 /* ---------- Flächen und Kopfbereiche ----------------------------------- */
 
 .panel,
@@ -885,7 +914,13 @@ button {
   padding: 8px 8px 8px 18px;
   border-color: var(--line);
   box-shadow: var(--shadow-float);
+  cursor: text;
   transition: border-color .15s, box-shadow .18s;
+}
+
+.search-pill .search-go,
+.search-pill .search-clear {
+  cursor: pointer;
 }
 
 .search-pill:hover {
@@ -904,6 +939,9 @@ button {
 }
 
 .search-pill input {
+  flex: 1;
+  min-width: 0;
+  padding: 0 0 0 36px;
   font-size: 15.5px;
 }
 
@@ -2001,9 +2039,54 @@ button {
   .ctrl::after {
     transition: none;
   }
+
+  .skeleton {
+    animation: none;
+    background: var(--line);
+  }
+
+  .map-loading-spinner {
+    border-top-color: var(--accent);
+    border-right-color: var(--accent);
+  }
 }
 
 /* ---------- Mehr Kontrast auf Wunsch ----------------------------------- */
+
+@media (pointer: coarse) {
+  .icon-btn,
+  .search-go,
+  .search-clear {
+    width: 44px;
+    height: 44px;
+  }
+
+  .chip {
+    min-height: 42px;
+  }
+
+  .quick-pill {
+    min-height: 42px;
+  }
+
+  .status-pill {
+    min-height: 42px;
+  }
+
+  .explain {
+    width: 40px;
+    height: 40px;
+  }
+
+  .seg button {
+    min-height: 36px;
+  }
+
+  .ctrl {
+    width: 44px;
+    height: 44px;
+  }
+}
 
 @media (prefers-contrast: more) {
   :root {
