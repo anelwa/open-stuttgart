@@ -107,6 +107,26 @@ export function LayerSheet({ open, onClose, visible, toggle, theme, onTheme, ter
             </div>
           </section>
         ))}
+        <section className="layers-group">
+          <h4>Darstellung</h4>
+          <div className="layers-list">
+            <button type="button" className={`layer-toggle ${terrain ? 'on' : ''}`} aria-pressed={terrain} onClick={onTerrain}>
+              <span className="layer-ico"><span className="ctrl-txt">3D</span></span>
+              <span className="layer-txt"><strong>3D-Gelände</strong><small>Schräge Ansicht mit Höhenrelief</small></span>
+              <span className={`layer-switch ${terrain ? 'on' : ''}`} aria-hidden />
+            </button>
+            <button type="button" className={`layer-toggle ${theme === 'dark' ? 'on' : ''}`} aria-pressed={theme === 'dark'} onClick={onTheme}>
+              <span className="layer-ico"><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} /></span>
+              <span className="layer-txt"><strong>{theme === 'dark' ? 'Helle Ansicht' : 'Dunkle Ansicht'}</strong><small>Karte und Oberfläche umschalten</small></span>
+              <span className={`layer-switch ${theme === 'dark' ? 'on' : ''}`} aria-hidden />
+            </button>
+            <button type="button" className="layer-toggle" onClick={onResetNorth}>
+              <span className="layer-ico"><Icon name="compass" size={17} /></span>
+              <span className="layer-txt"><strong>Nach Norden ausrichten</strong><small>Karte drehen und neigen zurücksetzen</small></span>
+              <Icon name="chevron" size={15} className="muted" />
+            </button>
+          </div>
+        </section>
         <footer className="layers-foot">
           <span className="muted small">Die Werte hinter den Ebenen sind unter „Wie entstehen die Werte?“ erklärt.</span>
         </footer>

@@ -102,8 +102,9 @@ Im Browser öffnen. Fehlt die Suchdatenbank, antwortet `/api/search` mit `503` u
 
 ## Aktualisieren
 
-- **Code:** `git push` auf `main` löst über den GitHub-Webhook automatisch ein Deploy aus (Auto-Deploy ist aktiv,
-  Webhook-URL aus den Deployments der Application in Dokploy). Die Datenbestände bleiben dabei unangetastet.
+- **Code:** `git push` auf `main` löst über den GitHub-Actions-Workflow [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
+  ein Deploy aus (Webhook-URL der Application als Secret `DOKPLOY_WEBHOOK_TOKEN`; die Deployments sind in den
+  Workflow-Logs und in Dokploy nachvollziehbar). Die Datenbestände bleiben dabei unangetastet.
 - **Daten:** `scripts/push-data.sh` erzeugt die Bestände neu (`npm run data:verwaltung`, `npm run data:search`),
   spielt sie per `tar`-Pipe auf den Server und startet die App neu (die Suchdatenbank wird nur beim Start geöffnet).
   Von Hand geht es genauso: Schritt 1 ausführen, danach in Dokploy *Reload*. `npm run check:wasgeht` prüft die

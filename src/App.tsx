@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { MapView, type MapData, type MapHandle } from './map/MapView';
 import type { Theme } from './map/mapStyle';
 import { AERIAL_YEARS, type OverlayKey } from './map/overlays';
@@ -119,10 +119,45 @@ function Shell() {
   }, [mobile]);
 
   const sheetDrag = useRef<{ startY: number; moved: boolean } | null>(null);
+  const pageDrag = useRef<{ mode: 'sheet' | 'module' | 'detail'; startY: number; moved: boolean } | null>(null);
   const suppressSheetClick = useRef(false);
   const cycleSheet = useCallback(() => {
     setSheet((s) => (s === 'mini' ? 'peek' : s === 'peek' ? 'open' : 'mini'));
   }, []);
+
+  const backToStart = useCallback(() => {
+    setModuleId(null);
+    setFocus(null);
+    setAnliegenId(null);
+    setSelection(null);
+    setSheet('peek');
+  }, []);
+
+  const startPageDrag = (mode: 'sheet' | 'module' | 'detail') => (e: ReactPointerEvent<HTMLElement>) => {
+    if (!mobile) return;
+    if ((e.target as HTMLElement).closest('button, a, input, select, textarea')) return;
+    if (mode === 'detail' && !(e.target as HTMLElement).closest('.sheet-head, .mobile-grab')) return;
+    pageDrag.current = { mode, startY: e.clientY, moved: false };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+
+  const movePageDrag = (e: ReactPointerEvent<HTMLElement>) => {
+    if (!pageDrag.current) return;
+    if (Math.abs(e.clientY - pageDrag.current.startY) > 8) pageDrag.current.moved = true;
+  };
+
+  const endPageDrag = (e: ReactPointerEvent<HTMLElement>) => {
+    const drag = pageDrag.current;
+    pageDrag.current = null;
+    if (!drag?.moved) return;
+    const dy = e.clientY - drag.startY;
+    if (drag.mode === 'detail' && dy > 70) { setSelection(null); return; }
+    if (drag.mode === 'module' && dy > 70) { backToStart(); return; }
+    if (drag.mode === 'sheet') {
+      if (dy > 36) setSheet((s) => (dy > 120 ? 'mini' : s === 'open' ? 'peek' : 'mini'));
+      else if (dy < -36) setSheet((s) => (dy < -120 ? 'open' : s === 'mini' ? 'peek' : 'open'));
+    }
+  };
 
   const sheetBottom = sheet === 'mini' ? 0.1 : sheet === 'open' ? 0.86 : 0.46;
 
@@ -331,7 +366,13 @@ function Shell() {
             }}
           ><span /></button>
         )}
-        <header className="brand">
+        <header
+          className="brand"
+          onPointerDown={startPageDrag('sheet')}
+          onPointerMove={movePageDrag}
+          onPointerUp={endPageDrag}
+          onPointerCancel={() => { pageDrag.current = null; }}
+        >
           <div className="brand-row">
             <img className="brand-logo" src="/logo.svg" alt="" width="40" height="40" />
             <div className="brand-text">
@@ -344,8 +385,14 @@ function Shell() {
         <div className="panel-scroll" id="panel-content" tabIndex={-1} ref={panelScrollRef}>
           {mod ? (
             <>
-              <div className="panel-crumb">
-                <button type="button" className="crumb-back" onClick={() => { setModuleId(null); setFocus(null); setAnliegenId(null); setSelection(null); }}>
+              <div
+                className="panel-crumb"
+                onPointerDown={startPageDrag('module')}
+                onPointerMove={movePageDrag}
+                onPointerUp={endPageDrag}
+                onPointerCancel={() => { pageDrag.current = null; }}
+              >
+                <button type="button" className="crumb-back" onClick={backToStart}>
                   <Icon name="chevron" size={15} className="chev-left" />
                   <span>{tr('Einstieg')}</span>
                 </button>
@@ -434,7 +481,16 @@ function Shell() {
       )}
 
       {showDetail && (
-        <aside className="detail" aria-label="Details" aria-labelledby="detail-title">
+        <aside
+          className="detail"
+          aria-label="Details"
+          aria-labelledby="detail-title"
+          onPointerDown={startPageDrag('detail')}
+          onPointerMove={movePageDrag}
+          onPointerUp={endPageDrag}
+          onPointerCancel={() => { pageDrag.current = null; }}
+        >
+          <div className="mobile-grab" aria-hidden />
           <DetailSheet sel={selection!} onClose={() => setSelection(null)} select={select} flyTo={flyTo} />
         </aside>
       )}
