@@ -141,7 +141,8 @@ export type Selection =
   | { type: 'facility'; item: Facility }
   | { type: 'place'; id: string }
   | { type: 'verwaltung_gebaeude'; id: string; lngLat?: [number, number] }
-  | { type: 'verwaltung_leistung'; url: string; lat?: number; lon?: number };
+  | { type: 'verwaltung_leistung'; url: string; lat?: number; lon?: number }
+  | { type: 'wissen'; id: string; layer: string; layerTitle: string; name: string; lngLat: [number, number]; props: Record<string, unknown> };
 
 export interface CultureEvent {
   id: string;

@@ -425,24 +425,79 @@ export async function buergerbueros() {
   };
 }
 
-// ---------- Bäder: Besucherzahl der Stuttgarter Bäder ----------
+// ---------- Bäder: Besucherzahl und Verzeichnis der Stuttgarter Bäder ----------
+const BAEDER_VERZEICHNIS = 'https://www.stuttgarterbaeder.de/fileadmin/jsonData/baeder.json';
+const normBad = (s) => (s ?? '').toLowerCase().replace(/[^a-zäöüß]/g, '');
+
+/** Heutige Öffnungszeit aus dem Bäderverzeichnis; Feiertage und Sonderzeiten sind nicht enthalten. */
+function heuteImBad(bh) {
+  if (!bh) return { text: null, open: null };
+  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', weekday: 'short' }).format(new Date()).slice(0, 3).toLowerCase();
+  const key = { mon: 'mo', tue: 'di', wed: 'mi', thu: 'do', fri: 'fr', sat: 'sa', sun: 'so' }[weekday];
+  const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+  const list = (bh.usually_bhpool ?? []).filter((x) => (!x.validity?.from || x.validity.from <= today) && (!x.validity?.to || today <= x.validity.to));
+  const cur = list[list.length - 1];
+  if (!cur) return { text: null, open: null };
+  if (!key) return { text: null, open: null };
+  const ranges = [cur[key], cur[`${key}1`], cur[`${key}2`]].filter((x) => x?.from && x?.to);
+  if (!ranges.length) return { text: 'heute geschlossen', open: false };
+  const text = `heute ${ranges.map((x) => `${x.from}–${x.to}`).join(' und ')}`;
+  const now = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+  return { text, open: ranges.some((x) => now >= x.from && now < x.to) };
+}
+
+async function baederVerzeichnis() {
+  const { value } = await cached('baeder-verzeichnis', 24 * 3600_000, async () => {
+    const list = await fetchJson(BAEDER_VERZEICHNIS, { timeout: 20_000 });
+    return list.map((b) => {
+      const hours = heuteImBad(b.businesshours);
+      const addr = [b.building?.street, [b.building?.zip_code, b.building?.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+      return {
+        id: b.id,
+        name: b.name,
+        subtitle: b.subtitle ?? null,
+        type: b.lookups?.type?.value ?? null,
+        features: (b.lookups?.characteristic ?? []).map((x) => x.value).filter(Boolean),
+        targetGroups: (b.lookups?.targetgroup ?? []).map((x) => x.value).filter(Boolean),
+        phone: (b.communications ?? []).find((x) => x.type === 't')?.address ?? null,
+        website: (b.communications ?? []).find((x) => x.type === 'i')?.address ?? null,
+        address: addr || null,
+        district: b.building?.district ?? null,
+        hoursToday: hours.text,
+        openNow: hours.open,
+      };
+    });
+  });
+  return value;
+}
+
 export async function baeder() {
   const { value, fresh } = await cached('baeder', 60_000, () => fetchJson('https://www.stuttgarterbaeder.de/fileadmin/jsonData/visitor_count.json'));
   const fac = (await facilities('bad')).items;
-  const norm = (s) => (s ?? '').toLowerCase().replace(/[^a-zäöüß]/g, '');
+  let details = [];
+  try { details = await baederVerzeichnis(); } catch { /* Verzeichnis ist optional */ }
   return {
     items: (value.data ?? []).map((b) => {
-      const n = norm(b.location_name).replace(/^das/, '');
-      const f = fac.find((x) => norm(x.name).includes(n) || n.includes(norm(x.name).replace(/^(hallenbad|freibad|mineralbad)/, '')));
+      const n = normBad(b.location_name).replace(/^das/, '');
+      const f = fac.find((x) => normBad(x.name).includes(n) || n.includes(normBad(x.name).replace(/^(hallenbad|freibad|mineralbad)/, '')));
+      const d = details.find((x) => {
+        const dn = normBad(x.name).replace(/^das/, '');
+        return dn === n || dn.includes(n) || n.includes(dn);
+      });
       return {
         id: b.location_id, name: b.location_name, count: b.customer_amount, max: b.customer_amount_max, usual: usual('bad', b.location_id), best: bestToday('bad', b.location_id, 21),
         areas: (b.area_list ?? []).map((a) => ({ name: a.area_name, count: a.customer_amount, max: a.customer_amount_max })),
-        ...(f ? { lat: f.lat, lon: f.lon, address: f.address } : {}),
+        ...(f ? { lat: f.lat, lon: f.lon } : {}),
+        address: f?.address ?? d?.address ?? undefined,
+        ...(d ? { type: d.type, features: d.features, targetGroups: d.targetGroups, phone: d.phone, website: d.website, district: d.district, hoursToday: d.hoursToday, openNow: d.openNow } : {}),
       };
     }),
+    totalPools: details.length,
+    all: details,
     fetchedAt: new Date().toISOString(), fresh,
     since: since('bad'), quote: quote('bad'),
-    source: 'Stuttgarter Bäder, Besucherzahlen',
+    source: 'Stuttgarter Bäder, Besucherzahlen und Bäderverzeichnis',
+    hinweis: 'Besucherzahlen melden nur geöffnete Bäder. Öffnungszeiten und Merkmale stammen aus dem Bäderverzeichnis; Feiertage, Sonderzeiten und nicht gepflegte Saisonen können abweichen.',
   };
 }
 
@@ -588,11 +643,31 @@ export async function gesundheit(plz = '70173') {
   return out;
 }
 
-// ---------- Adresssuche (Nominatim, höchstens 1 Anfrage pro Sekunde, Ergebnis 30 Tage) ----------
+// ---------- Adresssuche: amtlicher gis6-Geocoder, Fallback Nominatim ----------
+// gis6 liefert Adressen, Straßen, Haltestellen und Stadtteile präziser für Stuttgart.
+// Nominatim bleibt der Rückfall, wenn der inoffizielle Dienst nicht antwortet.
 export async function adresse(q) {
   const t = (q ?? '').trim();
-  if (t.length < 3) return { items: [] };
+  if (t.length < 3) return { items: [], source: 'Landeshauptstadt Stuttgart, gis6' };
   const { value } = await cached(`addr-${t.toLowerCase()}`, 30 * 86400_000, async () => {
+    try {
+      const j = await fetchJson(`https://gis6.stuttgart.de/locationfinderutm/Finder/Lookup?query=${encodeURIComponent(t)}&sref=4326&limit=8`, { timeout: 12000 });
+      if (j?.ok) {
+        const items = (j.locs ?? []).map((l) => {
+          const name = String(l.name ?? '').trim();
+          const nr = /^(.*?)\s+(\d+[a-zA-Z]?)$/.exec(name);
+          return {
+            label: name,
+            street: l.type === 'Adresse' && nr ? nr[1] : (l.type === 'Straßenname' ? name : null),
+            nr: l.type === 'Adresse' && nr ? nr[2] : null,
+            lat: +Number(l.cy).toFixed(6),
+            lon: +Number(l.cx).toFixed(6),
+            typ: l.type ?? null,
+          };
+        }).filter((x) => Number.isFinite(x.lat) && Number.isFinite(x.lon));
+        if (items.length) return { items: items.slice(0, 6), source: 'Landeshauptstadt Stuttgart, gis6 Location Finder' };
+      }
+    } catch { /* Fallback unten */ }
     const d = await fetchJson(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&countrycodes=de&addressdetails=1&viewbox=9.03,48.87,9.32,48.68&bounded=1&q=${encodeURIComponent(t)}`);
     // Nominatim liefert für dieselbe Adresse oft mehrere Gebäudeumrisse. Für die Auswahl
     // zählt der Ort, nicht die Geometrievariante – deshalb nach Adresse und Stadtteil filtern.
@@ -605,10 +680,10 @@ export async function adresse(q) {
       const key = `${label}|${street ?? ''}|${nr ?? ''}`.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      items.push({ label, street, nr, lat: +(+r.lat).toFixed(6), lon: +(+r.lon).toFixed(6) });
+      items.push({ label, street, nr, lat: +(+r.lat).toFixed(6), lon: +(+r.lon).toFixed(6), typ: 'Adresse' });
       if (items.length >= 5) break;
     }
-    return items;
+    return { items, source: '© OpenStreetMap-Mitwirkende (Nominatim)' };
   });
-  return { items: value, source: '© OpenStreetMap-Mitwirkende (Nominatim)' };
+  return value;
 }

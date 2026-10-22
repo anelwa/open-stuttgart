@@ -21,6 +21,7 @@ import {
 
 const MODEL = process.env.OS_BOT_MODEL ?? 'gemini-2.5-flash-lite';
 const MODEL_FALLBACK = process.env.OS_BOT_MODEL_FALLBACK ?? '';
+const API_BASE = (process.env.OS_BOT_API_BASE ?? 'https://generativelanguage.googleapis.com/v1beta').replace(/\/$/, '');
 const BOT_OFF = process.env.OS_BOT === '0';
 const DAILY_USD = Math.max(0, Number(process.env.OS_BOT_DAILY_USD ?? 0.5) || 0.5);
 const RATE_PER_HOUR = Math.max(0, Number(process.env.OS_BOT_RATE ?? 40));
@@ -46,6 +47,7 @@ Deine Aufgabe: Menschen in Stuttgart helfen, ein Amt-Anliegen zu erledigen, den 
 
 Regeln:
 - Antworte auf Deutsch, per „du“, freundlich und knapp (2 bis 4 Sätze).
+- Kein Markdown, keine Aufzählungszeichen, keine Überschriften – reiner Fließtext.
 - Nutze ausschließlich die Fakten im JSON. Erfinde keine Gebühren, Fristen, Adressen, Öffnungszeiten oder Wartezeiten.
 - Nenne Zahlen nur, wenn sie im JSON stehen. Wenn eine Angabe fehlt, sage das und verweise auf den Link.
 - Behaupte nie, du hättest einen Termin gebucht oder eine Anfrage abgeschickt. Du kannst nur informieren und Links anbieten.
@@ -219,7 +221,7 @@ async function callGemini({ system, user, schema, maxOutputTokens = 400, tempera
   };
   let res;
   try {
-    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    res = await fetch(`${API_BASE}/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify(body),
@@ -434,6 +436,7 @@ function waitFeeling(status) {
   if (status === 11) return 'keine Wartemarken mehr';
   if (status >= 10) return 'sehr viel los';
   if (status >= 6) return 'ziemlich viel los';
+  if (status >= 3) return 'überschaubar';
   if (status >= 1) return 'wenig los';
   return null;
 }
@@ -546,10 +549,10 @@ function firstDocs(text) {
   const lines = String(text ?? '')
     .split(/\n/)
     .map((x) => x.replace(/^[-•*:;\s]+/, '').replace(/[.;:\s]+$/, '').trim())
-    .filter((x) => x.length >= 3 && !/^hinweis/i.test(x));
+    .filter((x) => x.length >= 4 && !/^hinweis/i.test(x));
   const picked = [];
   for (const line of lines) {
-    if (line.length < 3) continue;
+    if (line.length < 4) continue;
     if (picked.some((p) => p.toLowerCase().includes(line.toLowerCase()))) continue;
     picked.push(line);
     if (picked.length >= 4) break;
@@ -639,12 +642,16 @@ function fallbackAnswer(facts, askLocation) {
       parts.push(`${r.name} ist gerade ${r.openText}.`);
     } else if (r.openText) {
       parts.push(`${r.name}: ${r.openText}.`);
+    } else {
+      parts.push(`${r.name} ist die nächste passende Stelle.`);
     }
     if (r.waitMin != null && !closed) {
       parts.push(`Dort ${r.waitFeeling ? `${r.waitFeeling}, ` : ''}ca. ${r.waitMin} Minuten Wartezeit.`);
+    } else if (r.waitStatus === 11 && !closed) {
+      parts.push(`${r.name} vergibt gerade keine Wartemarken mehr.`);
     }
     if (!closed && r.travelMin != null) {
-      parts.push(`${r.travelLabel} bist du in ${r.travelMin} Minuten dort${r.totalMin != null ? `, mit Wartezeit rund ${r.totalMin} Minuten` : ''}.`);
+      parts.push(`Anfahrt: ${r.travelLabel} ca. ${r.travelMin} Minuten${r.totalMin != null ? `, mit Wartezeit rund ${r.totalMin} Minuten` : ''}.`);
     }
     if (r.booking && !s.booking) parts.push(`Termin: ${r.booking}`);
   } else if (facts.location) {
@@ -870,10 +877,11 @@ export async function botReply({ sessionId, message, location, ip } = {}) {
     }
     if (!text && !loc) throw HTTP(400, 'Bitte eine Nachricht oder einen Standort senden.');
     if (s.turns >= MAX_TURNS) {
+      resetState(s, true);
       return {
         sessionId: s.id,
-        reply: 'Diese Unterhaltung ist schon sehr lang. Starte bitte einen neuen Chat, dann beginne ich frisch.',
-        suggestions: [],
+        reply: 'Die Unterhaltung war schon sehr lang – ich starte einmal frisch. Was möchtest du bei der Stadt erledigen?',
+        suggestions: ['Personalausweis beantragen', 'Wohnsitz anmelden', 'Termin im Bürgerbüro'],
         actions: [],
         office: null,
         alternatives: [],
@@ -914,8 +922,22 @@ export async function botReply({ sessionId, message, location, ip } = {}) {
     let intent = s.intentId ? INTENTS.find((i) => i.id === s.intentId) ?? null : null;
     let plan = null;
 
+    // Klarer Anliegenwechsel schon ohne Modell (z. B. „eigentlich brauche ich einen Reisepass“).
+    if (intent && text && text.length <= 90) {
+      const alt = detectIntent(text);
+      if (alt && alt.id !== intent.id) {
+        intent = alt;
+        s.intentId = intent.id;
+        s.slots = {};
+        s.pending = null;
+        s.lastFacts = null;
+        s.lastServiceUrl = null;
+        s.topic = text;
+      }
+    }
+
     // Standort alone (z. B. Klick auf „Standort freigeben“) beantwortet die offene Frage.
-    if (!text && loc && intent) {
+    if (!text && loc && intent && !nextSlot(intent, s.slots)) {
       const service = await loadService(intent, s.slots);
       s.turns += 1;
       return answerWithService(s, intent, service, meta);
@@ -1006,6 +1028,20 @@ export async function botReply({ sessionId, message, location, ip } = {}) {
       const slot = slotById(intent, slotId);
       if (slot && !s.slots[slotId] && !parseSlotValue(slot, text)) {
         plan = await understand(text, s, intent);
+      }
+    }
+
+    // Das Modell kann mitten im Gespräch ein anderes Anliegen erkennen.
+    if (plan?.intent && plan.intent !== intent.id) {
+      const next = INTENTS.find((i) => i.id === plan.intent);
+      if (next) {
+        intent = next;
+        s.intentId = intent.id;
+        s.slots = {};
+        s.pending = null;
+        s.lastFacts = null;
+        s.lastServiceUrl = null;
+        s.topic = text || s.topic;
       }
     }
 

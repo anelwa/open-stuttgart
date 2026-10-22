@@ -21,7 +21,17 @@ type Addr = { label: string; street: string | null; nr: string | null; lat: numb
 type Best = { zeit: string; value: number } | null | undefined;
 type Quote = { anteil: number; n: number } | null | undefined;
 type Bb = BbItem & { waitMin: number | null; best?: Best };
-type Bad = { id: number; name: string; count: number; max: number; usual?: { value: number; n: number } | null; best?: Best; areas: { name: string; count: number; max: number }[]; lat?: number; lon?: number; address?: string };
+type Bad = {
+  id: number; name: string; count: number; max: number; usual?: { value: number; n: number } | null; best?: Best;
+  areas: { name: string; count: number; max: number }[]; lat?: number; lon?: number; address?: string;
+  type?: string | null; features?: string[]; targetGroups?: string[]; phone?: string | null; website?: string | null;
+  district?: string | null; hoursToday?: string | null; openNow?: boolean | null;
+};
+type BadDetail = {
+  id: number; name: string; subtitle?: string | null; type?: string | null; features: string[]; targetGroups: string[];
+  phone?: string | null; website?: string | null; address?: string | null; district?: string | null;
+  hoursToday?: string | null; openNow?: boolean | null;
+};
 type Waste = { street: string; nr: string; dates: { type: string; date: string; rhythm: string | null }[]; error?: string; source: string };
 type Charger = { id: string; name: string; address: string; lat: number; lon: number; operator: string | null; total: number; available: number | null; maxKw: number | null };
 type Gruenstrom = { plz: string; aktuell: { t: number; share: number; signal: number; text: string | null } | null; bestesFenster: { von: number; bis: number; share: number } | null } | null;
@@ -149,7 +159,7 @@ export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visibl
   const dietParam = diet ? `&diet=${diet}${onlyDiet ? '-only' : ''}` : '';
   const fac = usePolling<FacilitiesResponse>(`/api/nearby/facilities?cat=${cat}${dietParam}`, 24 * 3600_000);
   const bb = usePolling<{ items: Bb[]; source: string; since: string | null; quote: Quote }>('/api/nearby/buergerbueros', 60_000);
-  const baeder = usePolling<{ items: Bad[]; source: string; since: string | null; quote: Quote }>('/api/nearby/baeder', 60_000);
+  const baeder = usePolling<{ items: Bad[]; totalPools: number; all: BadDetail[]; source: string; since: string | null; quote: Quote }>('/api/nearby/baeder', 60_000);
   const [lon, lat] = origin.lngLat;
   const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
   const laden = usePolling<{ items: Charger[]; gruenstrom?: Gruenstrom; source: string }>(`/api/nearby/laden?lat=${key.split(',')[0]}&lon=${key.split(',')[1]}`, 120_000);
@@ -174,6 +184,7 @@ export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visibl
     .map((b) => ({ b, d: distM([lon, lat], [b.lon!, b.lat!]) })).sort((a, b) => a.d - b.d).slice(0, 3), [bb.data, lon, lat]);
   const badNear = useMemo(() => (baeder.data?.items ?? [])
     .map((b) => ({ b, d: b.lat != null ? distM([lon, lat], [b.lon!, b.lat!]) : Infinity })).sort((a, b) => a.d - b.d), [baeder.data, lon, lat]);
+  const badAll = baeder.data?.all ?? [];
   const chargers = useMemo(() => (laden.data?.items ?? [])
     .map((c) => ({ c, d: distM([lon, lat], [c.lon, c.lat]) })).sort((a, b) => a.d - b.d).slice(0, 5), [laden.data, lon, lat]);
 
@@ -392,7 +403,7 @@ export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visibl
 
       <GeocacheSection lngLat={origin.lngLat} />
 
-      <Section title="Bäder, aktuelle Besucherzahl" aside={<Explain id="baeder" />}>
+      <Section title="Bäder, Besucherzahl und Öffnungszeiten" aside={<Explain id="baeder" />}>
         <ul className="bath-list">
           {badNear.map(({ b, d }) => {
             const pct = b.max ? Math.min(100, Math.round((b.count / b.max) * 100)) : 0;
@@ -402,10 +413,43 @@ export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visibl
                 <div className={`bath-bar ${pct >= 90 ? 'crit' : pct >= 70 ? 'warn' : ''}`}><span style={{ width: `${pct}%` }} /></div>
                 <span className="small muted">{b.count} von {b.max} Personen{b.count > b.max ? ' (Kapazität überschritten)' : ''}{b.areas.filter((a) => /sauna/i.test(a.name)).map((a) => ` · Sauna: ${a.count} von ${a.max}`).join('')}</span>
                 {b.max > 0 && <span className="small muted block">{usualBad(b)}{b.best ? `; am wenigsten los heute laut Verlauf um ${b.best.zeit} Uhr (etwa ${Math.round(b.best.value)} Personen)` : ''}</span>}
+                {(b.type || b.features?.length) && (
+                  <span className="small muted block">
+                    {[b.type, ...(b.features ?? []).slice(0, 3)].filter(Boolean).join(' · ')}
+                  </span>
+                )}
+                {(b.hoursToday || b.phone) && (
+                  <span className="small muted block">
+                    {[b.hoursToday, b.phone].filter(Boolean).join(' · ')}
+                    {b.website && <> · <a href={b.website} target="_blank" rel="noreferrer">Website</a></>}
+                  </span>
+                )}
               </li>
             );
           })}
         </ul>
+        {baeder.data && baeder.data.items.length < baeder.data.totalPools && (
+          <p className="muted small">Besucherzahlen melden aktuell {baeder.data.items.length} von {baeder.data.totalPools} Bädern. Öffnungszeiten und Merkmale stehen für alle Bäder im Verzeichnis.</p>
+        )}
+        {baeder.data && badAll.length > baeder.data.items.length && (
+          <details className="near-details">
+            <summary>Alle {badAll.length} Bäder im Verzeichnis</summary>
+            <ul className="bath-list">
+              {badAll.map((b) => (
+                <li key={b.id}>
+                  <div className="bath-head"><strong>{b.name}</strong><span className="muted small">{b.district ?? ''}</span></div>
+                  <span className="small muted">{[b.type, ...(b.features ?? []).slice(0, 3)].filter(Boolean).join(' · ')}</span>
+                  {(b.hoursToday || b.phone || b.website) && (
+                    <span className="small muted block">
+                      {[b.hoursToday, b.phone].filter(Boolean).join(' · ')}
+                      {b.website && <> · <a href={b.website} target="_blank" rel="noreferrer">Website</a></>}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </Section>
 
       {baeder.data && <p className="muted small nearby-hint">{quoteText(baeder.data.quote, baeder.data.since)}</p>}
@@ -438,7 +482,7 @@ export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visibl
       </Section>
 
       <Source disclosure>
-        Einrichtungen: Landeshauptstadt Stuttgart, Geodaten (CC BY 4.0). Wartezeiten: Bürgerbüros der Stadt. Besucherzahlen: Stuttgarter Bäder.
+        Einrichtungen: Landeshauptstadt Stuttgart, Geodaten (CC BY 4.0). Wartezeiten: Bürgerbüros der Stadt. Besucherzahlen und Bäderverzeichnis: Stuttgarter Bäder.
         Abfuhrtermine: AWS. Ladepunkte: MobiData BW (OCPDB). Adresssuche © OpenStreetMap-Mitwirkende. Entfernungen in Luftlinie.
         Der Standort wird nur für diese Abfragen verwendet und nicht gespeichert. Eine eingegebene Adresse bleibt lokal auf diesem Gerät gespeichert.
       </Source>

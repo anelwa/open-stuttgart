@@ -93,6 +93,17 @@ export const ANLIEGEN: Anliegen[] = [
     layers: ['air', 'radar', 'warnung', 'water'],
     primary: 'Jetzt ansehen',
   },
+  {
+    id: 'wissen',
+    short: 'Stadtwissen',
+    label: 'Stadtwissen & Transparenz',
+    hint: 'Stadt-Layer, amtliche Statistik, IFG-Anfragen, Fairteiler, Arten, Feeds',
+    icon: 'layers',
+    module: 'wissen',
+    focus: 'karte',
+    layers: [],
+    primary: 'Layer und Quellen öffnen',
+  },
 ];
 
 /** Themenreiter als Rückfall, damit kein Inhalt unerreichbar wird. */
@@ -105,4 +116,5 @@ export const ALLE_THEMEN = [
   { id: 'culture', label: 'Kultur', icon: 'culture', hint: 'Veranstaltungen, Sehenswürdigkeiten' },
   { id: 'wasgeht', label: 'Was geht', icon: 'ticket', hint: 'Termine heute Abend, Neu in der Stadt' },
   { id: 'sun', label: 'Sonne', icon: 'sunset', hint: 'Verschattung, Höhenlagen, Aussicht' },
+  { id: 'wissen', label: 'Stadtwissen', icon: 'layers', hint: 'WFS-Layer, Statistik, Transparenz, Feeds, Standards' },
 ];

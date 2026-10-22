@@ -138,7 +138,9 @@ Besonders lohnend:
 | `historische Karten`, `luftbilder-2021`, `strassennetz-in-stuttgart`, `raddaten`, `ergebnisse-der-verkehrszaehlungen` | diverse | Karten-Layer & Radverkehr |
 
 Umsetzung: ein `scripts/build-opendata-stuttgart.mjs` (CKAN-Import nach `server/data/`,
-wie bei `build-unfaelle.mjs`) + dünne `/api/opendata/*`-Routen.
+wie bei `build-unfaelle.mjs`) + dünne `/api/opendata/*`-Routen. **Stand 22.10.2026:**
+Der Katalog selbst ist bereits über `/api/stadt/ckan` angebunden; der Import einzelner
+Datensätze nach `server/data/` steht noch aus.
 
 ### 2.4 Ratsinformationssystem ALLRIS / OParl ⭐ (politisch, nicht technisch)
 

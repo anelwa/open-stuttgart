@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { StuttBotMark } from './StuttBotMark';
+import { SpeakButton } from './SpeakButton';
 import { usePlanRoute } from '../lib/routeCtx';
 import '../styles/stuttbot.css';
 
@@ -128,7 +129,6 @@ export function StuttBot({
   });
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const savedLocation = useRef<BotLocation | null>(readSavedLocation());
   const locationSent = useRef(false);
 
   useEffect(() => {
@@ -172,7 +172,7 @@ export function StuttBot({
     if (text) addMessage({ role: 'user', text });
     else if (locOverride) addMessage({ role: 'user', text: '📍 Mein Standort' });
 
-    const firstLocation = !locationSent.current && savedLocation.current ? savedLocation.current : null;
+    const firstLocation = !locationSent.current ? readSavedLocation() : null;
     try {
       const res = await fetch('/api/bot', {
         method: 'POST',
@@ -197,7 +197,7 @@ export function StuttBot({
         suggestions: bot.suggestions ?? [],
         fallback: !!bot.meta?.fallback,
       });
-      if (typeof bot.meta?.llm === 'boolean') setStatus({ llm: bot.meta.llm });
+      if (typeof bot.meta?.llm === 'boolean') setStatus({ llm: !!bot.meta.llm && !bot.meta.fallback });
     } catch (err) {
       addMessage({
         role: 'assistant',
@@ -315,6 +315,7 @@ export function StuttBot({
               <div className="sb-bubble-wrap">
                 <div className="sb-bubble">
                   <p>{m.text}</p>
+                  {m.role === 'assistant' && <div className="sb-speak"><SpeakButton text={m.text} compact /></div>}
                   {m.office && <OfficeCard office={m.office} alternatives={m.alternatives} onAction={handleAction} />}
                   {(m.actions?.length ?? 0) > 0 && (
                     <div className="sb-actions">

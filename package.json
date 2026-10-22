@@ -26,6 +26,7 @@
     "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource/merriweather-sans": "^5.3.0",
     "maplibre-gl": "^6.15.0",
+    "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "sqlite-vec": "^0.1.9"
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@types/geojson": "^7946.0.16",
     "@types/node": "^26.6.5",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",

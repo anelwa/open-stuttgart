@@ -153,7 +153,7 @@ function Werte() {
 const API = [
   ['/api/departures?stop=de:08111:6118', 'Abfahrten einer Haltestelle'],
   ['/api/parking', 'Parkhäuser mit freien Plätzen'],
-  ['/api/nearby/baeder', 'Besucherzahlen der Bäder mit „üblich um diese Zeit“'],
+  ['/api/nearby/baeder', 'Besucherzahlen, Öffnungszeiten und Merkmale der Bäder'],
   ['/api/nearby/buergerbueros', 'Wartezeiten der Bürgerbüros mit „üblich um diese Zeit“'],
   ['/api/nearby/facilities?cat=spielplatz', 'Einrichtungen einer Kategorie'],
   ['/api/adresse/profil?lat=48.7744&lon=9.1773', 'Angaben für einen Ort (Wahlbezirk, Starkregen, Lärm, Haus-Akte …)'],
@@ -163,6 +163,8 @@ const API = [
   ['/api/search/stats', 'Umfang des Dokumentenregisters und der Backlinks'],
   ['/api/documents/9387', 'Dokument mit Ablauf, Quellen, Backlinks und verwandten Dokumenten'],
   ['/api/stadtgedaechtnis.rss?days=30', 'Stadtgedächtnis als RSS-Feed'],
+  ['/api/stadt/ckan', 'OpenData@Stuttgart: 140 Datensätze mit Download-Links'],
+  ['/api/stadt/stadtpalais', 'StadtPalais: Termine der nächsten 21 Tage und Ausstellungen'],
   ['/api/wanderwege', 'Wander-, Weinwander- und Downhillwege mit Start/Ziel'],
   ['/api/geocaches?lat=48.775&lon=9.18', 'Geocaches in der Nähe (Opencaching.de)'],
   ['/api/bikeandride?lat=48.783&lon=9.181&radius=3000', 'Fahrradboxen und Schließfächer an Haltestellen'],

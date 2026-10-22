@@ -66,6 +66,16 @@ const HOST_GAP = {
   'kessel.tv': 2000,
   'api.openstreetmap.org': 1500, // OSM-API: Änderungssätze für „Neu in der Stadt“, sparsam
   'geoserver.stuttgart.de': 500,
+  'gis6.stuttgart.de': 500,
+  'fragdenstaat.de': 1000,
+  'foodsharing.de': 1000,
+  'api.gbif.org': 500,
+  'www.domino1.stuttgart.de': 1000,
+  'www.stadtpalais-stuttgart.de': 2000,
+  'opendata.stuttgart.de': 1000,
+  'www.stuttgarterbaeder.de': 1000,
+  'sru.k10plus.de': 1000,
+  'www.govdata.de': 1000,
   default: 120,
 };
 

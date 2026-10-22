@@ -1,4 +1,5 @@
 // API-Proxy und Auslieferung der gebauten Oberfläche. Keine Abhängigkeiten außer Node ≥ 20.
+import './env.mjs';
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
@@ -35,6 +36,11 @@ import { archivDatei, archivTage, startVerlauf } from './sources/verlauf.mjs';
 import { abfall, adresse, baeder, buergerbueros, categories, facilities, freizeitRouten, gesundheit, gruenstrom, laden, schulbezirk } from './sources/nearby.mjs';
 import { verwaltungGebaeude, verwaltungLeistung, verwaltungSuche, verwaltungWerkzeug, verwaltungWo } from './sources/verwaltung.mjs';
 import { botReply, botStatus } from './sources/bot.mjs';
+import { stadtpalais } from './sources/stadtpalais.mjs';
+import {
+  addressSearch, bibliothek, dcatKatalog, foodsharing, fragdenstaat, fragdenstaatRss, gbif,
+  geocode, komunis, komunisDoc, osmNotes, stadtKatalog, wfsFeatures, wfsKatalog, wfsRss, wikidataGaps,
+} from './sources/schnittstellen.mjs';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
@@ -123,6 +129,22 @@ const routes = {
   '/api/mensa': (q) => mensen(q.get('date')),
   '/api/health': async () => ({ ok: true, time: new Date().toISOString() }),
   '/api/bot/health': async () => botStatus(),
+  // Schnittstellen im weiten Sinn: Stadt-Layer, Geocoder, Statistik, Transparenz, Arten, Katalog
+  '/api/stadt/wfs/katalog': () => wfsKatalog(),
+  '/api/stadt/wfs': (q) => wfsFeatures({ layer: q.get('layer'), lat: q.get('lat'), lon: q.get('lon'), r: q.get('r'), limit: q.get('limit') }),
+  '/api/stadt/geocode': (q) => geocode(q.get('q'), q.get('limit')),
+  '/api/stadt/adresse': (q) => addressSearch(q.get('q')),
+  '/api/stadt/komunis': (q) => komunis(q.get('start')),
+  '/api/stadt/komunis/doc': (q) => komunisDoc(q.get('unid')),
+  '/api/stadt/fragdenstaat': (q) => fragdenstaat(q.get('limit'), q.get('status')),
+  '/api/stadt/foodsharing': () => foodsharing(),
+  '/api/stadt/gbif': (q) => gbif(q.get('lat'), q.get('lon'), q.get('r')),
+  '/api/stadt/osm-notes': (q) => osmNotes(q.get('lat'), q.get('lon'), q.get('r')),
+  '/api/stadt/wikidata': () => wikidataGaps(),
+  '/api/stadt/bibliothek': (q) => bibliothek(q.get('q')),
+  '/api/stadt/katalog': () => dcatKatalog(),
+  '/api/stadt/ckan': () => stadtKatalog(),
+  '/api/stadt/stadtpalais': () => stadtpalais(),
 };
 
 const MIME = {
@@ -233,6 +255,29 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       res.writeHead(err.status ?? 500, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: err.message ?? 'Suchdatenbank nicht erreichbar' }));
+    }
+    return;
+  }
+  if (url.pathname === '/api/stadt/wfs.rss') {
+    const q = url.searchParams;
+    try {
+      const rss = await wfsRss({ layer: q.get('layer') });
+      res.writeHead(200, { 'Content-Type': 'application/rss+xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
+      res.end(rss);
+    } catch (err) {
+      res.writeHead(err.status ?? 502, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: err.message ?? 'Feed nicht verfügbar' }));
+    }
+    return;
+  }
+  if (url.pathname === '/api/stadt/fragdenstaat.rss') {
+    try {
+      const rss = await fragdenstaatRss();
+      res.writeHead(200, { 'Content-Type': 'application/rss+xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
+      res.end(rss);
+    } catch (err) {
+      res.writeHead(err.status ?? 502, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: err.message ?? 'Feed nicht verfügbar' }));
     }
     return;
   }

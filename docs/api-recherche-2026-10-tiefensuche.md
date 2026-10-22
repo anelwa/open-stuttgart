@@ -644,8 +644,9 @@ Presseportal/Polizei oder ein sehr vorsichtiger HTML-Crawl – nicht empfohlen.
 
 Ehrlich benannt, damit die Lücke nicht immer wieder gesucht wird:
 
-* **Bäder-Auslastung:** keine öffentliche API gefunden; die Bäder-Website liefert
-  keine Live-Belegung als JSON.
+* **Bäder-Auslastung:** inzwischen gefunden: `visitor_count.json` (Live-Besucherzahlen)
+  und `baeder.json` (vollständiges Verzeichnis). Details in
+  [`api-recherche-2026-10-versteckte-schnittstellen.md`](api-recherche-2026-10-versteckte-schnittstellen.md).
 * **Parkleitsystem der Stadt:** kein eigener offener Endpunkt gefunden; die
   dynamischen Parkdaten laufen über MobiData BW (ParkAPI), das bereits angebunden ist.
 * **Veranstaltungen:** kein offizielles Event-API der Stadt; weiterhin Crawling

@@ -240,10 +240,20 @@ OS_BOT_MODEL_FALLBACK=          # optional, z. B. gemini-3.5-flash-lite
 OS_BOT_DAILY_USD=0.50
 OS_BOT_RATE=40
 OS_BOT_STATE=server/.cache/     # Budgetdatei
+OS_BOT_API_BASE=https://generativelanguage.googleapis.com/v1beta   # für Tests/Proxy
 OS_BOT=1                        # 0 = Kill-Switch
 OS_BOT_LOG=0                    # 1 = Intent/Latenz/Fehler loggen
 OS_TRUST_PROXY=1                # hinter Dokploy/nginx
 ```
+
+Die Werte können in einer `.env` im Projektordner liegen; `server/env.mjs` lädt sie beim Start. Vorhandene Umgebungsvariablen (Docker, Dokploy, Shell) haben Vorrang. `.env` ist in `.gitignore` und wird nicht mitgeliefert.
+
+```bash
+printf 'GEMINI_API_KEY=dein-key\nOS_BOT_DAILY_USD=0.50\n' > .env
+npm start
+```
+
+Ohne Key startet der Server trotzdem und nutzt den Regelmodus. Mit Key zeigt `GET /api/bot/health` `"llm": true` und den aktuellen Tagesverbrauch.
 
 ## 13. Offene Punkte
 

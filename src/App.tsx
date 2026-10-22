@@ -4,7 +4,7 @@ import type { Theme } from './map/mapStyle';
 import { AERIAL_YEARS, type OverlayKey } from './map/overlays';
 import { MODULES } from './modules';
 import { DataProvider, useData } from './lib/data';
-import type { Selection } from './lib/types';
+import type { Facility, Selection } from './lib/types';
 import { Icon, weatherIconName } from './components/Icon';
 import { Search } from './components/Search';
 import { DocumentReader } from './components/DocumentReader';
@@ -24,9 +24,11 @@ import { QuickActions } from './components/QuickActions';
 import { ANLIEGEN, type Anliegen } from './lib/anliegen';
 import { Disclosure } from './components/ui';
 import { StuttBot } from './components/StuttBot';
+import { Kiosk } from './components/Kiosk';
+import { objectUrl } from './components/WissenDetail';
 
 const DEFAULT_VISIBLE: Record<OverlayKey, boolean> = {
-  network: true, stops: true, parking: true, sharing: false, roadworks: true, bike: false, air: true, water: true, events: true, places: true, sun: false, radar: true, aerial: false, nearby: true, live: true, route: true, vehicles: true, traffic: false, warnung: true, flug: false, kaltluft: false, unfall: false, hike: false,
+  network: true, stops: true, parking: true, sharing: false, roadworks: true, bike: false, air: true, water: true, events: true, places: true, sun: false, radar: true, aerial: false, nearby: true, live: true, route: true, vehicles: true, traffic: false, warnung: true, flug: false, kaltluft: false, unfall: false, hike: false, wissen: false,
 };
 
 function readPref<T>(key: string, fallback: T): T {
@@ -71,6 +73,7 @@ function Shell() {
   const [sunImage, setSunImage] = useState<string | null>(null);
   const [radarFrame, setRadarFrame] = useState<number | null>(null);
   const [nearby, setNearby] = useState<MapData['nearby']>(null);
+  const [wissen, setWissen] = useState<GeoJSON.FeatureCollection | null>(null);
   const [info, setInfo] = useState<{ page: InfoPage; anchor?: string } | null>(null);
   const [docId, setDocId] = useState<number | null>(null);
   const [layersOpen, setLayersOpen] = useState(false);
@@ -112,6 +115,7 @@ function Shell() {
       case 'place': { const p = data.places.data?.places.find((x) => x.id === selection.id); return p ? [p.lon, p.lat] : null; }
       case 'verwaltung_gebaeude': return selection.lngLat ?? null;
       case 'verwaltung_leistung': return selection.lon != null && selection.lat != null ? [selection.lon, selection.lat] : null;
+      case 'wissen': return selection.lngLat;
     }
   }, [selection, data]);
 
@@ -123,6 +127,7 @@ function Shell() {
   const sheetDrag = useRef<{ startY: number; moved: boolean } | null>(null);
   const pageDrag = useRef<{ mode: 'sheet' | 'module' | 'detail'; startY: number; moved: boolean } | null>(null);
   const suppressSheetClick = useRef(false);
+  const deepLinkDone = useRef(false);
   const cycleSheet = useCallback(() => {
     setSheet((s) => (s === 'mini' ? 'peek' : s === 'peek' ? 'open' : 'mini'));
   }, []);
@@ -132,6 +137,8 @@ function Shell() {
     setFocus(null);
     setAnliegenId(null);
     setSelection(null);
+    setWissen(null);
+    setVisible((v) => (v.wissen ? { ...v, wissen: false } : v));
     setSheet('peek');
   }, []);
 
@@ -154,10 +161,12 @@ function Shell() {
     if (!drag?.moved) return;
     const dy = e.clientY - drag.startY;
     if (drag.mode === 'detail' && dy > 70) { setSelection(null); return; }
-    if (drag.mode === 'module' && dy > 70) { backToStart(); return; }
-    if (drag.mode === 'sheet') {
-      if (dy > 36) setSheet((s) => (dy > 120 ? 'mini' : s === 'open' ? 'peek' : 'mini'));
-      else if (dy < -36) setSheet((s) => (dy < -120 ? 'open' : s === 'mini' ? 'peek' : 'open'));
+    // Module verhalten sich wie das Startblatt: nach unten ziehen gibt die Karte frei,
+    // ohne das Modul (und damit eine geplante Route) zu verlassen. Zurück geht es über
+    // die Brotkrume. So bleibt die Route beim Blick auf die Karte erhalten.
+    if (drag.mode === 'sheet' || drag.mode === 'module') {
+      if (dy > 36) setSheet((s) => (dy > 150 ? 'mini' : s === 'open' ? 'peek' : 'mini'));
+      else if (dy < -36) setSheet((s) => (dy < -150 ? 'open' : s === 'mini' ? 'peek' : 'open'));
     }
   };
 
@@ -200,6 +209,81 @@ function Shell() {
 
   const flyTo = useCallback((c: [number, number], z?: number) => mapRef.current?.flyTo(c, z), []);
   const fitBounds = useCallback((bounds: [[number, number], [number, number]], opts?: { maxZoom?: number }) => mapRef.current?.fitBounds(bounds, opts), []);
+
+  // Permanente Links (?o=…): Objekt nach dem Laden der Daten auswählen.
+  useEffect(() => {
+    if (deepLinkDone.current) return;
+    const q = new URLSearchParams(location.search);
+    const kind = q.get('o');
+    if (!kind) { deepLinkDone.current = true; return; }
+    const id = q.get('id') ?? '';
+    if (kind === 'wissen') {
+      const lat = Number(q.get('lat')); const lon = Number(q.get('lon'));
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        select({
+          type: 'wissen', id, layer: q.get('layer') ?? '', layerTitle: q.get('lt') ?? 'Stadt-Layer',
+          name: q.get('name') ?? 'Objekt', lngLat: [lon, lat], props: {},
+        });
+        setTimeout(() => flyTo([lon, lat], 16), 500);
+      }
+      deepLinkDone.current = true;
+      return;
+    }
+    if (kind === 'parking' && data.parking.data) {
+      const p = data.parking.data.sites.find((x) => String(x.id) === id);
+      if (p) { select({ type: 'parking', id: p.id }); flyTo([p.lon, p.lat], 15); }
+      deepLinkDone.current = true;
+    } else if (kind === 'roadwork' && data.roadworks.data) {
+      const r = data.roadworks.data.items.find((x) => x.id === id);
+      if (r) { select({ type: 'roadwork', id: r.id }); flyTo([r.lon, r.lat], 15); }
+      deepLinkDone.current = true;
+    } else if (kind === 'place' && data.places.data) {
+      const p = data.places.data.places.find((x) => x.id === id);
+      if (p) { select({ type: 'place', id: p.id }); flyTo([p.lon, p.lat], 15); }
+      deepLinkDone.current = true;
+    } else if (kind === 'air' && data.air.data) {
+      const a = data.air.data.stations.find((x) => x.id === id);
+      if (a) { select({ type: 'air', id: a.id }); flyTo([a.lon, a.lat], 15); }
+      deepLinkDone.current = true;
+    } else if (kind === 'sharing' && data.sharing.data) {
+      const x = data.sharing.data.items.find((s) => s.id === id);
+      if (x) { select({ type: 'sharing', id: x.id }); flyTo([x.lon, x.lat], 15); }
+      deepLinkDone.current = true;
+    } else if (kind === 'water' && data.water.data) {
+      select({ type: 'water' }); flyTo([data.water.data.lon, data.water.data.lat], 14);
+      deepLinkDone.current = true;
+    } else if (kind === 'event' && data.events.data) {
+      const e = data.events.data.events.find((x) => x.id === id);
+      if (e) { select({ type: 'event', id: e.id }); if (e.lon != null && e.lat != null) flyTo([e.lon, e.lat], 15); }
+      deepLinkDone.current = true;
+    } else if (kind === 'verwaltung_gebaeude') {
+      const lat = Number(q.get('lat')); const lon = Number(q.get('lon'));
+      select({ type: 'verwaltung_gebaeude', id, ...(Number.isFinite(lat) && Number.isFinite(lon) ? { lngLat: [lon, lat] as [number, number] } : {}) });
+      if (Number.isFinite(lat) && Number.isFinite(lon)) flyTo([lon, lat], 15);
+      deepLinkDone.current = true;
+    } else if (kind === 'leistung') {
+      const url = q.get('url');
+      if (url) {
+        const lat = Number(q.get('lat')); const lon = Number(q.get('lon'));
+        select({ type: 'verwaltung_leistung', url, ...(Number.isFinite(lat) ? { lat } : {}), ...(Number.isFinite(lon) ? { lon } : {}) });
+        deepLinkDone.current = true;
+      }
+    } else if (kind === 'facility') {
+      const cat = q.get('cat');
+      if (cat && id && !deepLinkDone.current) {
+        deepLinkDone.current = true;
+        fetch(`/api/nearby/facilities?cat=${encodeURIComponent(cat)}`)
+          .then((r) => r.json())
+          .then((d: { items?: Facility[] }) => {
+            const item = (d.items ?? []).find((x) => x.id === id);
+            if (item) {
+              select({ type: 'facility', item });
+              flyTo([item.lon, item.lat], 15);
+            }
+          }).catch(() => { /* egal */ });
+      }
+    }
+  }, [data.parking.data, data.roadworks.data, data.places.data, data.air.data, data.sharing.data, data.water.data, data.events.data, select, flyTo]);
 
   // Tiefe Links: ?stop=de:08111:6115
   useEffect(() => {
@@ -254,7 +338,8 @@ function Shell() {
       for (const k of a.layers) next[k] = true;
       return next;
     });
-    if (mobile) setSheet('open');
+    // Der Weg ist eine Kartenaufgabe: Beim Öffnen bleibt die Karte sichtbar.
+    if (mobile) setSheet(a.module === 'route' ? 'peek' : 'open');
   }, [mobile]);
 
   /**
@@ -299,9 +384,12 @@ function Shell() {
     kaltluft: data.kaltluft.data?.punkte ?? null,
     unfall: data.unfaelle.data?.items ?? null,
     wanderwege: data.wanderwege.data?.items ?? null,
-  }), [data.traffic.data, sunImage, radarImg, nearby, live, routeGeo, data.parking.data, data.sharing.data, data.roadworks.data, data.air.data, data.water.data, data.bike.data, data.events.data, data.places.data, data.warnungen.data, data.flug.data, data.kaltluft.data, data.unfaelle.data, data.wanderwege.data]);
+    wissen,
+  }), [data.traffic.data, sunImage, radarImg, nearby, live, routeGeo, data.parking.data, data.sharing.data, data.roadworks.data, data.air.data, data.water.data, data.bike.data, data.events.data, data.places.data, data.warnungen.data, data.flug.data, data.kaltluft.data, data.unfaelle.data, data.wanderwege.data, wissen]);
 
   const showDetail = !!selection;
+  const kiosk = new URLSearchParams(location.search).get('display') === 'kiosk';
+  if (kiosk) return <Kiosk />;
 
   return (
     <InfoProvider open={openInfo}>
@@ -416,7 +504,7 @@ function Shell() {
                   {activeAnliegen && activeAnliegen.module !== mod.id && <span className="crumb-context">{tr(mod.label)}</span>}
                 </div>
               </div>
-              <mod.Panel focus={focus ?? undefined} visible={visible} toggle={toggle} select={select} flyTo={flyTo} fitBounds={fitBounds} setLayer={setLayer} center={center} setSunImage={setSunImage} radarFrame={radarFrame} setRadarFrame={setRadarFrame} setNearby={setNearby} setRoute={setRouteGeo} routeTarget={routeTarget} />
+              <mod.Panel focus={focus ?? undefined} visible={visible} toggle={toggle} select={select} flyTo={flyTo} fitBounds={fitBounds} setLayer={setLayer} center={center} setSunImage={setSunImage} radarFrame={radarFrame} setRadarFrame={setRadarFrame} setNearby={setNearby} setWissen={setWissen} setRoute={setRouteGeo} routeTarget={routeTarget} />
             </>
           ) : (
             <StartPanel onModule={(id) => openModule(id)} />
@@ -506,6 +594,20 @@ function Shell() {
           onPointerCancel={() => { pageDrag.current = null; }}
         >
           <div className="mobile-grab" aria-hidden />
+          <button
+            type="button"
+            className="detail-share"
+            aria-label="Link zu diesem Objekt kopieren"
+            title="Link zu diesem Objekt kopieren"
+            onClick={() => {
+              const url = objectUrl(selection!);
+              navigator.clipboard?.writeText(url)
+                .then(() => setLocateMsg('Link kopiert'))
+                .catch(() => setLocateMsg(url));
+            }}
+          >
+            <Icon name="share" size={17} />
+          </button>
           <DetailSheet sel={selection!} onClose={() => setSelection(null)} select={select} flyTo={flyTo} />
         </aside>
       )}

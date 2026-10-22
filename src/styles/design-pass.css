@@ -1664,21 +1664,18 @@ button {
     bottom: calc(94px + env(safe-area-inset-bottom));
   }
 
-  /* Vollbild für Module: eine Aufgabe, eine Fläche, kein Bedienchaos darüber. */
-  .is-mobile.has-module .panel {
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: auto;
-    height: 100vh;
-    height: 100dvh;
-    border-radius: 0;
+  /* Module nutzen dieselben Rasten wie das Startblatt: Vollbild, Peek (Karte sichtbar)
+     und Mini. So lässt sich eine geplante Route auf der Karte ansehen, ohne sie zu verlieren. */
+  .is-mobile.has-module .panel-scroll {
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
   }
 
-  .is-mobile.has-module .panel-scroll {
+  .is-mobile.has-module.sheet-open .panel-scroll {
     padding-top: calc(env(safe-area-inset-top) + 8px);
-    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .is-mobile.has-module:not(.sheet-open) .panel-scroll {
+    padding-top: 8px;
   }
 
   .is-mobile.has-module .sheet-handle {
@@ -1686,16 +1683,25 @@ button {
   }
 
   .is-mobile.has-module .panel-crumb {
-    top: 0;
-    padding-top: calc(env(safe-area-inset-top) + 18px);
     padding-bottom: 11px;
     touch-action: none;
+  }
+
+  /* Im Vollbild sitzt der Griff unter der Statusleiste, in den unteren Rasten am Blatt. */
+  .is-mobile.has-module.sheet-open .panel-crumb {
+    top: 0;
+    padding-top: calc(env(safe-area-inset-top) + 18px);
+  }
+
+  .is-mobile.has-module:not(.sheet-open) .panel-crumb {
+    top: -2px;
+    padding-top: 18px;
   }
 
   .is-mobile.has-module .panel-crumb::before {
     content: '';
     position: absolute;
-    top: calc(env(safe-area-inset-top) + 7px);
+    top: 7px;
     left: 50%;
     width: 44px;
     height: 4px;
@@ -1704,13 +1710,25 @@ button {
     transform: translateX(-50%);
   }
 
-  /* Auf der Vollbildseite gibt es keine schwebenden Kartenbedienelemente mehr. */
+  .is-mobile.has-module.sheet-open .panel-crumb::before {
+    top: calc(env(safe-area-inset-top) + 7px);
+  }
+
+  /* Auf der Vollbildseite gibt es keine schwebenden Kartenbedienelemente mehr.
+     Sobald das Modul die Karte freigibt, sind Zoom und Standort wieder da. */
   .is-mobile.has-module .search-dock,
   .is-mobile.has-module .quick-actions,
   .is-mobile.has-module .status-cluster,
-  .is-mobile.has-module .map-controls,
   .is-mobile.has-module .aerial-card {
     display: none;
+  }
+
+  .is-mobile.has-module .map-controls {
+    display: none;
+  }
+
+  .is-mobile.has-module:not(.sheet-open) .map-controls {
+    display: flex;
   }
 
   /* Auch ein voll aufgezogenes Startblatt ist eine eigene Fläche. */

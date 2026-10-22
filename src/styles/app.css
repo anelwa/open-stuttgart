@@ -608,6 +608,9 @@ h1, h2, h3 { font-family: var(--font-head); margin: 0; }
 .bath-bar { height: 8px; border-radius: 99px; background: var(--card-2); overflow: hidden; margin: 5px 0 3px; border: 1px solid var(--line); }
 .bath-bar span { display: block; height: 100%; background: var(--ok, #2F8F5B); }
 .bath-bar.warn span { background: #E0A100; } .bath-bar.crit span { background: #C8102E; }
+.near-details { margin-top: 10px; }
+.near-details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.near-details .bath-list { margin-top: 10px; }
 .fac-info { margin: 0 0 12px; padding-left: 18px; font-size: 14px; line-height: 1.5; }
 .link-btn.secondary { background: var(--card-2); color: var(--ink); border: 1.5px solid var(--line); }
 /* Fünf Themen nebeneinander: Symbole nur im aktiven Reiter */

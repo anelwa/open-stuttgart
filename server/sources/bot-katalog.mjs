@@ -69,7 +69,7 @@ export const INTENTS = [
   {
     id: 'personalausweis',
     label: 'Personalausweis',
-    keywords: [/personalausweis/, /\bperso\b/, /ausweis.*beantrag/, /ausweis.*(verlor|gestohl|geklaut|diebstahl|abgelaufen)/],
+    keywords: [/personalausweis/, /\bperso\b/, /\bausweis\b/, /ausweis.*beantrag/, /ausweis.*(verlor|gestohl|geklaut|diebstahl|abgelaufen)/],
     serviceUrl: (s) => {
       if (s.anlass === 'verlust') return SERVICE_URLS.personalausweisVerlust;
       if (s.anlass === 'unter16') return SERVICE_URLS.personalausweisUnter16;
@@ -81,10 +81,10 @@ export const INTENTS = [
         id: 'anlass',
         question: 'Worum geht es beim Personalausweis?',
         options: [
-          opt('erstmalig', 'Erstmalig oder abgelaufen', /erst|abgelaufen|neu|verlaeng|alt|normal/),
-          opt('verlust', 'Verloren oder gestohlen', /verlor|gestohl|geklaut|diebstahl|weg/),
           opt('unter16', 'Für ein Kind unter 16', /kind|unter 16|minderjaehrig|sohn|tochter/),
+          opt('verlust', 'Verloren oder gestohlen', /verlor|gestohl|geklaut|diebstahl|weg/),
           opt('adressaenderung', 'Adresse ändern', /adress|umzug|umgemeldet/),
+          opt('erstmalig', 'Erstmalig oder abgelaufen', /erst|abgelaufen|neu|verlaeng|alt|normal/),
         ],
       },
       { ...ALTER, when: (s) => !['unter16', 'adressaenderung'].includes(s.anlass) },
@@ -106,10 +106,10 @@ export const INTENTS = [
         id: 'anlass',
         question: 'Was brauchst du beim Reisepass?',
         options: [
-          opt('erstmalig', 'Erstmalig oder abgelaufen', /erst|abgelaufen|neu|verlaeng|alt|normal/),
-          opt('express', 'Express, möglichst schnell', /express|schnell|eilig|sofort/),
-          opt('verlust', 'Verloren oder gestohlen', /verlor|gestohl|geklaut|diebstahl|weg/),
           opt('unter16', 'Für ein Kind unter 16', /kind|unter 16|minderjaehrig|sohn|tochter/),
+          opt('verlust', 'Verloren oder gestohlen', /verlor|gestohl|geklaut|diebstahl|weg/),
+          opt('express', 'Express, möglichst schnell', /express|schnell|eilig|sofort/),
+          opt('erstmalig', 'Erstmalig oder abgelaufen', /erst|abgelaufen|neu|verlaeng|alt|normal/),
         ],
       },
       { ...ALTER, when: (s) => !['unter16'].includes(s.anlass) },
@@ -193,7 +193,7 @@ export const INTENTS = [
   {
     id: 'kfz',
     label: 'Kfz-Zulassung',
-    keywords: [/kfz/, /kraftfahrzeug/, /auto.*zulass/, /zulassung.*auto/, /auto.*ummeld/, /fahrzeug.*ummeld/, /neuwagen/],
+    keywords: [/kfz/, /kraftfahrzeug/, /auto.*zulass/, /zulassung.*auto/, /auto.*ummeld/, /fahrzeug.*ummeld/, /auto.*anmeld/, /auto.*abmeld/, /neuwagen/],
     serviceUrl: (s) => {
       if (s.anlass === 'wieder') return SERVICE_URLS.kfzWieder;
       if (s.anlass === 'abmelden') return SERVICE_URLS.kfzAbmelden;
@@ -313,5 +313,8 @@ export const ALL_SLOT_IDS = [...new Set(INTENTS.flatMap((i) => i.slots.map((s) =
 
 /** Kurzbeschreibung für den Systemprompt des Modells. */
 export function catalogForPrompt() {
-  return INTENTS.map((i) => `${i.id}: ${i.label} — ${i.hint}`).join('\n');
+  return INTENTS.map((i) => {
+    const slots = i.slots.map((s) => `${s.id}: ${s.options.map((o) => o.value).join('|')}`).join('; ');
+    return `${i.id}: ${i.label} — ${i.hint}${slots ? ` — Angaben: ${slots}` : ''}`;
+  }).join('\n');
 }

@@ -10,7 +10,7 @@ export const aerialTiles = (year: string) =>
 
 export const BLANK_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
-export type OverlayKey = 'network' | 'stops' | 'parking' | 'sharing' | 'roadworks' | 'bike' | 'air' | 'water' | 'events' | 'places' | 'sun' | 'radar' | 'aerial' | 'nearby' | 'live' | 'route' | 'vehicles' | 'traffic' | 'warnung' | 'flug' | 'kaltluft' | 'unfall' | 'hike';
+export type OverlayKey = 'network' | 'stops' | 'parking' | 'sharing' | 'roadworks' | 'bike' | 'air' | 'water' | 'events' | 'places' | 'sun' | 'radar' | 'aerial' | 'nearby' | 'live' | 'route' | 'vehicles' | 'traffic' | 'warnung' | 'flug' | 'kaltluft' | 'unfall' | 'hike' | 'wissen';
 
 export const OVERLAY_LAYERS: Record<OverlayKey, string[]> = {
   bike: ['bike-routes'],
@@ -36,6 +36,7 @@ export const OVERLAY_LAYERS: Record<OverlayKey, string[]> = {
   kaltluft: ['kaltluft-line'],
   unfall: ['unfall-dot'],
   hike: ['hike-line', 'hike-label'],
+  wissen: ['wissen-fill', 'wissen-line', 'wissen-dot', 'wissen-label'],
 };
 
 export const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -80,6 +81,7 @@ export function addOverlays(map: MlMap, theme: Theme, visible: Record<OverlayKey
   map.addSource('kaltluft', { type: 'geojson', data: EMPTY });
   map.addSource('unfall', { type: 'geojson', data: EMPTY });
   map.addSource('hike', { type: 'geojson', data: EMPTY });
+  map.addSource('wissen', { type: 'geojson', data: EMPTY });
   map.addSource('selected', { type: 'geojson', data: EMPTY });
 
   const vis = (k: OverlayKey) => ({ visibility: visible[k] ? 'visible' : 'none' }) as const;
@@ -544,6 +546,36 @@ export function addOverlays(map: MlMap, theme: Theme, visible: Record<OverlayKey
     },
   }, 'stops-rail');
 
+  // Freie WFS-Layer aus dem Stadt-Layer-Katalog: Flächen, Linien und Punkte.
+  map.addLayer({
+    id: 'wissen-fill', type: 'fill', source: 'wissen',
+    filter: ['==', ['geometry-type'], 'Polygon'], layout: vis('wissen'),
+    paint: { 'fill-color': '#2B7FBF', 'fill-opacity': 0.2 },
+  });
+  map.addLayer({
+    id: 'wissen-line', type: 'line', source: 'wissen',
+    filter: ['any', ['==', ['geometry-type'], 'LineString'], ['==', ['geometry-type'], 'Polygon']],
+    layout: { ...vis('wissen'), 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#1F6FA8', 'line-width': zl([[10, 1.2], [14, 2.6], [17, 4]]), 'line-opacity': 0.85 },
+  });
+  map.addLayer({
+    id: 'wissen-dot', type: 'circle', source: 'wissen',
+    filter: ['==', ['geometry-type'], 'Point'], layout: vis('wissen'),
+    paint: {
+      'circle-radius': zl([[10, 3.5], [14, 6], [17, 8]]),
+      'circle-color': '#2B7FBF', 'circle-stroke-color': card, 'circle-stroke-width': 1.8,
+    },
+  });
+  map.addLayer({
+    id: 'wissen-label', type: 'symbol', source: 'wissen', minzoom: 13.5,
+    filter: ['has', '_name'], layout: {
+      ...vis('wissen'), 'text-field': ['get', '_name'], 'text-font': ['Noto Sans Regular'], 'text-size': 11,
+      'text-variable-anchor': ['top', 'left', 'right'], 'text-radial-offset': 0.9, 'text-optional': true,
+      'text-max-width': 10,
+    },
+    paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 1.6 },
+  });
+
   // Auswahl
   map.addLayer({
     id: 'selected-halo', type: 'circle', source: 'selected',
@@ -557,4 +589,4 @@ export function setOverlayVisibility(map: MlMap, key: OverlayKey, on: boolean) {
   }
 }
 
-export const INTERACTIVE_LAYERS = ['stops-rail', 'stops-bus', 'parking-icon', 'parking-dot', 'roadworks', 'share-point', 'share-cluster', 'air-circle', 'water-gauge', 'events-pin', 'places-icon', 'nearby-dot', 'live-dot', 'vehicles-dot', 'traffic-dot', 'traffic-line', 'flug-dot', 'warnung-label', 'kaltluft-line', 'unfall-dot', 'hike-line'];
+export const INTERACTIVE_LAYERS = ['stops-rail', 'stops-bus', 'parking-icon', 'parking-dot', 'roadworks', 'share-point', 'share-cluster', 'air-circle', 'water-gauge', 'events-pin', 'places-icon', 'nearby-dot', 'live-dot', 'vehicles-dot', 'traffic-dot', 'traffic-line', 'flug-dot', 'warnung-label', 'kaltluft-line', 'unfall-dot', 'hike-line', 'wissen-dot', 'wissen-line', 'wissen-fill'];

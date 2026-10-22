@@ -29,6 +29,7 @@ export interface MapData {
   kaltluft: KaltluftPunkt[] | null;
   unfall: Unfall[] | null;
   wanderwege: Wanderweg[] | null;
+  wissen: GeoJSON.FeatureCollection | null;
   radarImage: { url: string; coords: [[number, number], [number, number], [number, number], [number, number]] } | null;
 }
 
@@ -256,6 +257,7 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
     (m.getSource('kaltluft') as GeoJSONSource | undefined)?.setData(g.kaltluft);
     (m.getSource('unfall') as GeoJSONSource | undefined)?.setData(g.unfall);
     (m.getSource('hike') as GeoJSONSource | undefined)?.setData(g.hike);
+    (m.getSource('wissen') as GeoJSONSource | undefined)?.setData(propsRef.current.data.wissen ?? fc([]));
     pushVehicles(true);
     const sun = m.getSource('sun') as ImageSource | undefined;
     const img = propsRef.current.data.sunImage ?? BLANK_PNG;
@@ -365,6 +367,7 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
           return `Unfall ${pr.jahr}: ${schwere}${pr.rad ? ' · Rad beteiligt' : ''}${pr.fuss ? ' · Fuß beteiligt' : ''}`;
         }
         case 'hike-line': return String(pr.text ?? pr.name);
+        case 'wissen-dot': case 'wissen-line': case 'wissen-fill': return String(pr._name ?? pr.NAME ?? pr.TITEL ?? '');
         case 'vehicles-dot': case 'traffic-dot': case 'traffic-line': return String(pr.text);
         case 'events-pin': return `${pr.time} · ${pr.title}${Number(pr.count) > 1 ? ` (und ${Number(pr.count) - 1} weitere hier)` : ''}`;
         default: return null;
@@ -395,7 +398,9 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
         new maplibregl.Popup({ offset: 12, maxWidth: '280px', className: 'info-pop' }).setLngLat(e.lngLat).setText(String(pr.text ?? label(f) ?? '')).addTo(m);
         return;
       }
-      const coord = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+      const coord = f.geometry.type === 'Point'
+        ? f.geometry.coordinates as [number, number]
+        : [e.lngLat.lng, e.lngLat.lat] as [number, number];
       switch (f.layer.id) {
         case 'stops-rail': case 'stops-bus': {
           const lines = typeof pr.lines === 'string' ? JSON.parse(pr.lines as string) : pr.lines;
@@ -424,6 +429,16 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
           const zoom = await src.getClusterExpansionZoom(pr.cluster_id as number);
           m.easeTo({ center: coord, zoom: Math.min(zoom + 0.3, 18) });
           return;
+        }
+        case 'wissen-dot': case 'wissen-line': case 'wissen-fill': {
+          let props: Record<string, unknown> = {};
+          try { props = JSON.parse(String(pr._props ?? '{}')); } catch { /* leer */ }
+          propsRef.current.onSelect({
+            type: 'wissen', id: String(pr.id ?? ''), layer: String(pr._layer ?? ''),
+            layerTitle: String(pr._layerTitle ?? 'Stadt-Layer'), name: String(pr._name ?? 'Objekt'),
+            lngLat: coord, props,
+          });
+          break;
         }
       }
       m.easeTo({ center: coord, zoom: Math.max(m.getZoom(), 14.5), padding: { top: 0, ...propsRef.current.detailPadding }, duration: reduced ? 0 : 700 });

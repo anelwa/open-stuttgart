@@ -26,6 +26,8 @@ export interface ModuleProps {
   setRadarFrame: (i: number | null) => void;
   /** Punkte der Nähe-Suche auf der Karte */
   setNearby: (d: { items: Facility[]; color: Record<string, string> } | null) => void;
+  /** Freie WFS-/Arten-/Fairteiler-Punkte für die Ebene „Stadtwissen“ */
+  setWissen: (fc: GeoJSON.FeatureCollection | null) => void;
   /** Gewählte Verbindung als Linien auf der Karte */
   setRoute: (fc: GeoJSON.FeatureCollection | null) => void;
   /** Ziel aus „Verbindung suchen“ einer Detailansicht */

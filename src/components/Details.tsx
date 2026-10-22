@@ -12,6 +12,7 @@ import { RainLine } from './Rain';
 import { PlanB } from './PlanB';
 import { FacilityDetail } from './FacilityDetail';
 import { GebaeudeDetail, LeistungDetail } from './VerwaltungDetail';
+import { WissenDetail } from './WissenDetail';
 import { Explain } from '../lib/info';
 import { setVehicleTrips, type VehicleTrip } from '../lib/vehicles';
 
@@ -414,5 +415,6 @@ export function DetailSheet({ sel, onClose, select, flyTo }: Close & Nav & { sel
     case 'sharing': return <SharingDetail id={sel.id} onClose={onClose} />;
     case 'verwaltung_gebaeude': return <GebaeudeDetail key={sel.id} id={sel.id} onClose={onClose} select={select} flyTo={flyTo} />;
     case 'verwaltung_leistung': return <LeistungDetail key={sel.url} url={sel.url} lat={sel.lat} lon={sel.lon} onClose={onClose} select={select} flyTo={flyTo} />;
+    case 'wissen': return <WissenDetail key={`${sel.layer}-${sel.id}`} sel={sel} onClose={onClose} />;
   }
 }
