@@ -760,10 +760,10 @@ const AGENT_TOOLS = [{
   ],
 }];
 
-async function callGeminiAgent({ contents, model = MODEL }) {
+async function callGeminiAgent({ contents, system = AGENT_SYSTEM, model = MODEL }) {
   if (!llmAllowed()) return null;
   const body = {
-    system_instruction: { parts: [{ text: AGENT_SYSTEM }] },
+    system_instruction: { parts: [{ text: system }] },
     contents,
     tools: AGENT_TOOLS,
     toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
@@ -904,6 +904,11 @@ const AGENT_SUGGESTIONS = ['Welche Unterlagen brauche ich?', 'Kann ich das onlin
 
 async function agentTurn({ text, s, loc, meta }) {
   if (!llmAllowed()) return null;
+  const system = `${AGENT_SYSTEM}\n\nStandort der Person: ${
+    loc
+      ? `${loc.label ?? 'freigegeben'} (${loc.lat}, ${loc.lon}) — für Anfahrt und Routen direkt nutzen, nicht erneut danach fragen.`
+      : 'unbekannt — wenn eine Anfahrt nötig ist, danach fragen.'
+  }`;
   const ctx = { loc, service: null, officeData: null, routeTarget: null, needsLocation: false, toolLog: [] };
   const contents = [
     ...(s.history ?? []),
@@ -913,7 +918,7 @@ async function agentTurn({ text, s, loc, meta }) {
   let rounds = 0;
   while (rounds < 5) {
     rounds += 1;
-    const data = await callGeminiAgent({ contents });
+    const data = await callGeminiAgent({ contents, system });
     if (!data) return null;
     const parts = data?.candidates?.[0]?.content?.parts ?? [];
     const calls = parts.filter((p) => p.functionCall);
