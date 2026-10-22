@@ -8,7 +8,7 @@ import { BLANK_PNG, aerialTiles, addOverlays, setOverlayVisibility, INTERACTIVE_
 import { registerIcons } from './icons';
 import { getVehicleTrips, subscribeVehicles, vehiclePaths, vehiclePositions } from '../lib/vehicles';
 import { fmtTime, occupancy } from '../lib/format';
-import type { AirStation, CultureEvent, Facility, ParkingSite, Place, Roadwork, Selection, SharingItem, TrafficItem, Water } from '../lib/types';
+import type { AirStation, CultureEvent, Facility, Flugzeug, KaltluftPunkt, NinaWarnung, ParkingSite, Place, Roadwork, Selection, SharingItem, TrafficItem, Unfall, Wanderweg, Water } from '../lib/types';
 
 export interface MapData {
   parking: ParkingSite[] | null;
@@ -24,11 +24,17 @@ export interface MapData {
   live: (Facility & { level: string; short: string })[] | null;
   route: GeoJSON.FeatureCollection | null;
   traffic: TrafficItem[] | null;
+  warnungen: NinaWarnung[] | null;
+  flug: Flugzeug[] | null;
+  kaltluft: KaltluftPunkt[] | null;
+  unfall: Unfall[] | null;
+  wanderwege: Wanderweg[] | null;
   radarImage: { url: string; coords: [[number, number], [number, number], [number, number], [number, number]] } | null;
 }
 
 export interface MapHandle {
   flyTo: (lngLat: [number, number], zoom?: number) => void;
+  fitBounds: (bounds: [[number, number], [number, number]], opts?: { maxZoom?: number }) => void;
   zoomBy: (d: number) => void;
   resetNorth: () => void;
   getMap: () => MlMap | null;
@@ -85,6 +91,44 @@ function toGeo(data: MapData) {
       const p = pt(t.lon, t.lat, props);
       return t.linie ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: t.linie }, properties: props } as GeoJSON.Feature, p] : [p];
     })),
+    warnungen: fc((data.warnungen ?? []).flatMap((w) => {
+      const props = { title: w.title, severity: w.severity, area: w.area };
+      const feats: GeoJSON.Feature[] = w.polygon && w.polygon.length >= 3
+        ? [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [w.polygon] }, properties: props }]
+        : [];
+      if (w.polygon?.length) {
+        const c = w.polygon.reduce((s, p) => [s[0] + p[0] / w.polygon!.length, s[1] + p[1] / w.polygon!.length], [0, 0]);
+        feats.push(pt(c[0], c[1], props));
+      }
+      return feats;
+    })),
+    flug: fc((data.flug ?? []).map((a) => pt(a.lon, a.lat, {
+      callsign: a.callsign ?? a.reg ?? a.type ?? 'Flugzeug', reg: a.reg ?? '', type: a.type ?? '',
+      alt: a.altFt ?? 0, heli: a.heli, niedrig: a.niedrig, dist: a.dist,
+    }))),
+    hike: fc((data.wanderwege ?? []).map((w) => ({
+      type: 'Feature', geometry: w.geometrie,
+      properties: {
+        id: w.id, name: w.name, art: w.artLabel, laenge: w.laengeKm, aufstieg: w.aufstiegM, abstieg: w.abstiegM, farbe: w.farbe,
+        text: `${w.name} · ${w.laengeKm.toLocaleString('de-DE')} km${w.aufstiegM != null ? ` · ${w.aufstiegM} m Anstieg` : ''}`,
+      },
+    }))),
+    unfall: fc((data.unfall ?? []).map((u) => pt(u.lon, u.lat, {
+      schwere: u.kategorie, rad: u.rad ? 1 : 0, fuss: u.fuss ? 1 : 0, pkw: u.pkw ? 1 : 0,
+      jahr: u.jahr, monat: u.monat, stunde: u.stunde, art: u.art, id: u.id,
+    }))),
+    kaltluft: fc((data.kaltluft ?? []).map((p) => {
+      // Kurzes Liniensegment in Strömungsrichtung als Pfeilersatz
+      const len = 0.004;
+      const rad = ((p.ri ?? 0) * Math.PI) / 180;
+      const dLat = Math.cos(rad) * len;
+      const dLon = Math.sin(rad) * len / Math.max(0.2, Math.cos((p.lat * Math.PI) / 180));
+      return {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: [[p.lon, p.lat], [+(p.lon + dLon).toFixed(5), +(p.lat + dLat).toFixed(5)]] },
+        properties: { ge: p.ge ?? 0.1, ri: p.ri },
+      } as GeoJSON.Feature;
+    })),
   };
 }
 
@@ -127,6 +171,25 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
       if (!m) return;
       m.flyTo({ center: lngLat, zoom: Math.max(m.getZoom(), zoom), padding: { top: 0, ...propsRef.current.detailPadding }, speed: 1.2, essential: true });
     },
+    fitBounds: (bounds, opts) => {
+      const m = mapRef.current;
+      if (!m) return;
+      const w = m.getContainer().clientWidth;
+      const p = propsRef.current.padding;
+      // Das Panel verdeckt je nach Ansicht einen Teil der Karte. Der Ausschnitt wird in die
+      // tatsächlich sichtbare Fläche gelegt, damit Start, Ziel und Verlauf nicht darunter liegen.
+      m.fitBounds(bounds, {
+        padding: {
+          top: 34,
+          right: Math.min(p.right ?? 0, Math.round(w * 0.3)),
+          bottom: p.bottom ?? 0,
+          left: Math.min(p.left ?? 0, Math.round(w * 0.5)),
+        },
+        maxZoom: opts?.maxZoom ?? 16,
+        duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650,
+        essential: true,
+      });
+    },
     zoomBy: (d) => mapRef.current?.easeTo({ zoom: mapRef.current.getZoom() + d, duration: 300 }),
     resetNorth: () => mapRef.current?.easeTo({ bearing: 0, pitch: propsRef.current.terrain ? 55 : 0, duration: 500 }),
     getMap: () => mapRef.current,
@@ -165,6 +228,11 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
     (m.getSource('live') as GeoJSONSource | undefined)?.setData(g.live);
     (m.getSource('route') as GeoJSONSource | undefined)?.setData(propsRef.current.data.route ?? fc([]));
     (m.getSource('traffic') as GeoJSONSource | undefined)?.setData(g.traffic);
+    (m.getSource('warnung') as GeoJSONSource | undefined)?.setData(g.warnungen);
+    (m.getSource('flug') as GeoJSONSource | undefined)?.setData(g.flug);
+    (m.getSource('kaltluft') as GeoJSONSource | undefined)?.setData(g.kaltluft);
+    (m.getSource('unfall') as GeoJSONSource | undefined)?.setData(g.unfall);
+    (m.getSource('hike') as GeoJSONSource | undefined)?.setData(g.hike);
     pushVehicles(true);
     const sun = m.getSource('sun') as ImageSource | undefined;
     const img = propsRef.current.data.sunImage ?? BLANK_PNG;
@@ -266,6 +334,14 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
         case 'places-icon': return String(pr.name);
         case 'nearby-dot': return String(pr.name);
         case 'live-dot': return `${pr.name}: ${pr.live}`;
+        case 'flug-dot': return `${pr.callsign}${pr.type ? ` (${pr.type})` : ''} · ${pr.alt} ft${pr.heli ? ' · Hubschrauber' : ''}`;
+        case 'warnung-label': return `Warnung: ${pr.title} (${pr.severity})`;
+        case 'kaltluft-line': return `Kaltluftabfluss, Richtung ${pr.ri}°, ${pr.ge} m/s`;
+        case 'unfall-dot': {
+          const schwere = Number(pr.schwere) === 1 ? 'getötet' : Number(pr.schwere) === 2 ? 'schwer verletzt' : 'leicht verletzt';
+          return `Unfall ${pr.jahr}: ${schwere}${pr.rad ? ' · Rad beteiligt' : ''}${pr.fuss ? ' · Fuß beteiligt' : ''}`;
+        }
+        case 'hike-line': return String(pr.text ?? pr.name);
         case 'vehicles-dot': case 'traffic-dot': case 'traffic-line': return String(pr.text);
         case 'events-pin': return `${pr.time} · ${pr.title}${Number(pr.count) > 1 ? ` (und ${Number(pr.count) - 1} weitere hier)` : ''}`;
         default: return null;
@@ -291,8 +367,9 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
       if (!f) { propsRef.current.onSelect(null); return; }
       const pr = f.properties as Record<string, unknown>;
       // Fahrzeuge und Verkehrsmeldungen: Text am Ort, ohne Detailansicht
-      if (f.layer.id === 'vehicles-dot' || f.layer.id.startsWith('traffic-')) {
-        new maplibregl.Popup({ offset: 12, maxWidth: '280px', className: 'info-pop' }).setLngLat(e.lngLat).setText(String(pr.text)).addTo(m);
+      if (f.layer.id === 'vehicles-dot' || f.layer.id.startsWith('traffic-') || f.layer.id.startsWith('flug-')
+        || f.layer.id.startsWith('warnung-') || f.layer.id === 'kaltluft-line' || f.layer.id === 'unfall-dot' || f.layer.id === 'hike-line') {
+        new maplibregl.Popup({ offset: 12, maxWidth: '280px', className: 'info-pop' }).setLngLat(e.lngLat).setText(String(pr.text ?? label(f) ?? '')).addTo(m);
         return;
       }
       const coord = (f.geometry as GeoJSON.Point).coordinates as [number, number];

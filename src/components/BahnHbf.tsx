@@ -141,7 +141,7 @@ function Verlauf({ h }: { h: Historie }) {
   );
 }
 
-export function BahnHbf() {
+export function BahnHbf({ className }: { className?: string }) {
   const { data, error, loading, updatedAt, reload } = usePolling<BahnAntwort>('/api/bahn/hbf', 60_000);
   const hist = usePolling<Historie>('/api/bahn/historie', 6 * 3600_000);
   const now = useNow(15_000);
@@ -158,7 +158,7 @@ export function BahnHbf() {
 
   return (
     <>
-      <Section title="Eisenbahn am Hauptbahnhof" explain="bahnHbf">
+      <Section className={className} title="Eisenbahn am Hauptbahnhof" explain="bahnHbf">
         <div className="dep-toolbar">
           <span className="live-label">
             <LiveDot stale={!!error} /> {updatedAt ? `Stand der DB ${data?.stand ? fmtTime(data.stand) : ''}, abgerufen ${ago(updatedAt, now)}` : 'Lade Daten …'}
@@ -187,12 +187,12 @@ export function BahnHbf() {
         </ul>
       </Section>
 
-      <Section title="Häufigste Verspätungsgründe" aside={<span className="muted small">Züge mit Meldung</span>}>
+      <Section className={className} title="Häufigste Verspätungsgründe" aside={<span className="muted small">Züge mit Meldung</span>}>
         {data ? <Gruende liste={data.gruendeHaeufig} /> : <span className="skeleton" style={{ width: '100%', height: 60, display: 'block' }} />}
         <p className="muted small">Gezählt werden Züge am Hauptbahnhof (oben und tief) mit mindestens einer Meldung im aktuellen Änderungsstand der DB. Ein Zug kann mehrere Gründe haben.</p>
       </Section>
 
-      <Section title="Pünktlichkeit am Hauptbahnhof seit 2024" explain="bahnHistorie">
+      <Section className={className} title="Pünktlichkeit am Hauptbahnhof seit 2024" explain="bahnHistorie">
         {hist.error && !hist.data && <ErrorNote text={`Monatswerte nicht verfügbar: ${hist.error}`} onRetry={hist.reload} />}
         {hist.data && <Verlauf h={hist.data} />}
         <Source>Verspätungsdaten DB: Deutsche Bahn (CC BY 4.0), aufbereitet im Datensatz piebro/deutsche-bahn-data; eigene Auswertung für Stuttgart Hbf.</Source>

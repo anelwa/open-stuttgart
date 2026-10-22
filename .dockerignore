@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+docs
+gancio
+scripts
+server/data
+server/.cache
+*.log
+tsconfig.tsbuildinfo
+.DS_Store

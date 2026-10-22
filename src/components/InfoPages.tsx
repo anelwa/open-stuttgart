@@ -156,7 +156,25 @@ const API = [
   ['/api/nearby/baeder', 'Besucherzahlen der Bäder mit „üblich um diese Zeit“'],
   ['/api/nearby/buergerbueros', 'Wartezeiten der Bürgerbüros mit „üblich um diese Zeit“'],
   ['/api/nearby/facilities?cat=spielplatz', 'Einrichtungen einer Kategorie'],
-  ['/api/adresse/profil?lat=48.7744&lon=9.1773', 'Angaben für einen Ort (Wahlbezirk, Starkregen, Lärm …)'],
+  ['/api/adresse/profil?lat=48.7744&lon=9.1773', 'Angaben für einen Ort (Wahlbezirk, Starkregen, Lärm, Haus-Akte …)'],
+  ['/api/unfaelle?lat=48.775&lon=9.18&r=500', 'Unfallatlas im Umkreis, mit Statistik und Schwerpunkten'],
+  ['/api/stadtgedaechtnis?days=30', 'Stadtgedächtnis: Änderungen mit Quelle und Datum'],
+  ['/api/search?q=Personalausweis', 'Everything Search über Seiten, Leistungen und Dokumente'],
+  ['/api/search/stats', 'Umfang des Dokumentenregisters und der Backlinks'],
+  ['/api/documents/9387', 'Dokument mit Ablauf, Quellen, Backlinks und verwandten Dokumenten'],
+  ['/api/stadtgedaechtnis.rss?days=30', 'Stadtgedächtnis als RSS-Feed'],
+  ['/api/wanderwege', 'Wander-, Weinwander- und Downhillwege mit Start/Ziel'],
+  ['/api/geocaches?lat=48.775&lon=9.18', 'Geocaches in der Nähe (Opencaching.de)'],
+  ['/api/bikeandride?lat=48.783&lon=9.181&radius=3000', 'Fahrradboxen und Schließfächer an Haltestellen'],
+  ['/api/parkandride', 'Park+Ride-Anlagen in der Region'],
+  ['/api/radzaehler', 'Eco-Counter-Fahrradzählstellen'],
+  ['/api/flug', 'ADS-B, Wetterballons, ISS und Betriebsrichtung EDDS'],
+  ['/api/natur?lat=48.778&lon=9.18', 'iNaturalist-Beobachtungen in der Nähe'],
+  ['/api/mensa', 'Tagesgerichte der Stuttgarter Mensen'],
+  ['/api/giess?lat=48.775&lon=9.18', 'Gieß-Radar für junge Bäume'],
+  ['/api/pollenkarte', 'Pollen-Hotspots aus dem Baumkataster'],
+  ['/api/gruenstrom?plz=70173', 'Grünstrom-Anteil im Netz'],
+  ['/api/warnungen', 'BBK NINA / MoWaS-Warnungen für Stuttgart'],
   ['/api/events', 'Termine des Tages'],
   ['/api/archiv', 'Liste der Tagesdateien des Archivs'],
 ];
@@ -182,6 +200,13 @@ function OffeneDaten() {
           {!a.data.days.length && <p className="small muted">Noch keine Aufzeichnung vorhanden.</p>}
         </>
       )}
+      <h3>Stadtgedächtnis</h3>
+      <p>
+        Das <a href="/api/stadtgedaechtnis?days=30" target="_blank" rel="noreferrer">Stadtgedächtnis</a> sammelt öffentliche
+        Veränderungen mit Datum, Quelle und Lizenz. Es lässt sich als <a href="/api/stadtgedaechtnis.rss?days=30" target="_blank" rel="noreferrer">RSS-Feed</a>
+        abonnieren. Der erste Lauf des Verwaltungsvergleichs setzt nur den Vergleichsstand; danach werden Änderungen an
+        Öffnungszeiten, Adressen, Terminbuchungen und Leistungen sichtbar.
+      </p>
       <h3>Schnittstellen dieser Anwendung</h3>
       <p>Alle Ansichten beruhen auf einfachen JSON-Schnittstellen des eigenen Servers. Sie können für eigene Auswertungen genutzt werden; es gelten die Lizenzen der jeweiligen Quellen.</p>
       <ul className="api-list">

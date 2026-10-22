@@ -17,24 +17,49 @@ const KUECHE = { italian: 'italienisch', regional: 'regional', pizza: 'Pizza', k
 const ROLLSTUHL = { yes: 'stufenlos zugänglich', limited: 'eingeschränkt stufenlos', no: 'nicht stufenlos' };
 const GASTRO_ART = { essen_restaurant: ['restaurant', 'food_court'], essen_cafe: ['cafe'], essen_imbiss: ['fast_food'], essen_kneipe: ['pub', 'bar'], essen_biergarten: ['biergarten'], essen_eis: ['ice_cream'] };
 let gastroCache = null;
-function gastro(cat) {
+const DIET_LABEL = {
+  'vegan-only': 'ausschließlich vegan',
+  vegan: 'vegane Gerichte',
+  'vegetarian-only': 'ausschließlich vegetarisch',
+  vegetarian: 'vegetarische Gerichte',
+};
+/** OSM diet:vegan / diet:vegetarian in eine Stufe übersetzen. Vegan zählt immer auch als vegetarisch. */
+function dietOf(p) {
+  const v = String(p['diet:vegan'] ?? '').trim().toLowerCase();
+  const g = String(p['diet:vegetarian'] ?? '').trim().toLowerCase();
+  if (v === 'only') return 'vegan-only';
+  if (v === 'yes') return 'vegan';
+  if (g === 'only') return 'vegetarian-only';
+  if (g === 'yes') return 'vegetarian';
+  return null;
+}
+function dietMatch(diet, want) {
+  if (!want) return true;
+  if (want === 'vegan') return diet === 'vegan' || diet === 'vegan-only';
+  if (want === 'vegan-only') return diet === 'vegan-only';
+  if (want === 'vegetarian') return diet === 'vegan' || diet === 'vegan-only' || diet === 'vegetarian' || diet === 'vegetarian-only';
+  if (want === 'vegetarian-only') return diet === 'vegan-only' || diet === 'vegetarian-only';
+  return true;
+}
+function gastro(cat, wantDiet = null) {
   gastroCache ??= JSON.parse(readFileSync(GASTRO_FILE, 'utf8'));
   const kinds = GASTRO_ART[cat];
   return gastroCache.features.filter((f) => kinds.includes(f.properties.amenity) && f.properties.name).map((f) => {
     const p = f.properties;
     const [lon, lat] = f.geometry.coordinates;
     const kueche = (p.cuisine ?? '').split(';').map((c) => KUECHE[c.trim()] ?? null).filter(Boolean);
+    const diet = dietOf(p);
     return {
       id: `${cat}-${f.id}`, cat, name: p.name, lat: +lat.toFixed(6), lon: +lon.toFixed(6),
       address: join([p['addr:street'], p['addr:housenumber']].filter(Boolean).join(' ') || null, p['addr:postcode'] ? `${p['addr:postcode']} Stuttgart` : null) || null,
       web: p.website ?? p['contact:website'] ?? null, phone: p.phone ?? p['contact:phone'] ?? null, hours: p.opening_hours ?? null,
-      wheelchair: p.wheelchair ?? null, osm: f.id,
+      wheelchair: p.wheelchair ?? null, osm: f.id, diet,
       info: [kueche.length ? `Küche: ${kueche.join(', ')}` : null, p.wheelchair ? ROLLSTUHL[p.wheelchair] ?? null : null,
         p['toilets:wheelchair'] === 'yes' ? 'rollstuhlgerechtes WC' : null, p.outdoor_seating === 'yes' ? 'Außenplätze' : null,
-        p['diet:vegan'] === 'yes' || p['diet:vegan'] === 'only' ? 'vegane Gerichte' : p['diet:vegetarian'] === 'yes' || p['diet:vegetarian'] === 'only' ? 'vegetarische Gerichte' : null,
+        diet ? DIET_LABEL[diet] : null,
         p.takeaway === 'yes' ? 'zum Mitnehmen' : null, p['check_date:opening_hours'] ? `Öffnungszeiten geprüft am ${p['check_date:opening_hours'].split('-').reverse().join('.')}` : null].filter(Boolean),
     };
-  });
+  }).filter((x) => dietMatch(x.diet, wantDiet));
 }
 
 const WFS = (layer, ws = 'GEOLINE_FLEX') => `https://geoserver.stuttgart.de/geoserver/${ws}/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=${ws}:${layer}_EPSG25832&outputFormat=application/json&srsName=EPSG:4326`;
@@ -64,6 +89,36 @@ export const CATEGORIES = {
       info: [p.FLÄCHE ? `${Math.round(p.FLÄCHE).toLocaleString('de-DE')} m²` : null, yes(p.GESPERRT) ? 'derzeit gesperrt' : null, p.BESONDERHEIT].filter(Boolean) }),
   },
   bad: { label: 'Bäder', group: 'freizeit', layers: ['IP_2_03_36_HALLENBAD', 'IP_2_03_36_FREIBAD', 'IP_2_03_36_MINERALBAD'], map: infopool },
+  minigolf: { label: 'Minigolf', group: 'freizeit', layers: ['IP_2_03_39_MINIGOLF'], map: infopool },
+  kunst: { label: 'Kunst und Ateliers', group: 'freizeit', layers: ['IP_BILDENDE_KUNST'], map: infopool },
+  musik: { label: 'Musikschulen und -orte', group: 'freizeit', layers: ['IP_MUSIK', 'IP_KULTURAMT_MUSIKSCHULE'], map: infopool },
+  theater: { label: 'Theater und Bühnen', group: 'freizeit', layers: ['IP_THEATER'], map: infopool },
+  kino: { label: 'Kinos', group: 'freizeit', layers: ['IP_FILM_MEDIEN'], map: infopool },
+  digitale_teilhabe: {
+    label: 'Digitale Teilhabe', group: 'familie', layers: ['A50_SOZ_DIGITALE_TEILHABE'],
+    map: (p) => ({ ...infopool(p), name: p.NAME ?? p.TITEL ?? 'Kurs zur digitalen Teilhabe', info: [p.KURSART ?? p.ANGEBOT ?? null, p.WOCHENTAG && p.UHRZEIT ? `${p.WOCHENTAG} ${p.UHRZEIT}` : null, p.HYBRID ? 'hybrid' : 'Präsenz', p.BARRIEREFREI].filter(Boolean) }),
+  },
+  ferienprogramm: {
+    label: 'Ferienprogramm', group: 'familie',
+    layers: ['A51_ALG_FP_PUNKTE_Ausfluege_Wissenswertes', 'A51_ALG_FP_PUNKTE_Kreatives_Kultur', 'A51_ALG_FP_PUNKTE_Natur_Tiere', 'A51_ALG_FP_PUNKTE_Sport_Spiel_Action', 'A51_ALG_FP_PUNKTE_Vermischtes'],
+    map: (p) => {
+      const dt = (s) => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(String(s ?? ''));
+        return m ? `${m[3]}.${m[2]}.${m[1]}, ${m[4]}:${m[5]}` : null;
+      };
+      const von = dt(p.DATUM_VON);
+      const bis = dt(p.DATUM_BIS);
+      return {
+        name: p.NAME ?? 'Ferienangebot',
+        address: p.TREFFPUNKT ?? p.ORT ?? null,
+        web: p.WEBLINK ?? null,
+        info: [p.KATEGORIE, von ? `${von}${bis ? ` bis ${bis}` : ''}` : null,
+          p.ALTER_VON ? `ab ${p.ALTER_VON}${p.ALTER_BIS ? ` bis ${p.ALTER_BIS}` : ''} Jahren` : null,
+          p.GEBUEHR_TXT && !/^0([,.]0+)?$/.test(String(p.GEBUEHR_TXT).trim()) ? `${p.GEBUEHR_TXT} Euro` : 'kostenfrei',
+          p.VERANSTALTER, p.ANMELDUNG, p.BARRIEREFREI === 'ja' ? 'barrierefrei' : null].filter(Boolean),
+      };
+    },
+  },
   toilette: {
     label: 'Toiletten', group: 'unterwegs', layers: ['IP_2_10_10_TOILETTENANLAGE', 'A10_POI_NETTE_TOILETTE'],
     map: (p) => (p.BETRIEB
@@ -112,7 +167,124 @@ export const CATEGORIES = {
     label: 'Wahllokale', group: 'verwaltung', layers: ['A12_GBE_WAHLLOKALE'],
     map: (p) => ({ name: p.RAUM_WBEN1, address: join(p.RAUM_WBEN2, p.RAUM_WBEN3), info: [p.WBZ_AKTUEL ? `Wahlbezirk ${p.WBZ_AKTUEL}` : null, p.RAUM_ZUGAN, p.RAUM_LIFT, p.BARRIEREFR].filter(Boolean) }),
   },
+  umweltmobil: {
+    label: 'Schadstoffmobil', group: 'abfall', layers: ['IP_2_10_24_UMWELTMOBIL'],
+    map: (p) => ({ ...infopool(p), name: p.NAME || `Haltestelle Schadstoffmobil ${p.STRASSE ?? ''}`.trim(), info: [p.BEMERKUNG, p.STANDORT, p.TERMIN].filter(Boolean) }),
+  },
+  gruengut: {
+    label: 'Grüngutannahme', group: 'abfall', layers: ['IP_3_05_05_GRUENGUT'],
+    map: (p) => ({ ...infopool(p), name: p.NAME || `Grüngutannahmestelle ${p.STRASSE ?? ''}`.trim() }),
+  },
+  recup: {
+    label: 'Mehrweg-Becher (RECUP)', group: 'abfall', layers: ['FREMDDATEN_RECUP_STANDORTE'],
+    map: (p) => ({ name: p.NAME ?? p.BETRIEB ?? 'RECUP-Ausgabestelle', address: join(p.STRASSE, [p.PLZ, p.ORT].filter(Boolean).join(' ')), web: p.URL ?? null, info: ['RECUP Mehrweg-Pfandsystem', p.KATEGORIE ?? p.TYP].filter(Boolean) }),
+  },
+  mineralbrunnen: {
+    label: 'Mineral- und Heilquellen', group: 'unterwegs', layers: ['A62_BRU_BRUNNEN_Mineralbr_in_Betr'],
+    map: (p) => ({ name: p.NAME || 'Mineralbrunnen', address: p.BEZEICHNUNG_STANDORT ?? p.STANDORT ?? null, info: ['Stuttgarter Mineralwasser', p.STATUS, p.BEMERKUNG].filter(Boolean) }),
+  },
+  hofladen: {
+    label: 'Hofläden und Direktvermarkter', group: 'essen', layers: ['A62_INFOPOOL_DIREKTVERMARKTER'],
+    map: (p) => ({ ...infopool(p), name: p.NAME ?? p.BETRIEB ?? 'Direktvermarkter', info: [p.ANGEBOT ?? p.PRODUKTE ?? p.BEMERKUNG ?? 'Erzeugnisse aus Stuttgarter Landwirtschaft'].filter(Boolean) }),
+  },
+  chillorte: {
+    label: 'Jugend-Chillorte', group: 'freizeit',
+    layers: ['A61_JGD_CHILLORTE_AUSSICHT', 'A61_JGD_CHILLORTE_BEWEGUNG', 'A61_JGD_CHILLORTE_KREATIV', 'A61_JGD_CHILLORTE_MITTENDRIN', 'A61_JGD_CHILLORTE_NATUR', 'A61_JGD_CHILLORTE_ZWECKENTFR'],
+    map: (p, l) => {
+      const kat = l?.endsWith('AUSSICHT') ? 'Aussicht' : l?.endsWith('BEWEGUNG') ? 'Bewegung' : l?.endsWith('KREATIV') ? 'Kreativ' : l?.endsWith('MITTENDRIN') ? 'Mittendrin' : l?.endsWith('NATUR') ? 'Natur' : l?.endsWith('ZWECKENTFR') ? 'Umgenutzter Ort' : null;
+      return {
+        name: p.NAME ?? p.TITEL ?? p.BEZEICHNUNG ?? p.WO ?? `Chillort ${kat ?? ''}`.trim(),
+        address: join(p.STRASSE, p.STADTTEIL ?? p.STADTBEZIRK),
+        web: p.URL ?? p.LINK ?? null,
+        info: [kat ? `Kategorie: ${kat}` : null, p.WAS ?? p.BESCHREIBUNG ?? p.BEMERKUNG ?? p.AUSSTATTUNG, p.WEN ? `Empfohlen für: ${p.WEN}` : null, p.QUELLE ? `erfasst vom ${p.QUELLE}` : null].filter(Boolean),
+      };
+    },
+  },
+  gutefee: {
+    label: 'Aktion Gute Fee', group: 'notfall',
+    layers: ['A62_AKTION_GUTE_FEE'],
+    map: (p) => ({
+      name: p.NAME ?? 'Gute Fee',
+      address: join(p.ADRESSE, [p.PLZ, 'Stuttgart'].filter(Boolean).join(' ')),
+      phone: p.TELEFON ?? null,
+      email: p.EMAIL ?? null,
+      info: ['Sichere Anlaufstelle für Kinder', p.STADTTEIL ?? p.STADTBEZIRK].filter(Boolean),
+    }),
+  },
+  obstgehoelze: {
+    label: 'Essbare Stadt: Obst- und Nussbäume', group: 'freizeit',
+    layers: ['A67_GFM_Obstgehoelze', 'A67_GFM_Nussbaum'],
+    map: (p, l) => ({
+      name: `${p.BAUMART ?? (l?.includes('Nussbaum') ? 'Nussbaum' : 'Obstgehölz')}${p.BAUMART_BOT ? ` (${p.BAUMART_BOT})` : ''}`,
+      address: join(p.LAGEBEZEICHNUNG, p.STADTTEIL ?? p.STADTBEZIRK),
+      info: [p.PFLANZJAHR && Number(p.PFLANZJAHR) > 1750 ? `gepflanzt ${p.PFLANZJAHR}` : null,
+        p.NATURDENKMAL && !/^(0|nein)$/i.test(String(p.NATURDENKMAL)) ? 'Naturdenkmal' : null,
+        p.BAUMWUCHS ?? null, 'städtischer Baum, Ernte nur für den Eigenbedarf'].filter(Boolean),
+    }),
+  },
+  // Vereine und Engagement: bewusst nur öffentliche Anlaufstellen mit eigener Adresse.
+  // Private Vorstandsadressen und reine Postanschriften werden nicht auf die Karte gelegt.
+  verein_sport: {
+    label: 'Sportvereine und Sportanlagen', group: 'vereine',
+    layers: ['IP_2_03_02_SPORTHALLE', 'IP_2_03_03_SPORTPLATZ', 'IP_2_03_05_EISSPORT', 'IP_2_03_06_REITSPORT'],
+    map: (p) => ({ ...infopool(p), name: p.NAME, info: [p.ADRESSTYP ?? 'Sportanlage', 'öffentliche Sportanlage, Vereinsbetrieb möglich'].filter(Boolean) }),
+  },
+  verein_kultur: {
+    label: 'Kultur- und Musikvereine', group: 'vereine',
+    layers: ['IP_STADTTEILKULTUR', 'IP_KULTURAMT_MUSIKSCHULE'],
+    map: (p) => ({ ...infopool(p), name: p.NAME, info: [p.ADRESSTYP ?? 'Kultureinrichtung', 'öffentliche Kultureinrichtung'].filter(Boolean) }),
+  },
+  verein_stadtteil: {
+    label: 'Stadtteil, Jugend und Engagement', group: 'vereine',
+    layers: ['IP_2_06_09u13_SONSTIGE_VEREINIGUNGEN', 'IP_2_15_06_BUERGERHAUS', 'IP_2_01_11_KINDER_JUGENDTREFFS', 'IP_2_14_11_JUGENDGAESTEHAUS', 'IP_3_05_01_JUGENDBERATUNG', 'IP_3_05_11_JUGENDGESUNDHEIT'],
+    map: (p) => ({ ...infopool(p), name: p.NAME, info: [p.ADRESSTYP ?? 'Anlaufstelle', 'offene Anlaufstelle im Stadtteil'].filter(Boolean) }),
+  },
+  verein_natur: {
+    label: 'Natur, Wald und Kleingarten', group: 'vereine',
+    layers: ['IP_2_01_14_WALDHEIM'],
+    map: (p) => ({ ...infopool(p), name: p.NAME, info: [p.ADRESSTYP ?? 'Waldheim', 'öffentliche Anlage'].filter(Boolean) }),
+  },
+  fahrradgarage: {
+    label: 'Fahrrad- und Lastenrad-Abstellanlagen', group: 'unterwegs',
+    layers: ['A66_TIBIS_RADW_RADBUEGEL_Fahrradgarage', 'A66_TIBIS_RADW_RADBUEGEL_Lastenrad_Abstellanlage', 'A66_TIBIS_RADW_RADBUEGEL_Radabstellanlage_ueberdacht'],
+    map: (p, l) => {
+      const art = l?.includes('Fahrradgarage') ? 'Fahrradgarage' : l?.includes('Lastenrad') ? 'Lastenrad-Abstellanlage' : 'Überdachte Radabstellanlage';
+      return {
+        name: p.NAME ?? p.STANDORT ?? `${art} ${p.STRASSE ?? ''}`.trim(),
+        address: join(p.STRASSE, p.STADTBEZIRK ?? p.STADTTEIL),
+        info: [art, p.ANZAHL ? `${p.ANZAHL} Stellplätze` : null, p.BAUART ?? p.BEMERKUNG].filter(Boolean),
+      };
+    },
+  },
+  scooter_zone: {
+    label: 'E-Scooter-Abstellzonen', group: 'unterwegs', layers: ['A32_ES_ABSTELLFLAECHEN'],
+    map: (p) => ({
+      name: p.STANDORT ?? p.NAME ?? p.BEZEICHNUNG ?? 'E-Scooter-Abstellfläche',
+      address: join(p.STRASSE, p.STADTBEZIRK ?? p.STADTTEIL),
+      info: ['Feste E-Scooter-Abstellfläche', p.KAPAZITAET ? `Kapazität: ${p.KAPAZITAET}` : null, p.BEMERKUNG].filter(Boolean),
+    }),
+  },
+  behindertenparkplatz: {
+    label: 'Behindertenparkplätze', group: 'unterwegs', layers: ['A66_TIBIS_PRM_STELLPLATZ_PUNKT_Behindertenstellplatz'],
+    map: (p) => ({
+      name: `Behindertenstellplatz ${p.STRASSE ?? p.STANDORT ?? ''}`.trim(),
+      address: join(p.STRASSE, p.STADTBEZIRK ?? p.STADTTEIL),
+      info: [p.ANZAHL ? `${p.ANZAHL} Stellplätze` : 'Behindertenstellplatz', p.ZEITBEGRENZUNG ?? p.BEMERKUNG ?? p.ZUSATZZEICHEN].filter(Boolean),
+    }),
+  },
 };
+
+function geomPoint(g) {
+  if (!g) return null;
+  if (g.type === 'Point') return g.coordinates;
+  const pts = g.type === 'LineString' || g.type === 'MultiPoint' ? g.coordinates
+    : g.type === 'MultiLineString' || g.type === 'Polygon' ? g.coordinates.flat()
+      : g.type === 'MultiPolygon' ? g.coordinates.flat(2) : [];
+  if (!pts.length) return null;
+  const lon = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+  const lat = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+  return [lon, lat];
+}
 
 async function layer(name) {
   const { value } = await cached(`wfs-${name}`, 24 * 3600_000, async () => {
@@ -122,18 +294,19 @@ async function layer(name) {
   return value;
 }
 
-export async function facilities(cat) {
+export async function facilities(cat, { diet = null } = {}) {
   const c = CATEGORIES[cat];
   if (!c) throw new Error('Unbekannte Kategorie');
-  if (c.local) return { cat, label: c.label, items: gastro(cat), source: '© OpenStreetMap-Mitwirkende (ODbL), Auszug Stand 17.10.2026' };
+  if (c.local) return { cat, label: c.label, items: gastro(cat, diet), source: '© OpenStreetMap-Mitwirkende (ODbL), Auszug Stand 17.10.2026' };
   const { value } = await cached(`fac-${cat}`, 24 * 3600_000, async () => {
     const out = [];
     for (const l of c.layers) {
-      const fs = await layer(l);
+      const fs = await layer(l).catch(() => []);
       fs.forEach((f, i) => {
-        if (f.geometry?.type !== 'Point') return;
-        const [lon, lat] = f.geometry.coordinates;
-        const m = c.map(f.properties ?? {});
+        const pt = geomPoint(f.geometry);
+        if (!pt || !Number.isFinite(pt[0]) || !Number.isFinite(pt[1])) return;
+        const [lon, lat] = pt;
+        const m = c.map(f.properties ?? {}, l);
         if (!m.name) return;
         out.push({ id: `${cat}-${l}-${f.id ?? i}`, cat, lat: +lat.toFixed(6), lon: +lon.toFixed(6), ...m });
       });
@@ -145,6 +318,92 @@ export async function facilities(cat) {
 
 export function categories() {
   return Object.entries(CATEGORIES).map(([id, c]) => ({ id, label: c.label, group: c.group }));
+}
+
+// ---------- Freizeit-Routen: Weinwanderwege, Innenstadtrundweg & MTB-Downhill „Woodcracker“ (mit Zacke-Verknüpfung) ----------
+export async function freizeitRouten() {
+  const { value, at, fresh } = await cached('freizeit-routen', 24 * 3600_000, async () => {
+    const [wein, innen, downhill] = await Promise.allSettled([
+      layer('A62_WANDERN_WEINWANDERWEG'),
+      layer('A62_POI_INNENSTADTRUNDWEG_LINIE'),
+      layer('A62_RAD_DOWNHILL_LINIE_Strecke'),
+    ]);
+
+    const items = [];
+    const mapRoute = (fs, art, fallbackTitle) => {
+      for (const f of fs) {
+        const p = f.properties ?? {};
+        const pt = geomPoint(f.geometry);
+        if (!pt) continue;
+        const name = p.NAME ?? p.BEZEICHNUNG ?? p.TITEL ?? fallbackTitle;
+        items.push({
+          id: `${art}-${f.id ?? items.length}`,
+          art,
+          name,
+          beschreibung: p.BESCHREIBUNG ?? p.BEMERKUNG ?? p.STRECKE ?? null,
+          laengeKm: p.LAENGE_KM ? Number(p.LAENGE_KM) : (p.LAENGE ? +(Number(p.LAENGE) / 1000).toFixed(1) : null),
+          url: p.URL ?? p.LINK ?? null,
+          lat: +pt[1].toFixed(6),
+          lon: +pt[0].toFixed(6),
+        });
+      }
+    };
+
+    if (wein.status === 'fulfilled') mapRoute(wein.value, 'weinwanderweg', 'Stuttgarter Weinwanderweg');
+    if (innen.status === 'fulfilled') mapRoute(innen.value, 'innenstadtrundweg', 'Stuttgarter Innenstadtrundweg');
+    if (downhill.status === 'fulfilled' && downhill.value.length) {
+      const pt = geomPoint(downhill.value[0].geometry) ?? [9.1688, 48.7586];
+      const p = downhill.value[0].properties ?? {};
+      items.push({
+        id: 'downhill-woodcracker',
+        art: 'downhill',
+        name: p.NAME ?? p.BEZEICHNUNG ?? 'MTB-Downhill-Strecke „Woodcracker“ (Degerloch – Marienplatz)',
+        beschreibung: p.BESCHREIBUNG ?? 'Offizielle Downhill-Strecke der Stadt vom Dornhaldenwald in Degerloch hinab Richtung Marienplatz/Heslach.',
+        laengeKm: p.LAENGE ? +(Number(p.LAENGE) / 1000).toFixed(1) : 1.4,
+        url: p.URL ?? 'https://www.stuttgart.de/leben/sport/sportstaetten/downhill-strecke-degerloch.php',
+        lat: +pt[1].toFixed(6),
+        lon: +pt[0].toFixed(6),
+        zacke: {
+          line: '10',
+          talStopId: 'de:08111:6056',
+          talStopName: 'Marienplatz',
+          talCoords: [9.1714, 48.7640],
+          bergStopId: 'de:08111:2507',
+          bergStopName: 'Degerloch',
+          bergCoords: [9.1719, 48.7495],
+          hinweis: 'Bergfahrt mit der Zahnradbahn („Zacke“, Linie 10) ab Marienplatz bis Degerloch; Fahrradmitnahme auf dem Vorstellwagen.',
+        },
+      });
+    } else {
+      items.push({
+        id: 'downhill-woodcracker',
+        art: 'downhill',
+        name: 'MTB-Downhill-Strecke „Woodcracker“ (Degerloch – Marienplatz)',
+        beschreibung: 'Offizielle Downhill-Strecke der Stadt vom Dornhaldenwald in Degerloch hinab Richtung Marienplatz.',
+        laengeKm: 1.4,
+        url: 'https://www.stuttgart.de/leben/sport/sportstaetten/downhill-strecke-degerloch.php',
+        lat: 48.7586,
+        lon: 9.1688,
+        zacke: {
+          line: '10',
+          talStopId: 'de:08111:6056',
+          talStopName: 'Marienplatz',
+          talCoords: [9.1714, 48.7640],
+          bergStopId: 'de:08111:2507',
+          bergStopName: 'Degerloch',
+          bergCoords: [9.1719, 48.7495],
+          hinweis: 'Bergfahrt mit der Zahnradbahn („Zacke“, Linie 10) ab Marienplatz bis Degerloch; Fahrradmitnahme auf dem Vorstellwagen.',
+        },
+      });
+    }
+    return items;
+  });
+  return {
+    items: value,
+    fetchedAt: new Date(at).toISOString(),
+    fresh,
+    source: 'Landeshauptstadt Stuttgart, Geodaten (CC BY 4.0): Weinwanderwege, Innenstadtrundweg, Downhill-Strecke Degerloch',
+  };
 }
 
 // ---------- Bürgerbüros: Wartezeit-Anzeige der Stadt ----------
@@ -252,10 +511,14 @@ export async function schulbezirk(lat, lon) {
 }
 
 // ---------- Ladepunkte (OCPDB über MobiData BW) ----------
-export async function laden(lat, lon) {
+export async function laden(lat, lon, plz = '70173') {
   const la = (+lat).toFixed(3); const lo = (+lon).toFixed(3);
-  const { value } = await cached(`ocpdb-${la}-${lo}`, 2 * 60_000, () =>
-    fetchJson(`https://api.mobidata-bw.de/ocpdb/api/public/v1/locations?lat=${la}&lon=${lo}&radius=1000&limit=40`));
+  const [ocpRes, gruen] = await Promise.allSettled([
+    cached(`ocpdb-${la}-${lo}`, 2 * 60_000, () =>
+      fetchJson(`https://api.mobidata-bw.de/ocpdb/api/public/v1/locations?lat=${la}&lon=${lo}&radius=1000&limit=40`)),
+    gruenstrom(plz),
+  ]);
+  const value = ocpRes.status === 'fulfilled' ? ocpRes.value.value : { items: [] };
   const items = (value.items ?? value ?? []).map((l) => {
     const evses = l.evses ?? [];
     const known = evses.filter((e) => e.status && e.status !== 'STATIC' && e.status !== 'UNKNOWN');
@@ -266,17 +529,52 @@ export async function laden(lat, lon) {
       maxKw: Math.max(0, ...evses.flatMap((e) => (e.connectors ?? []).map((c) => (c.max_electric_power ?? 0) / 1000))) || null,
     };
   }).filter((x) => Number.isFinite(x.lat));
-  return { items, source: 'MobiData BW, OCPDB (Ladesäulenregister der Bundesnetzagentur und Betreiberdaten)' };
+  return {
+    items,
+    gruenstrom: gruen.status === 'fulfilled' ? gruen.value : null,
+    source: 'MobiData BW, OCPDB (Ladesäulenregister der Bundesnetzagentur und Betreiberdaten); Grünstrom: Fraunhofer ISE, Energy-Charts (CC BY 4.0)',
+  };
+}
+
+// ---------- Regionaler Grünstrom-Index (Fraunhofer ISE, Energy-Charts, CC BY 4.0) ----------
+const SIGNAL_TXT = { 0: 'grüne Phase: Verbrauch möglichst jetzt', 1: 'normale Phase', 2: 'Phase mit wenig erneuerbarem Strom: Verbrauch möglichst verschieben' };
+
+export async function gruenstrom(plz = '70173') {
+  const zip = /^\d{5}$/.test(String(plz ?? '')) ? String(plz) : '70173';
+  const { value, at } = await cached(`gruenstrom-${zip}`, 15 * 60_000, async () => {
+    const d = await fetchJson(`https://api.energy-charts.info/signal?country=de&postal_code=${zip}`, { timeout: 12000 });
+    const now = Date.now();
+    const punkte = (d.unix_seconds ?? []).map((t, i) => ({ t: t * 1000, share: d.share?.[i] ?? null, signal: d.signal?.[i] ?? null }));
+    const aktuell = punkte.find((p) => p.t >= now) ?? punkte.at(-1) ?? null;
+    const fenster = punkte.filter((p) => p.t >= now && p.t <= now + 24 * 3600_000 && p.share != null);
+    // Bestes Zeitfenster der nächsten 24 Stunden: höchster Anteil erneuerbarer Energien über vier Viertelstunden
+    let best = null;
+    for (let i = 0; i + 3 < fenster.length; i += 1) {
+      const vier = fenster.slice(i, i + 4);
+      const schnitt = vier.reduce((s, p) => s + p.share, 0) / 4;
+      if (!best || schnitt > best.share) best = { von: vier[0].t, bis: vier.at(-1).t + 900_000, share: +schnitt.toFixed(1) };
+    }
+    return {
+      plz: zip,
+      aktuell: aktuell ? { t: aktuell.t, share: aktuell.share, signal: aktuell.signal, text: SIGNAL_TXT[aktuell.signal] ?? null } : null,
+      bestesFenster: best,
+      min: fenster.length ? +Math.min(...fenster.map((p) => p.share)).toFixed(1) : null,
+      max: fenster.length ? +Math.max(...fenster.map((p) => p.share)).toFixed(1) : null,
+      reihe: fenster.filter((_, i) => i % 4 === 0).map((p) => ({ t: p.t, share: p.share })),
+    };
+  });
+  return { ...value, fetchedAt: new Date(at).toISOString(), source: 'Fraunhofer ISE, Energy-Charts (CC BY 4.0)' };
 }
 
 // ---------- Gesundheit und Energie ----------
-export async function gesundheit() {
-  const [pollen, uv, strom] = await Promise.allSettled([
+export async function gesundheit(plz = '70173') {
+  const [pollen, uv, strom, gruen] = await Promise.allSettled([
     cached('dwd-pollen', 3 * 3600_000, () => fetchJson('https://opendata.dwd.de/climate_environment/health/alerts/s31fg.json')),
     cached('dwd-uv', 3 * 3600_000, () => fetchJson('https://opendata.dwd.de/climate_environment/health/alerts/uvi.json')),
     cached('stromgedacht', 15 * 60_000, () => fetchJson('https://api.stromgedacht.de/v1/statesRelative?zip=70173&hoursInFuture=24')),
+    gruenstrom(plz),
   ]);
-  const out = { source: 'DWD (Pollenflug, UV-Index), TransnetBW StromGedacht' };
+  const out = { source: 'DWD (Pollenflug, UV-Index), TransnetBW StromGedacht, Fraunhofer ISE Energy-Charts' };
   if (pollen.status === 'fulfilled') {
     const c = pollen.value.value.content.find((x) => x.partregion_id === 112) ?? null;
     if (c) out.pollen = { region: c.partregion_name, next: pollen.value.value.next_update, items: Object.entries(c.Pollen).map(([k, v]) => ({ name: k, today: v.today, tomorrow: v.tomorrow })) };
@@ -286,6 +584,7 @@ export async function gesundheit() {
     if (c) out.uv = c.forecast;
   }
   if (strom.status === 'fulfilled') out.strom = strom.value.value.states ?? strom.value.value;
+  if (gruen.status === 'fulfilled') out.gruenstrom = gruen.value;
   return out;
 }
 
@@ -294,12 +593,22 @@ export async function adresse(q) {
   const t = (q ?? '').trim();
   if (t.length < 3) return { items: [] };
   const { value } = await cached(`addr-${t.toLowerCase()}`, 30 * 86400_000, async () => {
-    const d = await fetchJson(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=de&addressdetails=1&viewbox=9.03,48.87,9.32,48.68&bounded=1&q=${encodeURIComponent(t)}`);
-    return d.map((r) => ({
-      label: [join([r.address?.road, r.address?.house_number].filter(Boolean).join(' ') || r.name, r.address?.suburb || r.address?.city_district)].join(''),
-      street: r.address?.road ?? null, nr: r.address?.house_number ?? null,
-      lat: +(+r.lat).toFixed(6), lon: +(+r.lon).toFixed(6),
-    }));
+    const d = await fetchJson(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&countrycodes=de&addressdetails=1&viewbox=9.03,48.87,9.32,48.68&bounded=1&q=${encodeURIComponent(t)}`);
+    // Nominatim liefert für dieselbe Adresse oft mehrere Gebäudeumrisse. Für die Auswahl
+    // zählt der Ort, nicht die Geometrievariante – deshalb nach Adresse und Stadtteil filtern.
+    const seen = new Set();
+    const items = [];
+    for (const r of d) {
+      const street = r.address?.road ?? null;
+      const nr = r.address?.house_number ?? null;
+      const label = [join([street, nr].filter(Boolean).join(' ') || r.name, r.address?.suburb || r.address?.city_district)].join('');
+      const key = `${label}|${street ?? ''}|${nr ?? ''}`.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({ label, street, nr, lat: +(+r.lat).toFixed(6), lon: +(+r.lon).toFixed(6) });
+      if (items.length >= 5) break;
+    }
+    return items;
   });
   return { items: value, source: '© OpenStreetMap-Mitwirkende (Nominatim)' };
 }

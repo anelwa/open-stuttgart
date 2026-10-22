@@ -1,0 +1,19 @@
+{
+  "baseurl": "http://localhost:13120",
+  "title": "Offenes Veranstaltungsregister Stuttgart",
+  "description": "Gemeinsames, offenes Terminregister für Clubs, Bühnen, Jugendhäuser, Kollektive und Hochschulen in Stuttgart. Fakten unter CC0 1.0.",
+  "server": {
+    "host": "0.0.0.0",
+    "port": 13120
+  },
+  "db": {
+    "dialect": "sqlite",
+    "storage": "/data/gancio-stuttgart.sqlite",
+    "logging": false
+  },
+  "upload_path": "/data/uploads",
+  "plugins_path": "/data/plugins",
+  "user_locale": "/app/user_locale",
+  "log_level": "info",
+  "proxy": false
+}

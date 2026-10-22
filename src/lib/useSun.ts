@@ -23,25 +23,49 @@ function getWorker() {
     else if (m.type === 'day') { dayCache.set(m.date, m); dayListeners.forEach((l) => l(m)); }
     else if (m.type === 'error') dayListeners.forEach((l) => l({ error: m.message }));
   };
+  // Bricht der Worker ab, meldet er nichts — dann hängt die Oberfläche sonst im Ladezustand.
+  worker.onerror = (ev) => {
+    dayListeners.forEach((l) => l({ error: ev.message || 'Berechnung im Hintergrund fehlgeschlagen' }));
+  };
   return worker;
 }
 
+export interface SunState {
+  day: SunDay | null;
+  error: string | null;
+  /** Wahr, solange die Eingangsdaten noch fehlen — dann wurde noch nicht gerechnet. */
+  waiting: boolean;
+}
+
 /** Gelände-Sonnenzeiten für einen Tag (Gitter und Aussichtspunkte), im Web Worker gerechnet */
-export function useSunDay(date: string, viewpoints: Viewpoint[] | null) {
-  const [state, setState] = useState<{ day: SunDay | null; error: string | null }>(() => ({ day: dayCache.get(date) ?? null, error: null }));
+export function useSunDay(date: string, viewpoints: Viewpoint[] | null): SunState {
+  const [state, setState] = useState<SunState>(() => ({
+    day: dayCache.get(date) ?? null, error: null, waiting: !viewpoints,
+  }));
   const key = viewpoints?.map((v) => v.id).join(',');
   useEffect(() => {
-    if (!viewpoints) return;
+    if (!viewpoints) {
+      // Bewusst als eigener Zustand: noch wurde nicht gerechnet, es wird nur gewartet.
+      setState((s) => ({ ...s, waiting: true }));
+      return;
+    }
     const cached = dayCache.get(date);
-    if (cached && cached.points.length === viewpoints.length) { setState({ day: cached, error: null }); return; }
-    setState({ day: null, error: null });
+    if (cached && cached.points.length === viewpoints.length) {
+      setState({ day: cached, error: null, waiting: false });
+      return;
+    }
+    setState({ day: null, error: null, waiting: false });
     const l = (d: SunDay | { error: string }) => {
-      if ('error' in d) setState({ day: null, error: d.error });
-      else if (d.date === date) setState({ day: d, error: null });
+      if ('error' in d) setState({ day: null, error: d.error, waiting: false });
+      else if (d.date === date) setState({ day: d, error: null, waiting: false });
     };
     dayListeners.add(l);
     getWorker().postMessage({ type: 'day', date, viewpoints } satisfies SunIn);
-    return () => { dayListeners.delete(l); };
+    // Sicherheitsnetz: bleibt die Antwort aus, melden wir das statt zu endlos zu warten.
+    const timer = setTimeout(() => {
+      setState((s) => (s.day || s.error ? s : { day: null, error: 'Berechnung dauert ungewöhnlich lange.', waiting: false }));
+    }, 30_000);
+    return () => { dayListeners.delete(l); clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, key]);
   return state;

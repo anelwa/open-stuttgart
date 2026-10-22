@@ -1,0 +1,8 @@
+{
+  "register": {
+    "description": "Konto für Veranstalterinnen und Veranstalter in Stuttgart (Clubs, Bühnen, Jugendhäuser, Hochschulgruppen, Kollektive und Kulturvereine). Freigeschaltete Konten veröffentlichen Termine ohne Einzelfreigabe. Alle eingetragenen Terminfakten (Titel, Zeit, Ort, Preis, Status, Link) werden unter CC0 1.0 (Gemeinfreiheit) über die offene Schnittstelle und in Open Stuttgart bereitgestellt."
+  },
+  "anon_event": {
+    "description": "Terminvorschläge ohne Konto werden vor der Veröffentlichung redaktionell geprüft. Bitte bei Schlagworten (Tags) die Kategorie angeben: konzert, party, comedy, hochschule, flohmarkt, buehne, kneipe oder popup. Optional: eintritt-frei, ab-10-euro, einlass-20-00, ab-16, ab-18, ausverkauft, abgesagt, verschoben. Alle Terminfakten stehen unter CC0 1.0."
+  }
+}

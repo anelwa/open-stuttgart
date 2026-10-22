@@ -1,12 +1,20 @@
 // Pollenflug und UV-Index (DWD) sowie der regionale Netzzustand (TransnetBW StromGedacht)
 import { usePolling } from '../lib/api';
 import { fmtTime } from '../lib/format';
+import { Explain } from '../lib/info';
 import { Section } from './ui';
 
 type G = {
   pollen?: { region: string; next: string; items: { name: string; today: string; tomorrow: string }[] };
   uv?: { today: number; tomorrow: number };
   strom?: { from: string; to: string; state: number }[];
+  gruenstrom?: {
+    plz: string;
+    aktuell: { t: number; share: number; signal: number; text: string | null } | null;
+    bestesFenster: { von: number; bis: number; share: number } | null;
+    min: number | null;
+    max: number | null;
+  };
 };
 type H = {
   warnung: { stufe: string | number; text: string; beschreibung?: string; hinweis?: string; von?: string; bis?: string } | null;
@@ -55,8 +63,19 @@ export function HealthEnergy() {
         {data.uv && <div><dt>UV-Index heute</dt><dd>{data.uv.today} ({uvText(data.uv.today)}), morgen {data.uv.tomorrow}</dd></div>}
         {data.pollen && <div><dt>Pollenflug</dt><dd>{active.length ? active.map((p) => `${POLLEN[p.name] ?? p.name} ${LEVEL[p.today] ?? p.today}`).join(', ') : 'keine Belastung heute und morgen'}</dd></div>}
         {cur && <div><dt>Stromnetz Region</dt><dd>{STROM[cur.state] ?? `Zustand ${cur.state}`}{next ? `, ab ${fmtTime(next.from)} Uhr: ${STROM[next.state] ?? next.state}` : ''}</dd></div>}
+        {data.gruenstrom?.aktuell && (
+          <div><dt>Grünstrom im Netz <Explain id="gruenstrom" /></dt><dd>
+            {Math.round(data.gruenstrom.aktuell.share)} % erneuerbare Energien in der Region{data.gruenstrom.plz ? ` (PLZ ${data.gruenstrom.plz})` : ''}
+            {data.gruenstrom.bestesFenster && (
+              <span className="block small muted">
+                Grüner Spitzenwert: {fmtTime(data.gruenstrom.bestesFenster.von)} bis {fmtTime(data.gruenstrom.bestesFenster.bis)} Uhr
+                (rund {Math.round(data.gruenstrom.bestesFenster.share)} %), Spanne heute {Math.round(data.gruenstrom.min ?? 0)} bis {Math.round(data.gruenstrom.max ?? 0)} %.
+              </span>
+            )}
+          </dd></div>
+        )}
       </dl>
-      <p className="muted small">Höchsttemperatur: DWD-Vorhersage (MOSMIX) für die Station Stuttgart-Echterdingen auf den Fildern; in der tiefer gelegenen Innenstadt ist es meist wärmer. Pollenflug für {data.pollen?.region ?? 'die Region'}. Stromnetz: Prognose von TransnetBW (StromGedacht) für Postleitzahl 70173.</p>
+      <p className="muted small">Höchsttemperatur: DWD-Vorhersage (MOSMIX) für die Station Stuttgart-Echterdingen auf den Fildern; in der tiefer gelegenen Innenstadt ist es meist wärmer. Pollenflug für {data.pollen?.region ?? 'die Region'}. Stromnetz: Prognose von TransnetBW (StromGedacht) für Postleitzahl 70173, Grünstrom-Anteil: Fraunhofer ISE (Energy-Charts, CC BY 4.0) im 15-Minuten-Takt.</p>
     </Section>
   );
 }

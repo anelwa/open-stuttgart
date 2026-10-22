@@ -10,17 +10,24 @@
     "build": "tsc -p tsconfig.json && vite build",
     "start": "npm run build && node server/index.mjs",
     "serve": "node server/index.mjs",
-    "data:gtfs": "python3 scripts/build_gtfs.py"
+    "data:gtfs": "python3 scripts/build_gtfs.py",
+    "data:verwaltung": "node scripts/crawl-verwaltung.mjs",
+    "data:unfall": "node scripts/build-unfaelle.mjs",
+    "data:wanderwege": "node scripts/build-wanderwege.mjs",
+    "data:geocaches": "node scripts/build-geocaches.mjs",
+    "data:search": "node scripts/build-search-db.mjs",
+    "check:wasgeht": "node scripts/check-wasgeht-quellen.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.5"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource/merriweather-sans": "^5.3.0",
     "maplibre-gl": "^6.15.0",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "sqlite-vec": "^0.1.9"
   },
   "devDependencies": {
     "@types/geojson": "^7946.0.16",

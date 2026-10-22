@@ -38,7 +38,7 @@ export function SunPanel({ visible, toggle, setLayer, setSunImage, flyTo, select
 
   // Nach Sonnenuntergang geht es um den nächsten Morgen
   const [date, setDate] = useState(today);
-  const { day, error } = useSunDay(date, viewpoints);
+  const { day, error, waiting } = useSunDay(date, viewpoints);
   const [mode, setMode] = useState<'abend' | 'morgen'>('abend');
   useEffect(() => {
     if (day && date === today && now > day.set + 15 * 60_000) { setDate(berlinDate(now + 86400_000)); setMode('morgen'); }
@@ -108,7 +108,7 @@ export function SunPanel({ visible, toggle, setLayer, setSunImage, flyTo, select
     <div className="module">
       <div className="culture-hero sun-hero">
         <span className="eyebrow">{mode === 'abend' ? 'Sonnenuntergang im Gelände' : isTomorrow ? 'Sonnenaufgang im Gelände, morgen' : 'Sonnenaufgang im Gelände'}</span>
-        {!day && !error && <h3>Berechnung läuft …</h3>}
+        {!day && !error && <h3>{waiting ? 'Warte auf Ortsdaten …' : 'Berechnung läuft …'}</h3>}
         {day && here && (
           <h3>
             {Number.isNaN(hereT)
@@ -195,7 +195,7 @@ export function SunPanel({ visible, toggle, setLayer, setSunImage, flyTo, select
         </ul>
       </Section>
 
-      <Source>
+      <Source disclosure>
         Eigene Rechnung: Sonnenstand nach suncalc-Formeln, Horizont aus dem Höhenmodell (Mapzen Terrain Tiles, rund 25 m Raster, bis 6 km Entfernung).
         Gebäude und Bäume fehlen im Modell, in der Innenstadt verschwindet die Sonne daher oft noch früher. Bewölkung: DWD über Bright Sky.
       </Source>

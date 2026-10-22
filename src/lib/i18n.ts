@@ -36,6 +36,15 @@ const EN: Record<string, string> = {
   Grillplätze: 'Barbecue areas', Stäffele: 'Public stairways', Wertstoffhöfe: 'Recycling centres', Altglas: 'Glass recycling', Altkleider: 'Clothes recycling',
   Kliniken: 'Hospitals', Polizei: 'Police', 'Notfall-Treffpunkte': 'Emergency meeting points', Restaurants: 'Restaurants', Cafés: 'Cafés', Imbisse: 'Snack bars',
   'Kneipen und Bars': 'Pubs and bars', Biergärten: 'Beer gardens', Eiscafés: 'Ice cream', 'Jetzt geöffnet': 'Open now', 'Stufenlos zugänglich': 'Step-free',
+  'Aktion Gute Fee': 'Safe places for children (Gute Fee)', 'Obst- und Nussbäume': 'Fruit and nut trees', 'Jugend-Chillorte': 'Youth hangouts',
+  'Essbare Stadt: Obst- und Nussbäume': 'Edible city: fruit and nut trees', 'Mineralquellen': 'Mineral springs', 'Mehrweg (RECUP)': 'Reusable cups (RECUP)',
+  // Natur, Flugverkehr, Mensen, Grünstrom
+  'Himmel über Stuttgart': 'Skies over Stuttgart', 'Abendspaziergang in der kühlen Brise': 'Evening stroll in the cool breeze',
+  'Stadt-Natur in der Nähe': 'Urban nature nearby', 'Stadt-Natur hier': 'Urban nature here',
+  'Pollen-Hotspots aus dem Baumkataster': 'Pollen hotspots from the tree register', 'Gieß-Radar für junge Bäume': 'Watering radar for young trees',
+  'Unterwegs am Abend': 'Out and about in the evening', 'Mensen und Hochschulgastronomie': 'University canteens',
+  'Warngebiete (NINA / MoWaS)': 'Warning areas (NINA / MoWaS)', 'Flugverkehr (ADS-B)': 'Air traffic (ADS-B)',
+  'Kaltluftabfluss (Klimaatlas)': 'Cold air flow (climate atlas)', 'Wohnlage & Satzung': 'Housing area & ordinances',
 };
 
 const KEY = 'os-sprache';

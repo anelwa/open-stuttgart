@@ -59,14 +59,14 @@ const QUELLE = 'Echtzeitdaten: NVBW/MobiData BW (DL-DE-BY-2.0) über gtfs.de (CC
 const badgeKind = (art: Verkehrsart) => (art === 'Regional/Fern' ? 'zug' : undefined);
 const stufe = (p: number | null) => (p == null ? 'leer' : p >= 90 ? 'gut' : p >= 75 ? 'mittel' : 'schlecht');
 
-export function PuenktlichkeitSection() {
+export function PuenktlichkeitSection({ className }: { className?: string }) {
   const { data, error, loading, reload } = usePolling<PuenktlichkeitJetzt>('/api/puenktlichkeit', 180_000);
   const d = data;
   if (d && d.aktiv === false) return null;
   const linien = (d?.linien ?? []).slice(0, 5);
 
   return (
-    <Section title="Pünktlichkeit jetzt" explain="puenktlichkeit" aside={d?.stand ? `Stand ${fmtTime(d.stand)} Uhr` : undefined}>
+    <Section className={className} title="Pünktlichkeit jetzt" explain="puenktlichkeit" aside={d?.stand ? `Stand ${fmtTime(d.stand)} Uhr` : undefined}>
       {error && !d && <ErrorNote text="Echtzeitdaten derzeit nicht verfügbar." onRetry={reload} />}
       {!d && loading && <span className="skeleton block" style={{ height: 96 }} />}
       {d && (

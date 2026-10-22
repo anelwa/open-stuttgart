@@ -6,12 +6,13 @@ import type { CultureEvent, Facility } from '../../lib/types';
 import { usePolling, useNow } from '../../lib/api';
 import { berlinDate, dayLabel, fmtTime } from '../../lib/format';
 import { Icon } from '../../components/Icon';
-import { ErrorNote, LayerRow, Section, Source } from '../../components/ui';
+import { ErrorNote, LayerRow, Section, Source, SkeletonRows } from '../../components/ui';
+import { MensaSection } from '../../components/Mensa';
 import { Explain } from '../../lib/info';
 import '../../styles/wasgeht.css';
 
 // ---------- Typen der Antworten ----------
-type Szene = 'konzert' | 'party' | 'comedy' | 'hochschule' | 'flohmarkt' | 'popup' | 'kneipe' | 'buehne' | 'sonstiges';
+type Szene = 'konzert' | 'party' | 'comedy' | 'hochschule' | 'flohmarkt' | 'popup' | 'kneipe' | 'buehne' | 'jugend' | 'sonstiges';
 
 interface WgEvent extends CultureEvent {
   scene?: Szene[];
@@ -23,6 +24,7 @@ interface WgEvent extends CultureEvent {
   venueId?: string | null;
   license?: string | null;
   soldOut?: boolean;
+  collective?: { id: string; name: string; url: string | null; szene?: string | null } | null;
 }
 
 interface WgSource {
@@ -34,6 +36,8 @@ interface WgSource {
 interface WasGehtResponse {
   date: string; days: string[]; span: 'tag' | 'abend' | 'wochenende';
   events: WgEvent[]; total: number; counts: Record<Szene, number>; merged: number; pending: number;
+  collectives?: { id: string; name: string; url: string | null; szene: string | null; anzahl: number }[];
+  collectiveCount?: number;
   sources: WgSource[]; errors: string[]; hinweis: string;
 }
 
@@ -52,6 +56,16 @@ interface NewsItem {
 }
 interface NewsResponse { items: NewsItem[]; updated: string; sources: { id: string; name: string; url: string; license: string; count: number; ok: boolean; error: string | null }[]; hinweis: string }
 
+interface StadtgedaechtnisItem {
+  id: string; date: string; title: string; summary: string | null; url: string; source: string; license: string;
+  topic: string; district: string | null; lat: number | null; lon: number | null; confidence: string;
+}
+interface StadtgedaechtnisResponse {
+  items: StadtgedaechtnisItem[]; total: number; days: number; since: string; districts: string[];
+  topics: Record<string, string>; byTopic: Record<string, number>; updated: string; hinweis: string;
+  sources: { id: string; name: string; count: number; ok: boolean; hinweis: string }[];
+}
+
 // ---------- Beschriftungen ----------
 const SZENE: { id: Szene; label: string; color: string }[] = [
   { id: 'konzert', label: 'Konzert', color: '#2B59C3' },
@@ -60,10 +74,17 @@ const SZENE: { id: Szene; label: string; color: string }[] = [
   { id: 'hochschule', label: 'Hochschule', color: '#1B7F3B' },
   { id: 'flohmarkt', label: 'Flohmarkt', color: '#8A6440' },
   { id: 'buehne', label: 'Bühne', color: '#A0522D' },
+  { id: 'jugend', label: 'Jugend', color: '#00897B' },
   { id: 'sonstiges', label: 'Sonstiges', color: '#5D5C62' },
 ];
-const JUNG: Szene[] = ['konzert', 'party', 'comedy', 'hochschule', 'flohmarkt', 'popup', 'kneipe'];
+const JUNG: Szene[] = ['konzert', 'party', 'comedy', 'hochschule', 'flohmarkt', 'popup', 'kneipe', 'jugend'];
 const SZENE_LABEL = Object.fromEntries(SZENE.map((s) => [s.id, s.label])) as Record<Szene, string>;
+
+/** Fremde Ticket-URLs dürfen den Render nie zum Absturz bringen. */
+function ticketHost(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return null; }
+}
 const CAT_COLOR: Record<string, string> = Object.fromEntries(SZENE.map((s) => [`wasgeht_${s.id}`, s.color]));
 const SIGNAL: Record<Opening['signal'], string> = {
   neu_in_osm: 'Neu in OpenStreetMap',
@@ -83,7 +104,7 @@ function preis(e: WgEvent) {
 const hauptSzene = (e: WgEvent): Szene => (e.scene?.find((s) => s !== 'sonstiges') ?? 'sonstiges');
 const osmId = (osm: string | null | undefined) => (osm ? osm.replace(/^node\//, 'n').replace(/^way\//, 'w').replace(/^relation\//, 'r') : null);
 
-export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLayer }: ModuleProps) {
+export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLayer, center }: ModuleProps) {
   const now = useNow(60_000);
   const today = berlinDate(now);
   const [ansicht, setAnsicht] = useState<Ansicht>({ kind: 'abend' });
@@ -91,10 +112,16 @@ export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLay
   const [szene, setSzene] = useState<Szene | null>(null);
   const [frei, setFrei] = useState(false);
   const [bis10, setBis10] = useState(false);
+  const [nurKollektive, setNurKollektive] = useState(false);
+  const [kollektiv, setKollektiv] = useState<string | null>(null);
   const [offen, setOffen] = useState<string | null>(null);
   const [topic, setTopic] = useState<NewsItem['topic'] | 'alle'>('alle');
   const [neuCount, setNeuCount] = useState(6);
+  const [listeCount, setListeCount] = useState(12);
   const [newsCount, setNewsCount] = useState(10);
+  const [sgTopic, setSgTopic] = useState<string>('alle');
+  const [sgDistrict, setSgDistrict] = useState<string>('alle');
+  const [sgCount, setSgCount] = useState(20);
 
   const url = ansicht.kind === 'abend' ? `/api/wasgeht?date=${today}&span=abend`
     : ansicht.kind === 'wochenende' ? `/api/wasgeht?date=${today}&span=wochenende`
@@ -102,12 +129,15 @@ export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLay
   const wg = usePolling<WasGehtResponse>(url, 10 * 60_000);
   const neu = usePolling<OpeningsResponse>('/api/openings?days=30', 60 * 60_000);
   const meldungen = usePolling<NewsResponse>('/api/news', 5 * 60_000);
+  const stadt = usePolling<StadtgedaechtnisResponse>('/api/stadtgedaechtnis?days=30', 15 * 60_000);
 
   const alle = wg.data?.events ?? [];
   const liste = useMemo(() => alle.filter((e) => (!jung || e.scene?.some((s) => JUNG.includes(s)))
     && (!szene || e.scene?.includes(szene))
+    && (!nurKollektive || !!e.collective)
+    && (!kollektiv || e.collective?.id === kollektiv)
     && (!frei || e.free === true || e.priceMin === 0)
-    && (!bis10 || e.free === true || (e.priceMin != null && e.priceMin <= 10))), [alle, jung, szene, frei, bis10]);
+    && (!bis10 || e.free === true || (e.priceMin != null && e.priceMin <= 10))), [alle, jung, szene, frei, bis10, nurKollektive, kollektiv]);
   const zaehler = useMemo(() => {
     const c: Partial<Record<Szene, number>> = {};
     for (const e of alle) if (!jung || e.scene?.some((s) => JUNG.includes(s))) for (const s of e.scene ?? []) c[s] = (c[s] ?? 0) + 1;
@@ -144,6 +174,7 @@ export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLay
   const neuItems = (neu.data?.items ?? []).filter((x) => x.signal !== 'evtl_geschlossen');
   const zu = (neu.data?.items ?? []).filter((x) => x.signal === 'evtl_geschlossen');
   const newsItems = (meldungen.data?.items ?? []).filter((n) => topic === 'alle' || n.topic === topic);
+  const sgItems = (stadt.data?.items ?? []).filter((x) => (sgTopic === 'alle' || x.topic === sgTopic) && (sgDistrict === 'alle' || x.district === sgDistrict));
 
   let lastDay = '';
   return (
@@ -180,21 +211,33 @@ export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLay
               <span className="kind-dot" style={{ background: s.color }} /> {s.label} <small>{zaehler[s.id]}</small>
             </button>
           ))}
+          <button type="button" className={`chip ${nurKollektive ? 'on' : ''}`} aria-pressed={nurKollektive} onClick={() => { setNurKollektive((v) => !v); setKollektiv(null); }}>
+            Kollektive &amp; freie Szene {wg.data?.collectiveCount ? <small>{wg.data.collectiveCount}</small> : null}
+          </button>
+          {(wg.data?.collectives ?? []).filter((k) => k.anzahl > 0).slice(0, 8).map((k) => (
+            <button key={k.id} type="button" className={`chip ${kollektiv === k.id ? 'on' : ''}`} aria-pressed={kollektiv === k.id}
+              onClick={() => { setKollektiv(kollektiv === k.id ? null : k.id); setNurKollektive(false); }}>
+              {k.name} <small>{k.anzahl}</small>
+            </button>
+          ))}
           <button type="button" className={`chip ${frei ? 'on' : ''}`} aria-pressed={frei} onClick={() => setFrei((v) => !v)}>Kostenlos</button>
           <button type="button" className={`chip ${bis10 ? 'on' : ''}`} aria-pressed={bis10} onClick={() => setBis10((v) => !v)}>Bis 10 Euro</button>
         </div>
+        {nurKollektive && <p className="muted small wg-note">Kollektive werden aus dem Veranstaltungsregister (Schlagwort <code>kollektiv:…</code>) und aus Nennungen im Titel erkannt. Die Zuordnung ist ein Hinweis, keine Bestätigung des Veranstalters.</p>}
+        {kollektiv && <p className="muted small wg-note">Gefiltert auf alle Termine des Kollektivs, unabhängig vom Ort. <button type="button" className="link-quiet small" onClick={() => setKollektiv(null)}>Filter aufheben</button></p>}
         {jung && <p className="muted small wg-note">„Junges Publikum“ zeigt Konzerte, Partys, Comedy, Hochschule und Flohmärkte. Eine Altersgruppe wird damit nicht unterstellt.</p>}
         {wg.error && !wg.data && <ErrorNote text={`Termine nicht verfügbar: ${wg.error}`} onRetry={wg.reload} />}
-        {!wg.data && !wg.error && <span className="skeleton block" style={{ height: 160 }} />}
+        {!wg.data && !wg.error && <SkeletonRows rows={5} />}
         {wg.data && liste.length === 0 && (
           <p className="muted small">Für diese Auswahl liegen aus den angebundenen Quellen keine Termine vor.</p>
         )}
         <ul className="event-list wg-list">
-          {liste.map((e) => {
+          {liste.slice(0, listeCount).map((e) => {
             const head = wg.data && wg.data.days.length > 1 && e.date !== lastDay ? e.date : null;
             lastDay = e.date;
             const p = preis(e);
             const isOpen = offen === e.id;
+            const host = ticketHost(e.ticketUrl);
             return (
               <li key={e.id}>
                 {head && <h4 className="list-head">{dayLabel(head, now)}</h4>}
@@ -216,6 +259,7 @@ export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLay
                   <span className="wg-src">
                     <span className="kind-dot" style={{ background: SZENE.find((s) => s.id === hauptSzene(e))?.color }} />
                     <small>{SZENE_LABEL[hauptSzene(e)]}</small>
+                    {e.collective && <small className="wg-collective">{e.collective.name}</small>}
                   </span>
                 </button>
                 {isOpen && (
@@ -225,11 +269,33 @@ export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLay
                       {e.start && !e.allDay && <><dt>Beginn</dt><dd>{fmtTime(e.start)} Uhr{e.doors ? `, Einlass ${fmtTime(e.doors)} Uhr` : ''}</dd></>}
                       {e.location && <><dt>Ort</dt><dd>{[e.venue, e.location].filter(Boolean).join(', ')}</dd></>}
                       {p && <><dt>Preis</dt><dd>{p}</dd></>}
+                      {e.collective && (
+                        <><dt>Kollektiv</dt><dd>
+                          <button type="button" className="link-quiet" onClick={() => { setKollektiv(e.collective!.id); setNurKollektive(false); setOffen(null); }}>
+                            {e.collective.name}
+                          </button>
+                          {e.collective.szene ? ` · ${e.collective.szene}` : ''}
+                          {e.collective.url && <> · <a href={e.collective.url} target="_blank" rel="noreferrer">Seite</a></>}
+                        </dd></>
+                      )}
+                      {e.verified && (
+                        <>
+                          <dt>Bestätigung</dt>
+                          <dd>
+                            {e.verified === 'venue' ? 'Hausquelle, vom Veranstalter angekündigt'
+                              : e.verified === 'official' ? 'städtische Quelle'
+                                : e.verified === 'ticket' ? 'Ticketanbieter'
+                                  : e.verified === 'register' ? 'offenes Veranstaltungsregister'
+                                    : 'Aggregator, nicht vom Veranstalter bestätigt'}
+                            {e.lastSeen ? ` · zuletzt ${new Date(e.lastSeen).toLocaleDateString('de-DE')}` : ''}
+                          </dd>
+                        </>
+                      )}
                       <dt>Quelle</dt>
                       <dd>{(e.sources ?? []).map((s, i) => <span key={s.name}>{i > 0 && ', '}<a href={s.url} target="_blank" rel="noreferrer">{s.name}</a></span>)}</dd>
                     </dl>
                     <div className="wg-actions">
-                      {e.ticketUrl && <a className="link-btn" href={e.ticketUrl} target="_blank" rel="noreferrer">Tickets bei {new URL(e.ticketUrl).hostname.replace(/^www\./, '')} <Icon name="external" size={16} /></a>}
+                      {e.ticketUrl && host && <a className="link-btn" href={e.ticketUrl} target="_blank" rel="noreferrer">Tickets bei {host} <Icon name="external" size={16} /></a>}
                       <a className="link-btn secondary" href={e.url} target="_blank" rel="noreferrer">Seite des Veranstalters <Icon name="external" size={16} /></a>
                       {e.lon != null && <button type="button" className="link-btn secondary" onClick={() => ortZeigen(e)}><Icon name="pin" size={16} /> Ort und Anreise</button>}
                     </div>
@@ -240,17 +306,22 @@ export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLay
             );
           })}
         </ul>
+        {liste.length > listeCount && (
+          <button type="button" className="more-btn" onClick={() => setListeCount((n) => n + 15)}>
+            {liste.length - listeCount} weitere Termine anzeigen
+          </button>
+        )}
         {wg.data && <p className="muted small wg-note">{wg.data.total} Termine im Zeitraum, {wg.data.merged} Einträge aus mehreren Quellen zusammengeführt. Die Quellen je Termin stehen in der Detailansicht.</p>}
       </Section>
 
-      <Section title="Auf der Karte">
+      <Section title="Auf der Karte" collapsible defaultOpen={false}>
         <div className="layer-list">
           <LayerRow icon="ticket" tone="amber" title="Orte der angezeigten Termine" on={visible.nearby} onToggle={() => toggle('nearby')}
             meta={wg.data ? `${orte.length} Orte, ${liste.filter((e) => e.lat != null).length} von ${liste.length} Terminen verortet` : 'lädt'} loading={!wg.data} />
         </div>
       </Section>
 
-      <Section title="Neu in der Stadt" aside={neu.data?.updated ? `Stand ${dayLabel(berlinDate(neu.data.updated), now)}` : undefined}>
+      <Section title="Neu in der Stadt" aside={neu.data?.updated ? `Stand ${dayLabel(berlinDate(neu.data.updated), now)}` : undefined} collapsible defaultOpen={false}>
         <p className="muted small wg-note">Neu in OpenStreetMap erfasst. Das ist nicht in jedem Fall eine Neueröffnung.</p>
         {neu.error && !neu.data && <ErrorNote text={`Neu in der Stadt nicht verfügbar: ${neu.error}`} onRetry={neu.reload} />}
         {!neu.data && !neu.error && <span className="skeleton block" style={{ height: 90 }} />}
@@ -273,7 +344,11 @@ export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLay
         </Source>
       </Section>
 
-      <Section title="Meldungen" aside={meldungen.data ? `${newsItems.length} Meldungen` : undefined}>
+      <AbendTipps lngLat={center} />
+
+      <FreizeitSection select={select} flyTo={flyTo} />
+
+      <Section title="Meldungen" aside={meldungen.data ? `${newsItems.length} Meldungen` : undefined} collapsible defaultOpen={false}>
         <div className="chips filter-chips">
           {(Object.keys(TOPIC) as (keyof typeof TOPIC)[]).map((t) => (
             <button key={t} type="button" className={`chip ${topic === t ? 'on' : ''}`} aria-pressed={topic === t} onClick={() => { setTopic(t); setNewsCount(10); }}>{TOPIC[t]}</button>
@@ -303,7 +378,64 @@ export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLay
         </Source>
       </Section>
 
-      <Section title="Quellen und Lizenzen">
+      <Section title="Stadtgedächtnis: Was sich geändert hat" explain="stadtgedaechtnis" collapsible defaultOpen={false}
+        aside={stadt.data ? `${stadt.data.total} Einträge, ${stadt.data.days} Tage` : undefined}>
+        <p className="muted small">
+          Ein Archiv der öffentlichen Veränderungen: Meldungen, amtliche Bekanntmachungen, neu erfasste Orte und Änderungen an
+          Verwaltungsseiten. Jeder Eintrag nennt Datum, Quelle und Lizenz. Keine Volltexte, keine Personendaten.
+        </p>
+        <div className="chips filter-chips">
+          <button type="button" className={`chip ${sgTopic === 'alle' ? 'on' : ''}`} aria-pressed={sgTopic === 'alle'} onClick={() => setSgTopic('alle')}>
+            Alle <small>{stadt.data?.total ?? 0}</small>
+          </button>
+          {Object.entries(stadt.data?.topics ?? {}).map(([id, label]) => (
+            <button key={id} type="button" className={`chip ${sgTopic === id ? 'on' : ''}`} aria-pressed={sgTopic === id} onClick={() => setSgTopic(id)}>
+              {label} <small>{stadt.data?.byTopic[id] ?? 0}</small>
+            </button>
+          ))}
+        </div>
+        {(stadt.data?.districts.length ?? 0) > 0 && (
+          <label className="small sg-filter">
+            Stadtbezirk{' '}
+            <select value={sgDistrict} onChange={(e) => setSgDistrict(e.target.value)} aria-label="Stadtbezirk filtern">
+              <option value="alle">alle</option>
+              {stadt.data!.districts.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </label>
+        )}
+        {stadt.error && !stadt.data && <ErrorNote text={`Stadtgedächtnis nicht verfügbar: ${stadt.error}`} onRetry={stadt.reload} />}
+        {!stadt.data && !stadt.error && <span className="skeleton block" style={{ height: 140 }} />}
+        {stadt.data && sgItems.length === 0 && <p className="muted small">Für diese Auswahl liegen keine Änderungen vor.</p>}
+        <ul className="wg-news sg-list">
+          {sgItems.slice(0, sgCount).map((x) => (
+            <li key={x.id}>
+              <span className="wg-news-meta">
+                <span>{dayLabel(x.date, now)}</span>
+                <span className="sg-topic">{stadt.data?.topics[x.topic] ?? x.topic}</span>
+                <span>{x.source}</span>
+                {x.district && <span>{x.district}</span>}
+                <span className={`sg-conf sg-${x.confidence}`} title="Sicherheit der Zuordnung">Quelle {x.confidence}</span>
+              </span>
+              <a href={x.url} target="_blank" rel="noreferrer" className="wg-news-title">{x.title}</a>
+              {x.summary && <span className="wg-news-teaser">{x.summary}</span>}
+              <span className="sg-license">{x.license}</span>
+            </li>
+          ))}
+        </ul>
+        {sgItems.length > sgCount && <button type="button" className="more-btn" onClick={() => setSgCount((n) => n + 20)}>Weitere anzeigen</button>}
+        {stadt.data && <p className="muted small">{stadt.data.hinweis}</p>}
+        <div className="row-actions">
+          <a className="chip" href="/api/stadtgedaechtnis.rss?days=30"><Icon name="calendar" size={16} /> Als RSS abonnieren</a>
+          <a className="link-quiet small" href="https://www.stuttgart.de/rathaus/amtliche-bekanntmachungen/" target="_blank" rel="noreferrer">Amtliche Bekanntmachungen der Stadt</a>
+        </div>
+        <Source>
+          Quellen: {(stadt.data?.sources ?? []).map((s) => `${s.name} (${s.count})`).join('; ')}.
+          Meldungen nur mit Titel, Zeit und Link; Bekanntmachungen mit Titel, Zeitraum und PDF-Link; OpenStreetMap unter ODbL; Verwaltungsseiten mit Quellenangabe.
+          Das Archiv wird bei jedem Abruf fortgeschrieben, der erste Vergleichslauf setzt nur den Stand.
+        </Source>
+      </Section>
+
+      <Section title="Quellen und Lizenzen" collapsible defaultOpen={false}>
         {wg.data && (
           <ul className="wg-sources">
             {wg.data.sources.map((s) => (
@@ -356,4 +488,129 @@ function openingFacility(o: Opening): Facility {
     info: [o.kindLabel, SIGNAL[o.signal], `gemeldet in OpenStreetMap am ${new Date(`${o.sinceDate}T12:00:00`).toLocaleDateString('de-DE')}`],
     osm: osmId(o.source.url.replace('https://www.openstreetmap.org/', '')),
   };
+}
+
+interface FreizeitRoute {
+  id: string;
+  art: 'weinwanderweg' | 'innenstadtrundweg' | 'downhill';
+  name: string;
+  beschreibung: string | null;
+  laengeKm: number | null;
+  url: string | null;
+  lat: number;
+  lon: number;
+  zacke?: {
+    line: string;
+    talStopId: string;
+    talStopName: string;
+    talCoords: [number, number];
+    bergStopId: string;
+    bergStopName: string;
+    bergCoords: [number, number];
+    hinweis: string;
+  };
+}
+
+function FreizeitSection({ select, flyTo }: Pick<ModuleProps, 'select' | 'flyTo'>) {
+  const routen = usePolling<{ items: FreizeitRoute[]; source: string }>('/api/freizeit/routen', 24 * 3600_000);
+  const chill = usePolling<{ items: Facility[] }>('/api/nearby/facilities?cat=chillorte', 24 * 3600_000);
+  const rItems = routen.data?.items ?? [];
+  const cItems = chill.data?.items ?? [];
+  if (!rItems.length && !cItems.length) return null;
+
+  const downhill = rItems.find((r) => r.art === 'downhill');
+  const wander = rItems.filter((r) => r.art !== 'downhill');
+
+  return (
+    <Section title="Draußen unterwegs: Strecken und Jugend-Chillorte" aside={cItems.length ? `${cItems.length} Chillorte` : undefined} collapsible defaultOpen={false}>
+      {downhill && (
+        <div className="wg-detail" style={{ marginBottom: 10 }}>
+          <strong>{downhill.name}</strong>
+          <p className="small muted">{downhill.beschreibung}</p>
+          {downhill.zacke && (
+            <div className="wg-actions">
+              <button type="button" className="chip" onClick={() => {
+                select({ type: 'stop', id: downhill.zacke!.talStopId, name: downhill.zacke!.talStopName, lngLat: downhill.zacke!.talCoords, lines: ['10', 'U1', 'U14'] });
+                flyTo(downhill.zacke!.talCoords, 15.5);
+              }}>
+                Abfahrten Zacke (Linie 10) ab {downhill.zacke.talStopName}
+              </button>
+              <button type="button" className="chip" onClick={() => flyTo([downhill.lon, downhill.lat], 15)}>
+                Strecke auf der Karte
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {wander.length > 0 && (
+        <>
+          <h4 className="list-head">Weinwanderwege und Rundwege ({wander.length})</h4>
+          <div className="chips filter-chips">
+            {wander.slice(0, 8).map((w) => (
+              <button key={w.id} type="button" className="chip" onClick={() => flyTo([w.lon, w.lat], 14.5)}>
+                {w.name}{w.laengeKm ? ` (${w.laengeKm} km)` : ''}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {cItems.length > 0 && (
+        <>
+          <h4 className="list-head">Jugend-Chillorte der Stadt ({cItems.length})</h4>
+          <div className="chips filter-chips">
+            {cItems.slice(0, 8).map((c) => (
+              <button key={c.id} type="button" className="chip" onClick={() => { select({ type: 'facility', item: c }); flyTo([c.lon, c.lat], 16); }}>
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <Source disclosure>
+        Landeshauptstadt Stuttgart, Geodaten (CC BY 4.0): Jugend-Chillorte (Jugendamt), Weinwanderwege, Innenstadtrundweg und Downhill-Strecke Degerloch.
+      </Source>
+    </Section>
+  );
+}
+
+// ---------- Abend-Tipps: Schließfächer und Fahrradboxen am Hbf, Tagesgericht für Studierende ----------
+type BoxSite = {
+  id: string | number; name: string; purpose?: string; capacity: number | null; free: number | null;
+  live: boolean; bookableUrl: string | null; fee: string | null; dist?: number | null;
+};
+
+/** Nächste freie Schließfächer und Fahrradboxen am Hauptbahnhof bzw. in der Stadtmitte, dazu ein Mensa-Tipp */
+function AbendTipps({ lngLat }: { lngLat: [number, number] }) {
+  // Bezugspunkt Hauptbahnhof (Arnulf-Klett-Platz); der Umkreis deckt die Stadtmitte ab
+  const hbf: [number, number] = [9.1808, 48.7831];
+  const boxen = usePolling<{ sites: BoxSite[]; lockerSites: BoxSite[]; bikeSites: BoxSite[] }>(
+    `/api/bikeandride?lat=${hbf[1]}&lon=${hbf[0]}&radius=3000`, 5 * 60_000,
+  );
+  const s = boxen.data;
+  const locker = (s?.lockerSites ?? []).find((x) => x.free == null || x.free > 0) ?? (s?.lockerSites ?? [])[0];
+  const box = (s?.bikeSites ?? []).find((x) => x.free == null || x.free > 0) ?? (s?.bikeSites ?? [])[0];
+  return (
+    <Section title="Unterwegs am Abend" explain="bikeride" collapsible defaultOpen={false}>
+      {locker && (
+        <p className="small">
+          Nächstes freies Schließfach für Rucksack oder Helm: <strong>{locker.name}</strong>
+          {locker.dist != null ? ` (${locker.dist} m)` : ''}
+          {locker.free != null && locker.capacity != null ? ` – noch ${locker.free} von ${locker.capacity} frei` : ''}
+          {locker.fee ? ` · ${locker.fee}` : ''}
+          {locker.bookableUrl && <> · <a href={locker.bookableUrl} target="_blank" rel="noreferrer">Buchen</a></>}
+        </p>
+      )}
+      {box && (
+        <p className="small">
+          Fahrradbox am Hbf oder in der Stadtmitte: <strong>{box.name}</strong>
+          {box.dist != null ? ` (${box.dist} m)` : ''}
+          {box.free != null && box.capacity != null ? ` – noch ${box.free} von ${box.capacity} frei` : ''}
+          {box.bookableUrl && <> · <a href={box.bookableUrl} target="_blank" rel="noreferrer">Buchen</a></>}
+        </p>
+      )}
+      {!locker && !box && boxen.data && <p className="muted small">Im Umkreis von 3 km sind derzeit keine Schließfächer oder Fahrradboxen erfasst.</p>}
+      <MensaSection lngLat={lngLat} compact />
+      <p className="muted small">Boxen und Schließfächer: MobiData BW (ParkAPI, dl-de/by-2-0), Echtzeit-Angaben der Betreiber.</p>
+    </Section>
+  );
 }

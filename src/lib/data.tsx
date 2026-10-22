@@ -2,7 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 import { usePolling, type Polled } from './api';
 import type { Radar } from './rain';
 import type { Kessel } from '../components/Kessel';
-import type { AirStation, EventsResponse, ParkingSite, Place, Roadwork, SharingResponse, TrafficItem, Water, Weather } from './types';
+import type { AirStation, EventsResponse, FlugDaten, KaltluftDaten, NinaWarnung, ParkingSite, Place, Roadwork, SharingResponse, TrafficItem, UnfallAntwort, WanderwegeAntwort, Water, Weather } from './types';
 
 export interface AppData {
   parking: Polled<{ sites: ParkingSite[]; fetchedAt: string; source: string }>;
@@ -17,6 +17,11 @@ export interface AppData {
   events: Polled<EventsResponse>;
   radar: Polled<Radar>;
   kessel: Polled<Kessel>;
+  warnungen: Polled<{ items: NinaWarnung[]; activeCount: number; fetchedAt: string; source: string }>;
+  flug: Polled<FlugDaten>;
+  kaltluft: Polled<KaltluftDaten>;
+  unfaelle: Polled<UnfallAntwort>;
+  wanderwege: Polled<WanderwegeAntwort>;
   eventDate: string | null;
   setEventDate: (d: string | null) => void;
 }
@@ -45,6 +50,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     bike: usePolling('/api/bikeroutes', 24 * 3600_000),
     radar: usePolling('/api/radar', 5 * 60_000),
     kessel: usePolling('/api/kessel', 10 * 60_000),
+    warnungen: usePolling('/api/warnungen', 2 * 60_000),
+    flug: usePolling('/api/flug', 60_000),
+    kaltluft: usePolling('/api/kaltluft', 24 * 3600_000),
+    unfaelle: usePolling('/api/unfaelle', 24 * 3600_000),
+    wanderwege: usePolling('/api/wanderwege', 24 * 3600_000),
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

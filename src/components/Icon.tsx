@@ -48,6 +48,7 @@ export const ICON_PATHS: Record<string, string> = {
   umbrella: 'M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9zM12 12v7a2 2 0 0 0 4 0',
   image: 'M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M15.5 9.5m-1.5 0a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0',
   pin: 'M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12zM12 9m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0',
+  swap: 'M8 3v18M8 21l-3-3M8 21l3-3M16 21V3M16 3l-3 3M16 3l3 3',
   play: 'M7 4l13 8-13 8z',
   pause: 'M7 4h3v16H7zM14 4h3v16h-3z',
 };

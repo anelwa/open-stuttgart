@@ -6,25 +6,34 @@ import { fileURLToPath } from 'node:url';
 import { departures, searchStops } from './sources/efa.mjs';
 import { approaching, trip } from './sources/vehicles.mjs';
 import { traffic } from './sources/traffic.mjs';
-import { neueroeffnungen, news, orte, wasGeht, wasGehtPruefliste } from './sources/wasgeht.mjs';
+import { neueroeffnungen, news, orte, wasGeht, wasGehtIcs, wasGehtPruefliste } from './sources/wasgeht.mjs';
 import { puenktlichkeitJetzt, puenktlichkeitTage, startGtfsrt } from './sources/gtfsrt.mjs';
 import { bahnHbf, bahnHistorie } from './sources/db.mjs';
 import { ankuenfteHbf, anschluss } from './sources/anschluss.mjs';
 import { radar } from './sources/radar.mjs';
-import { kessel } from './sources/kessel.mjs';
-import { parking } from './sources/parking.mjs';
+import { kaltluft, kessel } from './sources/kessel.mjs';
+import { bikeAndRide, parkAndRide, parking, radzaehler } from './sources/parking.mjs';
 import { sharing } from './sources/sharing.mjs';
 import { roadworks, bikeRoutes } from './sources/roadworks.mjs';
-import { air, weather, water } from './sources/environment.mjs';
+import { air, warnungen, weather, water } from './sources/environment.mjs';
 import { events, places, wikiSummary } from './sources/culture.mjs';
 import { profil } from './sources/adresse.mjs';
 import { hitze } from './sources/hitze.mjs';
+import { flug } from './sources/flug.mjs';
+import { unfaelle, unfallStatistik } from './sources/unfall.mjs';
+import { wanderwege, wanderwegeGeoJson } from './sources/wanderwege.mjs';
+import { stadtgedaechtnis, stadtgedaechtnisRss } from './sources/stadtgedaechtnis.mjs';
+import { geocaches } from './sources/geocaching.mjs';
+import { documentDetail, related, search, searchStats, suggest } from './sources/search.mjs';
+import { beobachtungen, giessRadar, pollenKarte } from './sources/natur.mjs';
+import { mensen } from './sources/mensa.mjs';
 import { ortSuche, route } from './sources/routing.mjs';
 import { aufzuege } from './sources/aufzuege.mjs';
 import { bebauungsplaene, beteiligungen, wahlergebnisse } from './sources/beteiligung.mjs';
 import { maengelUebergabe, partnerDaten, partnerStatus } from './sources/partner.mjs';
 import { archivDatei, archivTage, startVerlauf } from './sources/verlauf.mjs';
-import { abfall, adresse, baeder, buergerbueros, categories, facilities, gesundheit, laden, schulbezirk } from './sources/nearby.mjs';
+import { abfall, adresse, baeder, buergerbueros, categories, facilities, freizeitRouten, gesundheit, gruenstrom, laden, schulbezirk } from './sources/nearby.mjs';
+import { verwaltungGebaeude, verwaltungLeistung, verwaltungSuche, verwaltungWerkzeug, verwaltungWo } from './sources/verwaltung.mjs';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
@@ -42,7 +51,11 @@ const routes = {
   '/api/openings': async (q) => (process.env.OS_OPENINGS === '1'
     ? neueroeffnungen({ days: q.get('days'), signal: q.get('signal') })
     : { items: [], updated: null, running: false, error: null, hinweis: 'Die Auswertung neu erfasster Orte aus OpenStreetMap ist in dieser Fassung abgeschaltet.', source: { attribution: '© OpenStreetMap-Mitwirkende (ODbL)' } }),
+  '/api/search': (q) => search({ q: q.get('q'), type: q.get('type'), limit: q.get('limit'), offset: q.get('offset') }),
+  '/api/search/suggest': (q) => suggest(q.get('q')),
+  '/api/search/stats': () => searchStats(),
   '/api/news': (q) => news({ topic: q.get('topic'), district: q.get('district') }),
+  '/api/stadtgedaechtnis': (q) => stadtgedaechtnis({ days: q.get('days'), district: q.get('district'), topic: q.get('topic'), limit: q.get('limit') }),
   '/api/puenktlichkeit': () => puenktlichkeitJetzt(),
   '/api/puenktlichkeit/tage': (q) => puenktlichkeitTage(Math.min(31, Math.max(1, Number(q.get('n')) || 7))),
   '/api/bahn/hbf': () => bahnHbf(),
@@ -50,26 +63,38 @@ const routes = {
   '/api/anschluss/ankuenfte': () => ankuenfteHbf(),
   '/api/anschluss': (q) => anschluss(q.get('ankunft'), q.get('linie'), q.get('ziel')),
   '/api/parking': () => parking(),
+  '/api/bikeandride': (q) => bikeAndRide(q.get('stop'), q.get('lat'), q.get('lon'), { purpose: q.get('purpose'), radius: q.get('radius') }),
+  '/api/parkandride': () => parkAndRide(),
+  '/api/radzaehler': () => radzaehler(),
   '/api/sharing': () => sharing(),
   '/api/roadworks': () => roadworks(),
   '/api/bikeroutes': () => bikeRoutes(),
   '/api/air': () => air(),
   '/api/weather': () => weather(),
   '/api/water': () => water(),
+  '/api/warnungen': () => warnungen(),
   '/api/events': (q) => events(q.get('date')),
   '/api/places': () => places(),
   '/api/wiki': (q) => wikiSummary(q.get('title')),
   '/api/radar': () => radar(),
   '/api/kessel': () => kessel(),
   '/api/nearby/categories': async () => categories(),
-  '/api/nearby/facilities': (q) => facilities(q.get('cat')),
+  '/api/nearby/facilities': (q) => facilities(q.get('cat'), { diet: q.get('diet') }),
+  '/api/freizeit/routen': () => freizeitRouten(),
+  '/api/wanderwege': () => wanderwege(),
+  '/api/wanderwege.geojson': () => wanderwegeGeoJson(),
   '/api/nearby/buergerbueros': () => buergerbueros(),
   '/api/nearby/baeder': () => baeder(),
   '/api/nearby/abfall': (q) => abfall(q.get('street'), q.get('nr')),
   '/api/nearby/schulbezirk': (q) => schulbezirk(+q.get('lat'), +q.get('lon')),
-  '/api/nearby/laden': (q) => laden(q.get('lat'), q.get('lon')),
+  '/api/nearby/laden': (q) => laden(q.get('lat'), q.get('lon'), q.get('plz')),
   '/api/nearby/adresse': (q) => adresse(q.get('q')),
   '/api/adresse/profil': (q) => profil(+q.get('lat'), +q.get('lon'), q.get('street'), q.get('nr')),
+  '/api/verwaltung/gebaeude': (q) => verwaltungGebaeude(q.get('id'), q.get('rubrik')),
+  '/api/verwaltung/leistung': (q) => verwaltungLeistung(q.get('url') ?? q.get('id')),
+  '/api/verwaltung/suche': (q) => verwaltungSuche(q.get('q')),
+  '/api/verwaltung/wo': (q) => verwaltungWo(q.get('leistung') ?? q.get('url'), q.get('lat'), q.get('lon')),
+  '/api/verwaltung/werkzeuge': (q) => verwaltungWerkzeug(q.get('tool'), { q: q.get('q'), url: q.get('url'), id: q.get('id'), leistung: q.get('leistung'), name: q.get('name'), lat: q.get('lat'), lon: q.get('lon') }),
   '/api/archiv': async () => ({ days: archivTage(), format: 'CSV: zeit (UTC, ISO 8601), art (bad = Besucherzahl, bb = Wartezeit-Stufe der Bürgerbüros), id, wert, maximum', lizenz: 'Abgeleitet aus Daten der Stuttgarter Bäder und der Landeshauptstadt Stuttgart; Weiterverwendung mit Quellenangabe' }),
   '/api/route': (q) => route({ von: q.get('von'), nach: q.get('nach'), modus: q.get('modus') ?? undefined, zeit: q.get('zeit'), ankunft: q.get('ankunft'), profil: q.get('profil') ?? undefined }),
   '/api/orte/suche': (q) => ortSuche(q.get('q')),
@@ -81,7 +106,20 @@ const routes = {
   '/api/partner': async () => partnerStatus(),
   '/api/partner/daten': (q) => partnerDaten(q.get('id'), { q: q.get('q'), ars: q.get('ars') ?? undefined }),
   '/api/partner/maengel': async (q) => maengelUebergabe(q.get('lat'), q.get('lon'), q.get('art'), q.get('adresse')),
-  '/api/gesundheit': () => gesundheit(),
+  '/api/gesundheit': (q) => gesundheit(q.get('plz')),
+  '/api/gruenstrom': (q) => gruenstrom(q.get('plz')),
+  '/api/flug': () => flug(),
+  '/api/unfaelle': (q) => unfaelle({
+    lat: q.get('lat'), lon: q.get('lon'), r: q.get('r'), bbox: q.get('bbox'),
+    art: q.get('art') ?? 'alle', schwere: q.get('schwere') ?? 'alle', limit: q.get('limit'),
+  }),
+  '/api/unfaelle/statistik': () => unfallStatistik(),
+  '/api/kaltluft': () => kaltluft(),
+  '/api/giess': (q) => giessRadar(+q.get('lat'), +q.get('lon')),
+  '/api/pollenkarte': () => pollenKarte(),
+  '/api/natur': (q) => beobachtungen(+q.get('lat'), +q.get('lon'), q.get('r')),
+  '/api/geocaches': (q) => geocaches({ lat: q.get('lat'), lon: q.get('lon'), r: q.get('r'), limit: q.get('limit') }),
+  '/api/mensa': (q) => mensen(q.get('date')),
   '/api/health': async () => ({ ok: true, time: new Date().toISOString() }),
 };
 
@@ -128,6 +166,37 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: err.message ?? 'Quelle nicht erreichbar' }));
     }
+    return;
+  }
+  const docMatch = /^\/api\/documents\/(\d+)(\/related)?$/.exec(url.pathname);
+  if (docMatch) {
+    try {
+      const data = docMatch[2] ? related(Number(docMatch[1])) : documentDetail(Number(docMatch[1]));
+      if (!data) {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Dokument nicht gefunden' }));
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=300' });
+        res.end(JSON.stringify(data));
+      }
+    } catch (err) {
+      res.writeHead(err.status ?? 500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: err.message ?? 'Suchdatenbank nicht erreichbar' }));
+    }
+    return;
+  }
+  if (url.pathname === '/api/stadtgedaechtnis.rss') {
+    const q = url.searchParams;
+    const rss = await stadtgedaechtnisRss({ days: q.get('days') });
+    res.writeHead(200, { 'Content-Type': 'application/rss+xml; charset=utf-8', 'Cache-Control': 'public, max-age=900' });
+    res.end(rss);
+    return;
+  }
+  if (url.pathname === '/api/wasgeht.ics') {
+    const q = url.searchParams;
+    const ics = await wasGehtIcs({ tag: q.get('date'), span: q.get('span'), szene: q.get('scene'), jung: q.get('jung'), free: q.get('free'), maxPrice: q.get('maxPrice') });
+    res.writeHead(200, { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': 'inline; filename="was-geht-stuttgart.ics"' });
+    res.end(ics);
     return;
   }
   const csv = /^\/api\/archiv\/(\d{4}-\d{2}-\d{2})\.csv$/.exec(url.pathname);

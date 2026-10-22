@@ -8,7 +8,7 @@ import { berlinDate, dayLabel, fmtDec, fmtTime } from '../../lib/format';
 import { eveningOutlook, fernsicht } from '../../lib/weather';
 import type { CultureEvent, PlaceKind } from '../../lib/types';
 import { Icon } from '../../components/Icon';
-import { ErrorNote, LayerRow, Section, Source } from '../../components/ui';
+import { ErrorNote, LayerRow, Section, ShowMore, Disclosure, SkeletonRows } from '../../components/ui';
 import { EventRow, PlaceRow, Thumb } from '../../components/CultureDetails';
 import { EVENT_GROUPS, eventGroup, INDOOR, PLACE_KINDS, PLACE_ORDER, type EventGroup } from './kinds';
 
@@ -19,7 +19,7 @@ function endOf(e: CultureEvent) {
   return e.end ? Date.parse(e.end) : Date.parse(e.start) + 150 * 60_000;
 }
 
-export function CulturePanel({ visible, toggle, select, flyTo }: ModuleProps) {
+export function CulturePanel({ visible, toggle, select, flyTo, focus }: ModuleProps) {
   const { events, eventDate, setEventDate, places, weather } = useData();
   const stops = useStops();
   const now = useNow(60_000);
@@ -119,7 +119,7 @@ export function CulturePanel({ visible, toggle, select, flyTo }: ModuleProps) {
           </div>
         )}
         {events.error && !events.data && <ErrorNote text={`Veranstaltungen nicht verfügbar: ${events.error}`} onRetry={events.reload} />}
-        {!events.data && !events.error && <span className="skeleton block" style={{ height: 160 }} />}
+        {!events.data && !events.error && <SkeletonRows rows={5} />}
         {running.length > 0 && (
           <>
             <h4 className="list-head">Laufend</h4>
@@ -129,7 +129,11 @@ export function CulturePanel({ visible, toggle, select, flyTo }: ModuleProps) {
         {upcoming.length > 0 && (
           <>
             {isToday && <h4 className="list-head">Bevorstehend</h4>}
-            <ul className="event-list">{upcoming.map((e) => <li key={e.id}><EventRow e={e} meta={stopMeta(e)} onClick={() => open(e)} /></li>)}</ul>
+            <ul className="event-list">
+              <ShowMore first={8} asList>
+                {upcoming.map((e) => <li key={e.id}><EventRow e={e} meta={stopMeta(e)} onClick={() => open(e)} /></li>)}
+              </ShowMore>
+            </ul>
           </>
         )}
         {events.data && upcoming.length === 0 && running.length === 0 && (
@@ -151,7 +155,7 @@ export function CulturePanel({ visible, toggle, select, flyTo }: ModuleProps) {
         {past > 0 && <p className="muted small past-note">{past} bereits beendete Veranstaltungen ausgeblendet.</p>}
       </Section>
 
-      <Section title="Auf der Karte">
+      <Section title="Auf der Karte" collapsible defaultOpen={false}>
         <div className="layer-list">
           <LayerRow icon="ticket" tone="amber" title="Veranstaltungen" on={visible.events} onToggle={() => toggle('events')}
             meta={events.data ? `${list.filter((e) => e.lon != null).length} von ${list.length} verortet, ${dayLabel(date, now)}` : 'lädt'} loading={!events.data} />
@@ -161,7 +165,7 @@ export function CulturePanel({ visible, toggle, select, flyTo }: ModuleProps) {
       </Section>
 
       {viewpoints.length > 0 && (
-        <Section title="Aussichtspunkte" aside={fs ? `Sicht ${fs.km} km` : undefined}>
+        <Section title="Aussichtspunkte" aside={fs ? `Sicht ${fs.km} km` : undefined} collapsible defaultOpen={false}>
           {fs && <p className="muted small">{fs.hint}</p>}
           <ul className="card-strip">
             {viewpoints.map((p) => (
@@ -176,7 +180,7 @@ export function CulturePanel({ visible, toggle, select, flyTo }: ModuleProps) {
         </Section>
       )}
 
-      <Section title="Sehenswürdigkeiten" aside={places.data ? `${shownPlaces.length} Orte` : undefined}>
+      <Section title="Sehenswürdigkeiten" aside={places.data ? `${shownPlaces.length} Orte` : undefined} collapsible defaultOpen={focus === 'orte'}>
         <div className="chips filter-chips">
           <button type="button" className={`chip ${kind === 'all' ? 'on' : ''}`} onClick={() => { setKind('all'); setPlaceCount(6); }}>Alle</button>
           {PLACE_ORDER.filter((k) => kindCounts[k]).map((k) => (
@@ -186,7 +190,7 @@ export function CulturePanel({ visible, toggle, select, flyTo }: ModuleProps) {
           ))}
         </div>
         {places.error && !places.data && <ErrorNote text={`Orte nicht verfügbar: ${places.error}`} onRetry={places.reload} />}
-        {!places.data && !places.error && <span className="skeleton block" style={{ height: 160 }} />}
+        {!places.data && !places.error && <SkeletonRows rows={4} />}
         <ul className="thumb-list">
           {shownPlaces.slice(0, placeCount).map((p) => (
             <li key={p.id}><PlaceRow p={p} onClick={() => { select({ type: 'place', id: p.id }); flyTo([p.lon, p.lat], 16); }} /></li>
@@ -197,10 +201,12 @@ export function CulturePanel({ visible, toggle, select, flyTo }: ModuleProps) {
         )}
       </Section>
 
-      <Source>
-        Veranstaltungskalender der Landeshauptstadt Stuttgart (Einträge mit Verweis auf die Originalseite), Orte aus Wikidata (CC0),
-        Bilder Wikimedia Commons, Verortung © OpenStreetMap-Mitwirkende.
-      </Source>
+      <Disclosure label="Quellen und Lizenzen" defaultOpen={false}>
+        <p className="source">
+          Veranstaltungskalender der Landeshauptstadt Stuttgart (Einträge mit Verweis auf die Originalseite), Orte aus Wikidata (CC0),
+          Bilder Wikimedia Commons, Verortung © OpenStreetMap-Mitwirkende.
+        </p>
+      </Disclosure>
     </div>
   );
 }

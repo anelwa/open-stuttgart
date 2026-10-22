@@ -6,8 +6,15 @@ import type { Place } from '../lib/routeCtx';
 export interface ModuleProps {
   visible: Record<OverlayKey, boolean>;
   toggle: (k: OverlayKey) => void;
+  /**
+   * Gewähltes Anliegen. Das Panel lässt davon die Reihenfolge und die Offenheit seiner
+   * Abschnitte abhängen — Inhalte bleiben vorhanden, werden aber nicht alle zugleich gezeigt.
+   */
+  focus?: string;
   select: (s: Selection) => void;
   flyTo: (lngLat: [number, number], zoom?: number) => void;
+  /** Kartenausschnitt auf einen Bereich legen; berücksichtigt Panel und Detailansicht */
+  fitBounds: (bounds: [[number, number], [number, number]], opts?: { maxZoom?: number }) => void;
   /** Ebene gezielt ein- oder ausschalten */
   setLayer: (k: OverlayKey, on: boolean) => void;
   /** Aktueller Kartenmittelpunkt [lon, lat] */

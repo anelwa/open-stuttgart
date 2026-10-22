@@ -37,7 +37,7 @@ export function BigEventBanner({ select, flyTo }: { select: (s: Selection) => vo
   const used = cap ? Math.round((1 - parks.reduce((s, p) => s + p.free!, 0) / cap) * 100) : null;
   const wxEnd = weatherAt(weather.data, end);
   return (
-    <div className="big-event" role="status">
+    <aside className="big-event" aria-label="Hinweis zu einer Großveranstaltung">
       <Icon name="warn" size={20} />
       <button type="button" className="big-main" onClick={() => { select({ type: 'event', id: big.id }); flyTo([big.lon!, big.lat!], 15); }}>
         <strong>Großveranstaltung heute {fmtTime(start)} Uhr: {big.title}</strong>
@@ -48,6 +48,6 @@ export function BigEventBanner({ select, flyTo }: { select: (s: Selection) => vo
         </span>
       </button>
       <button type="button" className="icon-btn ghost" onClick={() => setHidden(big.id)} aria-label="Hinweis ausblenden"><Icon name="close" size={18} /></button>
-    </div>
+    </aside>
   );
 }

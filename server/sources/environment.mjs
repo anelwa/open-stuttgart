@@ -1,5 +1,7 @@
-// Umwelt: Luftqualität (Umweltbundesamt), Wetter und Warnungen (DWD über Bright Sky), Neckarpegel (WSV PEGELONLINE).
+// Umwelt: Luftqualität (Umweltbundesamt), Wetter und Warnungen (DWD über Bright Sky), Neckarpegel (WSV PEGELONLINE)
+// sowie amtliche Bevölkerungsschutz-Warnungen (BBK NINA / MoWaS) mit Warngebiets-Polygonen.
 import { cached, fetchJson } from '../cache.mjs';
+import { facilities } from './nearby.mjs';
 
 const UBA = 'https://luftdaten.umweltbundesamt.de/api/air-data/v4';
 // Aktive Stuttgarter Messstationen (UBA-ID). Am Neckartor liefert seit August 2026 keine Werte.
@@ -109,3 +111,100 @@ export async function water() {
   });
   return { ...value, fetchedAt: new Date(at).toISOString(), fresh, source: 'Wasserstraßen- und Schifffahrtsverwaltung des Bundes (PEGELONLINE)' };
 }
+
+// ---------- Amtliche Bevölkerungsschutz-Warnungen (BBK NINA / MoWaS, ARS Stuttgart 081110000000) ----------
+const NINA_DASHBOARD = 'https://warnung.bund.de/api31/dashboard/081110000000.json';
+const ninaDetailUrl = (id) => {
+  const s = String(id ?? '');
+  const prefix = /^mow/i.test(s) ? 'mowas' : /^kat/i.test(s) ? 'katwarn' : /^biw/i.test(s) ? 'biwapp' : /^dwd/i.test(s) ? 'dwd' : /^lhp/i.test(s) ? 'lhp' : 'mowas';
+  return `https://warnung.bund.de/api31/${prefix}/${encodeURIComponent(s)}.json`;
+};
+
+/** CAP-Polygon (WKT „lat lon lat lon …“) in GeoJSON-Koordinaten [lon, lat] wandeln */
+function capPolygon(wkt) {
+  const txt = String(wkt ?? '').replace(/POLYGON\s*\(\(/i, '').replace(/\)+\s*$/, '').trim();
+  if (!txt) return null;
+  const pts = txt.split(/[\s,]+/).map(Number).filter(Number.isFinite);
+  const ring = [];
+  for (let i = 0; i + 1 < pts.length; i += 2) ring.push([pts[i + 1], pts[i]]);
+  return ring.length >= 3 ? ring : null;
+}
+
+function inRing(pt, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
+    if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+const ringCenter = (ring) => {
+  const n = ring.length;
+  return [ring.reduce((s, p) => s + p[0], 0) / n, ring.reduce((s, p) => s + p[1], 0) / n];
+};
+
+const R = 6371000;
+const distM = (a, b) => {
+  const dLat = ((b[1] - a[1]) * Math.PI) / 180; const dLon = ((b[0] - a[0]) * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos((a[1] * Math.PI) / 180) * Math.cos((b[1] * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+
+/** Notfall-Treffpunkt und Leuchtturm außerhalb des Warngebiets, nächstgelegen zum Gebietsmittelpunkt */
+async function notfallAusserhalb(polygon) {
+  if (!polygon) return null;
+  let items = [];
+  try { items = (await facilities('notfall')).items; } catch { return null; }
+  const mitte = ringCenter(polygon);
+  const draussen = (f) => !inRing([f.lon, f.lat], polygon);
+  const sortiert = items.filter(draussen).map((f) => ({ ...f, dist: Math.round(distM(mitte, [f.lon, f.lat])) })).sort((a, b) => a.dist - b.dist);
+  return {
+    treffpunkt: sortiert.find((f) => f.info?.includes('Notfall-Treffpunkt')) ?? null,
+    leuchtturm: sortiert.find((f) => f.info?.includes('Notfall-Leuchtturm')) ?? null,
+  };
+}
+
+export async function warnungen() {
+  const { value, at, fresh } = await cached('bbk-nina-081110000000', 2 * 60_000, async () => {
+    const list = await fetchJson(NINA_DASHBOARD, { timeout: 12000 });
+    const raw = Array.isArray(list) ? list : [];
+    const items = await Promise.all(raw.slice(0, 10).map(async (w) => {
+      const id = w.id ?? w.payload?.id;
+      let detail = null;
+      if (id) {
+        detail = await fetchJson(ninaDetailUrl(id), { timeout: 8000 }).catch(() => null);
+      }
+      const info = detail?.info?.[0] ?? {};
+      const data = w.payload?.data ?? {};
+      const areas = info.area ?? [];
+      const withPoly = areas.map((a) => ({ desc: a.areaDesc ?? null, polygon: capPolygon(a.polygon) })).filter((a) => a.polygon);
+      const polygon = withPoly[0]?.polygon ?? null;
+      const notfall = polygon ? await notfallAusserhalb(polygon).catch(() => null) : null;
+      return {
+        id: String(id ?? ''),
+        title: w.i18nTitle?.de ?? info.headline ?? data.headline ?? 'Amtliche Warnmeldung',
+        severity: info.severity ?? data.severity ?? w.severity ?? 'Minor',
+        msgType: w.payload?.type ?? detail?.msgType ?? 'Alert',
+        provider: data.provider ?? info.senderName ?? 'BBK / MoWaS',
+        sent: w.sent ?? detail?.sent ?? null,
+        onset: info.onset ?? w.onset ?? null,
+        expires: info.expires ?? w.expires ?? null,
+        description: info.description ? String(info.description).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : null,
+        instruction: info.instruction ? String(info.instruction).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : null,
+        area: info.area?.[0]?.areaDesc ?? data.area?.description ?? 'Landeshauptstadt Stuttgart',
+        polygon: polygon ? polygon.map(([lon, lat]) => [+lon.toFixed(5), +lat.toFixed(5)]) : null,
+        notfall,
+      };
+    }));
+    return items;
+  });
+  return {
+    ars: '081110000000',
+    items: value,
+    activeCount: value.length,
+    fetchedAt: new Date(at).toISOString(),
+    fresh,
+    source: 'Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK), Warn-App NINA / MoWaS (dl-de/by-2-0); Notfall-Treffpunkte: Landeshauptstadt Stuttgart (CC BY 4.0)',
+  };
+}
+

@@ -43,7 +43,24 @@ const HOST_GAP = {
   'www.hft-stuttgart.de': 3000,
   'hdm-stuttgart.de': 3000,
   'www.abk-stuttgart.de': 10_000, // robots.txt: Crawl-delay 10
+  // Venue-first-Quellen für „Was geht“ (sources/wasgeht/venuefeeds.mjs)
+  'eintopf.info': 600, // öffentliche Tageslisten, höchstens alle 12 h (robots.txt sperrt /ical und /rss)
+  'ku-bu.de': 3000,
+  'www.fridaspier.de': 3000,
+  'climax-institutes.de': 3000,
+  'kowalskistuttgart.de': 3000,
+  'www.evensos.de': 3000,
+  'api.rausgegangen.de': 3000, // nur für einen ausdrücklich freigegebenen Partner-Export
   'feuerwehr.stuttgart.de': 1000,
+  'api.mobidata-bw.de': 300,
+  'api.brightsky.dev': 300,
+  'opendata.dwd.de': 500,
+  'warnung.bund.de': 500,
+  'api.adsb.lol': 1000, // ADS-B-Echtzeitdaten, mehrmals pro Minute ist genug
+  'api.energy-charts.info': 1000,
+  'api.inaturalist.org': 500,
+  'openmensa.org': 500,
+  'aviationweather.gov': 1500,
   'www.swr.de': 2000,
   'www.presseportal.de': 2000, // nur RSS, HTML-Seiten haben Bot-Schutz
   'kessel.tv': 2000,

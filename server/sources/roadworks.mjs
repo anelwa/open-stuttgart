@@ -44,6 +44,14 @@ function linesNear(lon, lat, maxM = 30) {
 }
 
 const WFS = 'https://geoserver.stuttgart.de/gdc/Verkehr_Mobilitaet/ows?service=WFS&version=1.0.0&request=GetFeature&outputFormat=application/json&srsName=EPSG:4326&typeName=';
+/**
+ * Feste Attributliste je Layer. Das ist kein Luxus: der Layer „geplant" meldet in seinem
+ * GeoServer-Schema das Feld VERKEHRSAUSWIRKUNG, das in der Tabelle nicht existiert, und
+ * beantwortet eine vollständige Abfrage mit einer OWS-ServiceException (XML) statt JSON.
+ * Ohne propertyName scheitert deshalb der gesamte Abruf. Die Liste enthält nur Felder,
+ * die in beiden Layern wirklich vorhanden sind.
+ */
+const PROPS = ['SHAPE', 'DETAILS_STANDORT', 'ANFANG', 'STRASSENNAME', 'ENDE', 'ZEITL_REGELUNG', 'ART_ARBEIT', 'STATUS'];
 const LAYERS = [
   'Verkehr_Mobilitaet:A66_BAUM_BAUSTELLEN_DATE_WEB_im_Bau_EPSG25832',
   'Verkehr_Mobilitaet:A66_BAUM_BAUSTELLEN_DATE_WEB_geplant_EPSG25832',
@@ -55,50 +63,90 @@ const toIso = (d) => {
 };
 
 export async function roadworks() {
-  const { value, at, fresh } = await cached('roadworks', 15 * 60_000, async () => {
-    const all = [];
-    const seen = new Set();
-    for (const layer of LAYERS) {
-      const d = await fetchJson(WFS + encodeURIComponent(layer));
-      for (const f of d.features ?? []) {
-        const p = f.properties ?? {};
-        const [lon, lat] = f.geometry?.coordinates ?? [];
-        if (lon == null) continue;
-        const key = `${p.STRASSENNAME}|${p.ANFANG}|${lon.toFixed(5)}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        all.push({
-          id: key,
-          street: p.STRASSENNAME ?? '',
-          where: p.DETAILS_STANDORT ?? '',
-          from: toIso(p.ANFANG),
-          to: toIso(p.ENDE),
-          work: p.ART_ARBEIT ?? '',
-          impact: p.VERKEHRSAUSWIRKUNG ?? '',
-          timing: p.ZEITL_REGELUNG ?? '',
-          status: p.STATUS === 'im Bau' ? 'active' : 'planned',
-          lat: +lat.toFixed(6),
-          lon: +lon.toFixed(6),
-          lines: linesNear(lon, lat),
-        });
+  try {
+    const { value, at, fresh, error } = await cached('roadworks', 15 * 60_000, async () => {
+      const all = [];
+      const seen = new Set();
+      const failed = [];
+      for (const layer of LAYERS) {
+        // Ein defekter Datensatz darf die übrigen nicht verhindern.
+        let d;
+        try {
+          d = await fetchJson(`${WFS + encodeURIComponent(layer)}&propertyName=${encodeURIComponent(PROPS.join(','))}`);
+        } catch (e) {
+          failed.push({ layer, error: String(e?.message ?? e) });
+          continue;
+        }
+        if (!d || !Array.isArray(d.features)) {
+          failed.push({ layer, error: 'Antwort ohne Merkmale' });
+          continue;
+        }
+        for (const f of d.features) {
+          const p = f.properties ?? {};
+          const [lon, lat] = f.geometry?.coordinates ?? [];
+          if (lon == null) continue;
+          const key = `${p.STRASSENNAME}|${p.ANFANG}|${lon.toFixed(5)}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          all.push({
+            id: key,
+            street: p.STRASSENNAME ?? '',
+            where: p.DETAILS_STANDORT ?? '',
+            from: toIso(p.ANFANG),
+            to: toIso(p.ENDE),
+            work: p.ART_ARBEIT ?? '',
+            // Wird von der Quelle nicht mehr geliefert (Feld existiert in keinem Layer).
+            impact: p.VERKEHRSAUSWIRKUNG ?? '',
+            timing: p.ZEITL_REGELUNG ?? '',
+            status: p.STATUS === 'im Bau' ? 'active' : 'planned',
+            lat: +lat.toFixed(6),
+            lon: +lon.toFixed(6),
+            lines: linesNear(lon, lat),
+          });
+        }
       }
-    }
-    return all;
-  });
-  return { items: value, fetchedAt: new Date(at).toISOString(), fresh, source: 'Landeshauptstadt Stuttgart, Tiefbauamt (Open Data)' };
+      return { items: all, failed };
+    });
+    const items = Array.isArray(value) ? value : (value?.items ?? []);
+    return {
+      items,
+      failed: Array.isArray(value) ? [] : (value?.failed ?? []),
+      fetchedAt: new Date(at).toISOString(),
+      fresh,
+      stale: !!error,
+      error,
+      source: 'Landeshauptstadt Stuttgart, Tiefbauamt (Open Data)',
+    };
+  } catch (err) {
+    // Kein letzter guter Wert vorhanden. Statt eines Fehlers liefern wir eine ehrliche
+    // leere Liste — die Karte bleibt nutzbar, der Hinweis steht im Panel.
+    return {
+      items: [],
+      fetchedAt: null,
+      fresh: false,
+      unavailable: true,
+      error: String(err?.message ?? err),
+      source: 'Landeshauptstadt Stuttgart, Tiefbauamt (Open Data)',
+    };
+  }
 }
 
 export async function bikeRoutes() {
-  const { value } = await cached('bikeroutes', 24 * 3600_000, async () =>
-    fetchJson(WFS + encodeURIComponent('Verkehr_Mobilitaet:A61_RAD_HAUPTRADROUTEN_EPSG25832'), { timeout: 30000 }));
-  // Koordinaten auf 5 Stellen kürzen, Eigenschaften auf das Nötige
-  const round = (c) => (typeof c[0] === 'number' ? [+c[0].toFixed(5), +c[1].toFixed(5)] : c.map(round));
-  return {
-    type: 'FeatureCollection',
-    features: (value.features ?? []).filter((f) => f.geometry).map((f) => ({
-      type: 'Feature',
-      geometry: { type: f.geometry.type, coordinates: round(f.geometry.coordinates) },
-      properties: { name: f.properties?.ROUTENNAME ?? f.properties?.NAME ?? f.properties?.HRR_NR ?? '' },
-    })),
-  };
+  try {
+    const { value, error } = await cached('bikeroutes', 24 * 3600_000, async () =>
+      fetchJson(WFS + encodeURIComponent('Verkehr_Mobilitaet:A61_RAD_HAUPTRADROUTEN_EPSG25832'), { timeout: 30000 }));
+    // Koordinaten auf 5 Stellen kürzen, Eigenschaften auf das Nötige
+    const round = (c) => (typeof c[0] === 'number' ? [+c[0].toFixed(5), +c[1].toFixed(5)] : c.map(round));
+    return {
+      type: 'FeatureCollection',
+      stale: !!error,
+      features: (value.features ?? []).filter((f) => f.geometry).map((f) => ({
+        type: 'Feature',
+        geometry: { type: f.geometry.type, coordinates: round(f.geometry.coordinates) },
+        properties: { name: f.properties?.ROUTENNAME ?? f.properties?.NAME ?? f.properties?.HRR_NR ?? '' },
+      })),
+    };
+  } catch {
+    return { type: 'FeatureCollection', features: [], unavailable: true };
+  }
 }

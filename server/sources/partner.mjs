@@ -45,9 +45,9 @@ export const PARTNER = [
     env: 'OS_SSB_FAHRZEUGE_URL',
   },
   {
-    id: 'verkehrszaehlung', rang: 16, titel: 'Verkehrslage aus städtischen Zählstellen',
-    beschreibung: 'Werte der Kfz-Zählstellen und des Verkehrsrechners der Stadt. Im Geoserver bestehen Ebenen im Arbeitsbereich DVFO_Aufbau_ERZ; ob sie live betrieben werden, ist nicht geklärt.',
-    benoetigt: 'Stadt: Amt für öffentliche Ordnung bzw. Tiefbauamt, Klärung von Betrieb, Aktualität und Nutzungsbedingungen der DVFO-Daten.',
+    id: 'verkehrszaehlung', rang: 16, titel: 'Verkehrslage aus städtischen Kfz-Zählstellen',
+    beschreibung: 'Werte der Kfz-Zählstellen und des Verkehrsrechners der Stadt. Geprüft im Geoserver-Arbeitsbereich DVFO_Aufbau_ERZ: Der Layer A32_DVFO_VERKEHRSLAGE_hbs_EPSG25832 liefert 12.370 Straßenabschnitte mit Qualitätsstufe (LOS 1–6, LOS_CALC A–F) und Reisezeiten, der Zeitstempel (TIME_STAMP) steht jedoch statisch auf dem 12.03.2025, 15:17 Uhr; der Layer A32_DVFO_MESSQUERSCHNITT_STUTTGART_EPSG25832 meldet „Feature type unknown“. Die Stuttgarter Eco-Counter-Fahrradzählstellen sind dagegen über MobiData BW live eingebunden (/api/radzaehler).',
+    benoetigt: 'Stadt: Amt für öffentliche Ordnung bzw. Tiefbauamt, laufende Aktualisierung des DVFO-Layers oder Freigabe eines aktuellen Kfz-Zählstellen-Feeds.',
     env: 'OS_VERKEHR_URL',
   },
   {
@@ -67,6 +67,12 @@ export const PARTNER = [
     beschreibung: 'Live-Wartezeiten weiterer Dienststellen, etwa Kfz-Zulassungsstelle und Ausländerbehörde. Heute veröffentlicht die Stadt nur die Bürgerbüros (wartezeiten.stuttgart.de/bb/status); die Bedeutung der Statuswerte ist nicht amtlich erläutert.',
     benoetigt: 'Stadt: Erläuterung der Statuswerte und Bereitstellung weiterer Ämter im selben Format.',
     env: 'OS_WARTEZEITEN_URL',
+  },
+  {
+    id: 'gancio-register', rang: 20, titel: 'Offenes Veranstaltungsregister Stuttgart (Gancio)',
+    beschreibung: 'Gemeinschaftlich gepflegtes Veranstaltungsregister auf Basis von Gancio 1.28.2 für Clubs, Kollektive und Jugendhäuser ohne eigene offene Schnittstelle. Einträge fließen unter CC0 1.0 vorrangig in das Modul „Was geht“ ein.',
+    benoetigt: 'Betrieb einer Gancio-Instanz (Konfiguration unter gancio/) und Einbindung erster Partner (Stuttgarter Jugendhaus gGmbH, Clubkollektiv Stuttgart e. V.).',
+    env: 'OS_GANCIO_URL', quelle: 'https://gancio.org/',
   },
 ];
 

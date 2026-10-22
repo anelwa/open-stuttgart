@@ -54,3 +54,19 @@
 @media (max-width: 420px) {
   .wg-detail, .wg-links { margin-left: 6px; }
 }
+
+/* Stadtgedächtnis: Timeline mit Quelle, Thema, Bezirk und Confidence */
+.sg-list li { border-bottom: 1px solid var(--line); padding: 12px 0; }
+.sg-list li:last-child { border-bottom: 0; }
+.sg-topic { color: var(--ink); font-weight: 700; }
+.sg-conf { border: 1px solid var(--line-strong); border-radius: 999px; padding: 1px 7px; font-size: 10.5px; color: var(--muted); }
+.sg-conf.sg-hoch { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.sg-conf.sg-mittel { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.sg-license { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); }
+.sg-filter { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; }
+.sg-filter select { font: inherit; padding: 4px 8px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--card); color: var(--ink); }
+
+/* Kollektive: Abzeichen in der Terminzeile, Filterchips */
+.wg-collective { color: var(--accent-hover); font-weight: 700; }
+:root[data-theme='dark'] .wg-collective { color: var(--accent); }
+.wg-src .wg-collective { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -60,7 +60,7 @@ function ankunftText(a: Fahrt) {
   return `${fmtTime(a.soll)} ${a.linie} aus ${a.herkunft ?? 'unbekannt'}, ${steig(a.steig)}${v}`;
 }
 
-export function Anschluss() {
+export function Anschluss({ className }: { className?: string }) {
   const liste = usePolling<AnkuenfteAntwort>('/api/anschluss/ankuenfte', 60_000);
   const [ankunft, setAnkunft] = useState('');
   const [linie, setLinie] = useState(''); // „Linie|Ziel“
@@ -93,7 +93,7 @@ export function Anschluss() {
   const r = ergebnis.data;
 
   return (
-    <Section title="Anschluss am Hauptbahnhof" explain="anschluss">
+    <Section className={className} title="Anschluss am Hauptbahnhof" explain="anschluss">
       <p className="muted small bahn-intro">
         Prüft, ob ein Umstieg am Stuttgarter Hauptbahnhof (oben, tief und Arnulf-Klett-Platz) mit der aktuellen Verspätung
         noch erreichbar ist.

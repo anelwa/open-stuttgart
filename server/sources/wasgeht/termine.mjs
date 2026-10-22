@@ -8,19 +8,23 @@
 // Übernommen werden Fakten (Titel, Zeit, Ort, Preis, Status) und der Link zur Quelle, keine Beschreibungstexte oder Bilder.
 // Jede Quelle einzeln: eigener Zwischenspeicher (Speicher und Platte), Fehler betreffen nur diese Quelle,
 // abschaltbar mit OS_SCENE_<NAME>=0 (z. B. OS_SCENE_THEATERHAUS=0, OS_SCENE_TICKETIO_LEHMANNCLUB=0).
+import { existsSync, readFileSync } from 'node:fs';
 import { diskStore, fetchJson, fetchText } from '../../cache.mjs';
 import { events as kulturTermine, geocode, icsDate, parseIcs } from '../culture.mjs';
 import { berlinLocal, dist, ldBlocks, same, titleSim } from '../events-extra.mjs';
 import {
-  LYA_PROFILES, TICKETIO_SHOPS, VENUES, addDays, berlinDate, berlinHM, bisZu, distToVenue, euro, letzterStand, minAgeOf,
+  LYA_PROFILES, TICKETIO_SHOPS, VENUES, addDays, berlinDate, berlinHM, bisZu, distToVenue, districtOf, euro, letzterStand, minAgeOf,
   priceText, quelle, sceneDay, text, today, venueById, venueFields, venueOf,
 } from './common.mjs';
+import { venueSources } from './venuefeeds.mjs';
+import { ferienprogrammSource } from './ferienprogramm.mjs';
+import { collectiveTags as tagsToCollectives, collectivesFromEvents, extractCollective, matchCollective } from '../kollektive.mjs';
 
 const H = 3600_000;
 const HORIZON_DAYS = 21; // so weit im Voraus werden Termine gelesen
-export const SZENEN = ['konzert', 'party', 'comedy', 'hochschule', 'flohmarkt', 'popup', 'kneipe', 'buehne', 'sonstiges'];
+export const SZENEN = ['konzert', 'party', 'comedy', 'hochschule', 'flohmarkt', 'popup', 'kneipe', 'buehne', 'jugend', 'sonstiges'];
 /** Standardsicht „junges Publikum“ (6.6): keine Altersangabe, nur ein Zuschnitt nach Kategorien. */
-export const JUNG = ['konzert', 'party', 'comedy', 'hochschule', 'flohmarkt', 'popup', 'kneipe'];
+export const JUNG = ['konzert', 'party', 'comedy', 'hochschule', 'flohmarkt', 'popup', 'kneipe', 'jugend'];
 
 const horizon = () => addDays(today(), HORIZON_DAYS);
 const inWindow = (day) => day >= addDays(today(), -1) && day <= horizon();
@@ -28,6 +32,11 @@ const inWindow = (day) => day >= addDays(today(), -1) && day <= horizon();
 /** Einheitlicher Termin im Format des Kulturmoduls (CultureEvent) mit den Feldern aus 6.2. */
 function termin(q, f) {
   const start = f.start ? new Date(f.start).toISOString() : null;
+  const tagCollectives = Array.isArray(f.tags) ? tagsToCollectives(f.tags) : [];
+  const collective = f.collective
+    ?? matchCollective(f.title, f.teaser, f.performer)
+    ?? tagCollectives[0]
+    ?? extractCollective(f.title, f.teaser, f.performer);
   const e = {
     id: `${q.id}-${f.key}`, title: text(f.title), teaser: f.teaser ? text(f.teaser) : '', url: f.url,
     start, end: f.end ? new Date(f.end).toISOString() : null, allDay: !start, noTime: !start || undefined,
@@ -36,8 +45,13 @@ function termin(q, f) {
     scene: f.scene?.length ? [...new Set(f.scene)] : ['sonstiges'], genre: f.genre ?? null, minAge: f.minAge ?? null,
     ticketUrl: f.ticketUrl ?? null, priceMin: f.priceMin ?? null, price: f.price ?? priceText(f.priceMin ?? null),
     free: f.free ?? (f.priceMin === 0 ? true : null), doors: f.doors ? new Date(f.doors).toISOString() : null,
-    status: f.status ?? null, soldOut: f.soldOut || undefined, performer: f.performer ?? null, license: null,
+    status: f.status ?? null, soldOut: f.soldOut || undefined, performer: f.performer ?? null, license: f.license ?? q.license ?? null,
     ready: true, group: q.group, srcId: q.id, sources: [{ name: q.name, url: f.url }],
+    collective: collective ?? null, collectiveTags: tagCollectives,
+    // „Tatsächlich stattfindend“: Hausquelle (selbst angekündigt) vor Register/Ticket vor Aggregator.
+    // lastSeen sagt, wann die Quelle den Termin zuletzt bestätigt hat.
+    verified: f.verified ?? ({ haus: 'venue', hochschule: 'venue', kultur: 'official', jugend: 'official', register: 'register', ticket: 'ticket', aggregator: 'aggregator' }[q.group] ?? null),
+    lastSeen: new Date().toISOString(),
   };
   e.date = f.date ?? sceneDay({ ...e, date: start ? berlinDate(new Date(start)) : null });
   return e;
@@ -433,8 +447,227 @@ async function stuvus() {
   return out;
 }
 
-// ---------- Quellenliste in Einspeisereihenfolge (6.5.1: Hausquellen, dann Ticketshops, dann Hochschulen) ----------
+// ---------- Jugendagentur Stuttgart: The Events Calendar / Tribe REST (WordPress) ----------
+// Die Quelle war bei der Einrichtung zeitweise nicht erreichbar. Sie bleibt eingebunden, weil sie
+// für junge Zielgruppen, Berufsorientierung und Infoveranstaltungen sehr ergiebig ist. Abschaltbar
+// mit OS_SCENE_JUGENDAGENTUR=0; Fehler betreffen nur diese Quelle.
+const JUGENDAGENTUR = {
+  id: 'jugendagentur', name: 'Jugendagentur Stuttgart', group: 'jugend',
+  url: 'https://www.jugendagentur.net/events/',
+  license: 'Terminfakten der Jugendagentur Stuttgart; übernommen werden Titel, Zeit, Ort und Link. Keine Bilder, keine Volltexte.',
+};
+async function jugendagentur() {
+  const d = await fetchJson('https://www.jugendagentur.net/wp-json/tribe/events/v1/events?per_page=100&start_date=' + encodeURIComponent(`${today()} 00:00:00`), { timeout: 8000 });
+  const out = [];
+  for (const r of d.events ?? []) {
+    if (!r.title || !r.start_date) continue;
+    const day = String(r.start_date).slice(0, 10);
+    if (!inWindow(day)) continue;
+    const allDay = Boolean(r.all_day);
+    const start = allDay ? null : berlinLocal(String(r.start_date).replace(' ', 'T'));
+    if (!allDay && (!start || Number.isNaN(+new Date(start)))) continue;
+    const v = r.venue ?? {};
+    const lat = v.geo_lat != null && Number.isFinite(Number(v.geo_lat)) ? Number(v.geo_lat) : null;
+    const lon = v.geo_lng != null && Number.isFinite(Number(v.geo_lng)) ? Number(v.geo_lng) : null;
+    const vid = venueOf(v.venue) ?? venueOf(v.address);
+    const all = `${r.title} ${r.excerpt ?? ''}`;
+    const scene = RE_PARTY.test(all) ? ['jugend', 'party'] : RE_COMEDY.test(all) ? ['jugend', 'comedy']
+      : RE_FLOH.test(all) ? ['jugend', 'flohmarkt'] : ['jugend'];
+    out.push(termin(JUGENDAGENTUR, {
+      key: r.id, title: r.title, teaser: text(r.excerpt), url: r.url, start, end: r.end_date ? berlinLocal(String(r.end_date).replace(' ', 'T')) : null,
+      date: allDay ? day : undefined, ...(vid ? { venueId: vid } : {
+        venue: text(v.venue) || null, location: [v.address, v.city].filter(Boolean).join(', ') || 'Stuttgart',
+        ...(lat != null && lon != null ? { lat, lon } : {}), district: districtOf(`${v.venue ?? ''} ${v.address ?? ''} ${v.city ?? ''}`),
+      }),
+      scene, category: 'Jugendagentur Stuttgart', priceMin: null, verified: 'official',
+    }));
+  }
+  return out;
+}
+
+// ---------- Ticketmaster Discovery API (optional, nur mit OS_TICKETMASTER_KEY) ----------
+// Kostenlos für 5.000 Calls/Tag, 5 Anfragen/s. Nur große Häuser (Porsche Arena, Schleyer-Halle,
+// Schräglage u. a.); kein Ersatz für Clubs. Es werden keine Bilder übernommen.
+const TICKETMASTER = {
+  id: 'ticketmaster', name: 'Ticketmaster Discovery', group: 'ticket',
+  url: 'https://www.ticketmaster.de/', license: 'Ticketmaster Discovery API; übernommen werden Termin, Ort, Preis und Link. Keine Bilder.',
+};
+async function ticketmaster() {
+  const key = (process.env.OS_TICKETMASTER_KEY ?? '').trim();
+  if (!key) return [];
+  const d = await fetchJson(`https://app.ticketmaster.com/discovery/v2/events.json?apikey=${encodeURIComponent(key)}&countryCode=DE&city=Stuttgart&size=100&sort=date,asc&locale=*`, { timeout: 12000 });
+  const out = [];
+  for (const r of d._embedded?.events ?? []) {
+    const day = r.dates?.start?.localDate;
+    if (!day || !inWindow(day) || !r.name) continue;
+    const time = r.dates?.start?.localTime;
+    const start = time ? berlinLocal(`${day}T${time}`) : null;
+    if (start && Number.isNaN(+new Date(start))) continue;
+    const v = r._embedded?.venues?.[0] ?? {};
+    const lat = v.location?.latitude != null ? Number(v.location.latitude) : null;
+    const lon = v.location?.longitude != null ? Number(v.location.longitude) : null;
+    const vid = venueOf(v.name) ?? venueOf([v.address?.line1, v.city?.name].filter(Boolean).join(' '));
+    const seg = r.classifications?.[0]?.segment?.name ?? '';
+    const genre = r.classifications?.[0]?.genre?.name ?? null;
+    const scene = /Music/i.test(seg) ? ['konzert'] : /Arts|Theatre|Theater/i.test(seg) ? ['buehne'] : ['sonstiges'];
+    const status = /cancelled/i.test(r.dates?.status?.code ?? '') ? 'abgesagt' : /postponed|rescheduled/i.test(r.dates?.status?.code ?? '') ? 'verschoben' : null;
+    out.push(termin(TICKETMASTER, {
+      key: r.id, title: r.name, teaser: r.info ?? r.pleaseNote ?? null, url: r.url,
+      start, date: start ? undefined : day, ...(vid ? { venueId: vid } : {
+        venue: v.name ?? null, location: [v.address?.line1, v.city?.name].filter(Boolean).join(', ') || 'Stuttgart',
+        ...(lat != null && lon != null ? { lat, lon } : {}), district: districtOf([v.name, v.city?.name].filter(Boolean).join(' ')),
+      }),
+      scene, genre, category: 'Ticketmaster', performer: r._embedded?.attractions?.[0]?.name ?? null,
+      priceMin: r.priceRanges?.[0]?.min != null ? Number(r.priceRanges[0].min) : null,
+      status, verified: 'ticket',
+    }));
+  }
+  return out;
+}
+
+// ---------- Offenes Veranstaltungsregister (Gancio 1.28.2, GET /api/events, CC0 1.0) ----------
+const GANCIO_BASE = () => (process.env.OS_GANCIO_URL ?? '').trim().replace(/\/+$/, '');
+const GANCIO = {
+  id: 'gancio', name: 'Offenes Veranstaltungsregister Stuttgart (Gancio)', group: 'register',
+  url: GANCIO_BASE() || 'http://localhost:13120', license: 'CC0 1.0 (Gemeinfreiheit der Terminfakten)',
+};
+const GANCIO_TAG_SCENE = {
+  konzert: 'konzert', live: 'konzert', musik: 'konzert', jazz: 'konzert', rock: 'konzert', indie: 'konzert', punk: 'konzert',
+  metal: 'konzert', hiphop: 'konzert', 'hip-hop': 'konzert', rap: 'konzert', 'singer-songwriter': 'konzert', klassik: 'konzert',
+  party: 'party', clubnacht: 'party', rave: 'party', techno: 'party', house: 'party', trance: 'party', dnb: 'party',
+  'drum-and-bass': 'party', dj: 'party', 'dj-set': 'party', elektro: 'party', electronic: 'party', tanzen: 'party',
+  comedy: 'comedy', kabarett: 'comedy', 'stand-up': 'comedy', standup: 'comedy', slam: 'comedy', 'poetry-slam': 'comedy', impro: 'comedy', kleinkunst: 'comedy',
+  hochschule: 'hochschule', uni: 'hochschule', campus: 'hochschule', studierende: 'hochschule', fachschaft: 'hochschule', asta: 'hochschule', stuvus: 'hochschule',
+  flohmarkt: 'flohmarkt', troedel: 'flohmarkt', 'trödel': 'flohmarkt', kleidertausch: 'flohmarkt', markt: 'flohmarkt', basar: 'flohmarkt',
+  popup: 'popup', 'pop-up': 'popup', zwischennutzung: 'popup', daydrinking: 'popup', 'open-air': 'popup', openair: 'popup',
+  kneipe: 'kneipe', bar: 'kneipe', quiz: 'kneipe', kneipenquiz: 'kneipe', pubquiz: 'kneipe', jam: 'kneipe', jamsession: 'kneipe', karaoke: 'kneipe', stammtisch: 'kneipe',
+  buehne: 'buehne', 'bühne': 'buehne', theater: 'buehne', lesung: 'buehne', tanz: 'buehne', performance: 'buehne', vortrag: 'buehne', diskussion: 'buehne', kino: 'buehne', film: 'buehne', ausstellung: 'buehne',
+};
+const PARTY_VENUES = new Set(['lehmann', 'proton', 'romantica', 'kowalski', 'whitenoise', 'fridaspier', 'climax', 'zollamt', 'schraeglage', 'kubu']);
+const GANCIO_AGE_TAG = /^(?:ab[- ]?(?:16|18)|(?:16|18)\+)$/i;
+const GANCIO_PRICE_TAG = /^(?:(?:preis|vvk|ak)[- ]?(\d+(?:[.,]\d{1,2})?)(?:[- ]?(?:euro|eur|€))?|ab[- ]?(\d+(?:[.,]\d{1,2})?)[- ]?(?:euro|eur|€)|(\d+(?:[.,]\d{1,2})?)[- ]?(?:euro|eur|€))$/i;
+const GANCIO_DOORS_TAG = /^einlass[- ]?(\d{1,2})(?:[:.-](\d{2}))?(?:[- ]?uhr)?$/i;
+const GANCIO_META_TAG = /^(?:stuttgart|eintritt[- ]?frei|kostenlos|frei|spende|hutkasse|ab[- ]?(?:16|18)|(?:16|18)\+|abgesagt|entf[aä]llt|cancelled|verschoben|verlegt|postponed|ausverkauft|sold[- ]?out|(?:(?:ab|preis|vvk|ak)[- ]?)?\d+(?:[.,]\d{1,2})?(?:[- ]?(?:euro|eur|€))?|einlass[- ]?\d{1,2}(?:[:.-]\d{2})?(?:[- ]?uhr)?)$/i;
+
+/** Wandelt eine Liste von Gancio-Einträgen (/api/events) in das Format des Moduls „Was geht“ um. */
+export async function gancioEvents(raw, baseUrl = GANCIO_BASE() || GANCIO.url) {
+  const out = [];
+  const base = baseUrl.replace(/\/+$/, '');
+  const q = { ...GANCIO, url: base };
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (r?.is_visible === false || !r?.start_datetime || !r?.title) continue;
+    const startMs = Number(r.start_datetime) * 1000;
+    if (!Number.isFinite(startMs)) continue;
+    const start = new Date(startMs);
+    const end = r.end_datetime && Number.isFinite(Number(r.end_datetime)) ? new Date(Number(r.end_datetime) * 1000) : null;
+    const probeDay = sceneDay({ start: start.toISOString(), date: berlinDate(start) });
+    if (!inWindow(probeDay)) continue;
+
+    const p = r.place ?? {};
+    const latNum = p.latitude != null && Number.isFinite(Number(p.latitude)) ? Number(p.latitude) : null;
+    const lonNum = p.longitude != null && Number.isFinite(Number(p.longitude)) ? Number(p.longitude) : null;
+    let vid = venueOf(p.name) ?? venueOf(p.address);
+    if (!vid && latNum != null && lonNum != null) {
+      vid = VENUES.find((v) => !v.approx && dist({ lat: latNum, lon: lonNum }, v) <= 80)?.id ?? null;
+    }
+
+    const tags = (Array.isArray(r.tags) ? r.tags : []).map((t) => text(t).replace(/^#/, '')).filter(Boolean);
+    const lowerTags = tags.map((t) => t.toLowerCase());
+    const scenes = [...new Set(lowerTags.map((t) => GANCIO_TAG_SCENE[t]).filter(Boolean))];
+    const allText = `${r.title} ${tags.join(' ')}`;
+    if (!scenes.length) {
+      if (RE_PARTY.test(allText) || (vid && PARTY_VENUES.has(vid))) scenes.push('party');
+      else if (RE_COMEDY.test(allText)) scenes.push('comedy');
+      else if (RE_FLOH.test(allText)) scenes.push('flohmarkt');
+      else if (RE_BUEHNE.test(allText)) scenes.push('buehne');
+      else scenes.push('konzert');
+    }
+
+    const freeTag = lowerTags.some((t) => /^(?:eintritt[- ]?frei|kostenlos|frei|spende|hutkasse)$/.test(t));
+    let priceMin = freeTag ? 0 : null;
+    if (priceMin == null) {
+      for (const t of lowerTags) {
+        if (GANCIO_AGE_TAG.test(t)) continue;
+        const pm = GANCIO_PRICE_TAG.exec(t);
+        if (pm) { priceMin = euro(pm[1] ?? pm[2] ?? pm[3]); break; }
+      }
+    }
+
+    let doors = null;
+    for (const t of lowerTags) {
+      const dm = GANCIO_DOORS_TAG.exec(t);
+      if (dm) {
+        doors = berlinLocal(`${berlinDate(start)}T${dm[1].padStart(2, '0')}:${dm[2] ?? '00'}:00`);
+        break;
+      }
+    }
+
+    const minAge = lowerTags.some((t) => /^(?:ab[- ]?18|18\+)$/.test(t)) ? 18
+      : lowerTags.some((t) => /^(?:ab[- ]?16|16\+)$/.test(t)) ? 16
+        : minAgeOf(r.title, ...tags);
+
+    const status = r.status === 'EventCancelled' || lowerTags.some((t) => /^(?:abgesagt|entf[aä]llt|cancelled)$/.test(t)) ? 'abgesagt'
+      : r.status === 'EventPostponed' || r.status === 'EventRescheduled' || lowerTags.some((t) => /^(?:verschoben|verlegt|postponed)$/.test(t)) ? 'verschoben'
+        : null;
+    const soldOut = lowerTags.some((t) => /^(?:ausverkauft|sold[- ]?out)$/.test(t));
+    const genreTags = tags.filter((t) => !GANCIO_META_TAG.test(t) && !GANCIO_TAG_SCENE[t.toLowerCase()]);
+    const links = (Array.isArray(r.online_locations) ? r.online_locations : []).filter((u) => /^https?:\/\//i.test(String(u ?? '')));
+    const ticketUrl = links.find((u) => !/eventim\./i.test(u)) ?? null;
+    const evUrl = r.slug ? `${base}/event/${r.slug}` : `${base}/event/${r.id}`;
+
+    let lat = latNum;
+    let lon = lonNum;
+    let approx;
+    if (!vid && lat == null && p.address) {
+      const g = await geocode(p.address).catch(() => null);
+      if (g) { lat = g.lat; lon = g.lon; approx = g.approx || undefined; }
+    }
+
+    const item = termin(q, {
+      key: r.id ?? r.slug, title: r.title, url: evUrl, start, end, doors,
+      venueId: vid,
+      ...(vid ? {} : {
+        venue: text(p.name) || null, location: text(p.address) || 'Stuttgart',
+        ...(lat != null && lon != null ? { lat, lon } : {}),
+        district: districtOf(`${p.name ?? ''} ${p.address ?? ''}`),
+      }),
+      scene: scenes, genre: genreTags.slice(0, 3).join(', ') || null, tags,
+      minAge, ticketUrl, priceMin, free: freeTag ? true : null,
+      status, soldOut, category: 'Veranstaltungsregister', license: q.license,
+    });
+    if (approx) item.approx = true;
+    out.push(item);
+  }
+  return out;
+}
+
+async function gancio() {
+  const file = (process.env.OS_GANCIO_FILE ?? '').trim();
+  if (file && existsSync(file)) {
+    const raw = JSON.parse(readFileSync(file, 'utf8'));
+    return gancioEvents(raw.events ?? raw, GANCIO_BASE() || GANCIO.url);
+  }
+  const base = GANCIO_BASE();
+  if (!base) return [];
+  const startSec = Math.floor(Date.parse(`${addDays(today(), -1)}T00:00:00Z`) / 1000);
+  const endSec = Math.floor(Date.parse(`${horizon()}T23:59:59Z`) / 1000);
+  const raw = await fetchJson(`${base}/api/events?start=${startSec}&end=${endSec}&show_recurrent=true&show_multidate=true&max=500`, { timeout: 15000 });
+  return gancioEvents(raw, base);
+}
+
+// ---------- Quellenliste in Einspeisereihenfolge (6.5.1: Register, Hausquellen, Ticketshops, Hochschulen) ----------
+// venueSources liefert die Haus- und Registerquellen aus sources/wasgeht/venuefeeds.mjs:
+// EINTOPF/LAUTI, KUlturBUnker, Fridas Pier, Climax, Kowalski, evensos und – nur mit Freigabe – Rausgegangen.
+// Die Jugendagentur war im Test von hier aus nicht erreichbar (Timeout). Deshalb ist sie nur
+// nach ausdrücklichem Einschalten aktiv: OS_SCENE_JUGENDAGENTUR=1. Ticketmaster nur mit Key.
+const EXTRA = [
+  ...(process.env.OS_SCENE_JUGENDAGENTUR === '1' ? [{ ...JUGENDAGENTUR, ttl: 6 * H, load: jugendagentur }] : []),
+  ...((process.env.OS_TICKETMASTER_KEY ?? '').trim() ? [{ ...TICKETMASTER, ttl: 3 * H, load: ticketmaster }] : []),
+];
 const Q = [
+  ...EXTRA,
+  ...venueSources(termin),
+  ferienprogrammSource(termin),
   { ...THEATERHAUS, ttl: 6 * H, load: theaterhaus },
   { ...WIZEMANN, ttl: 6 * H, load: wizemann },
   { ...BIX, ttl: 6 * H, load: bix },
@@ -449,10 +682,17 @@ const Q = [
   { ...STUVUS, ttl: 6 * H, load: stuvus },
 ];
 
+function activeSources() {
+  const gancioOn = Boolean(GANCIO_BASE() || (process.env.OS_GANCIO_FILE ?? '').trim());
+  return gancioOn
+    ? [{ ...GANCIO, url: GANCIO_BASE() || GANCIO.url, ttl: 15 * 60_000, load: gancio }, ...Q]
+    : Q;
+}
+
 /** Alle Szene-Quellen laden; wartet höchstens waitMs, danach gilt der letzte gespeicherte Stand. */
 export async function szeneQuellen(waitMs = 8000) {
   const deadline = Date.now() + waitMs;
-  const runs = Q.map((q) => ({ q, p: quelle(q.id, q.ttl, q.load) }));
+  const runs = activeSources().map((q) => ({ q, p: quelle(q.id, q.ttl, q.load) }));
   const out = [];
   for (const { q, p } of runs) {
     const r = await bisZu(p, Math.max(0, deadline - Date.now()), letzterStand(q.id));
@@ -518,15 +758,25 @@ function matchScene(a, b, grenz) {
 }
 
 /** Ergänzt einen vorhandenen Termin feldweise um einen Treffer aus einer Szene-Quelle (6.5.5 und 6.5.6). */
+const VERIFIED_RANK = { venue: 3, official: 3, ticket: 2, register: 2, aggregator: 1 };
 function mergeInto(hit, e) {
   for (const s of e.sources) if (!hit.sources.some((x) => x.name === s.name)) hit.sources.push(s);
+  if ((VERIFIED_RANK[e.verified] ?? 0) > (VERIFIED_RANK[hit.verified] ?? 0)) {
+    hit.verified = e.verified;
+    if (e.url) hit.url = e.url; // stärkere Quelle liefert den direkteren Veranstalterlink
+  }
+  if (e.lastSeen && (!hit.lastSeen || e.lastSeen > hit.lastSeen)) hit.lastSeen = e.lastSeen;
   hit.scene = [...new Set([...(hit.scene ?? []).filter((s) => s !== 'sonstiges'), ...e.scene.filter((s) => s !== 'sonstiges')])];
   if (!hit.scene.length) hit.scene = ['sonstiges'];
-  if (e.group === 'ticket') {
-    if (!hit.ticketUrl) hit.ticketUrl = e.ticketUrl ?? e.url;
+  if (e.group === 'register') {
+    if (e.license) hit.license = e.license;
+    if (e.ticketUrl && !hit.ticketUrl) hit.ticketUrl = e.ticketUrl;
     if (e.priceMin != null) { hit.priceMin = e.priceMin; hit.price = e.price; }
+  } else if (e.group === 'ticket') {
+    if (!hit.ticketUrl) hit.ticketUrl = e.ticketUrl ?? e.url;
+    if (e.priceMin != null && hit.group !== 'register') { hit.priceMin = e.priceMin; hit.price = e.price; }
   } else if (e.priceMin != null && hit.priceMin == null) { hit.priceMin = e.priceMin; hit.price = hit.price ?? e.price; }
-  if (e.group === 'haus') { hit.genre = hit.genre ?? e.genre; if (e.venue && e.venueId === hit.venueId && e.venue.length > (hit.venue ?? '').length) hit.venue = e.venue; }
+  if (e.group === 'haus' || e.group === 'register') { hit.genre = hit.genre ?? e.genre; if (e.venue && e.venueId === hit.venueId && e.venue.length > (hit.venue ?? '').length) hit.venue = e.venue; }
   if (!hit.genre && e.genre) hit.genre = e.genre;
   if (!hit.venueId && e.venueId) Object.assign(hit, { venueId: e.venueId, district: hit.district ?? e.district });
   if (e.lat != null && !e.approx && (hit.lat == null || hit.approx)) Object.assign(hit, { lat: e.lat, lon: e.lon, approx: undefined });
@@ -549,6 +799,7 @@ function kulturTermin(c) {
   const all = `${c.title} ${c.category ?? ''}`;
   e.scene = /LKA Longhorn/.test(names) ? ['konzert'] : RE_FLOH.test(all) ? ['flohmarkt'] : vid && venueById[vid] && ['wizemann', 'bix', 'lehmann', 'proton', 'clubcann', 'clubzentral'].includes(vid) ? ['konzert'] : ['sonstiges'];
   e.group = 'kultur';
+  e.verified = 'official';
   return e;
 }
 
@@ -635,6 +886,8 @@ export async function wasGeht({ tag, span, szene, jung, free, maxPrice, details 
   return {
     date, days, span: mode,
     events: shown, total: all.length, counts, merged,
+    collectives: collectivesFromEvents(shown),
+    collectiveCount: shown.filter((e) => e.collective).length,
     // Kennzahlen des Abgleichs (6.5.7): zusammengeführte Paare je Quelle
     abgleich: Object.entries(paare.reduce((m, p) => { const k = `${p.quelle} → ${p.mit}`; m[k] = (m[k] ?? 0) + 1; return m; }, {})).map(([paar, anzahl]) => ({ paar, anzahl })),
     pending: kultur.reduce((s, k) => s + k.pending, 0),

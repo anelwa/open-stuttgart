@@ -1,8 +1,11 @@
 import { useMemo } from 'react';
 import { useData } from '../../lib/data';
-import { fmtNum, occupancy, ago } from '../../lib/format';
-import { LayerRow, Section, Source, ErrorNote, LiveDot } from '../../components/ui';
+import { usePolling } from '../../lib/api';
+import { fmtNum, occupancy, ago, fmtDec } from '../../lib/format';
+import { LayerRow, Section, Source, ErrorNote, LiveDot, Disclosure } from '../../components/ui';
 import { useStops } from '../../lib/stops';
+import { distM, nearestStops } from '../../lib/geo';
+import { LineBadge } from '../../components/LineBadge';
 import type { ModuleProps } from '../types';
 import { Anschluss } from '../../components/Anschluss';
 import { BahnHbf } from '../../components/BahnHbf';
@@ -10,22 +13,46 @@ import { PuenktlichkeitSection } from '../../components/Puenktlichkeit';
 
 const QUICK = ['Hauptbahnhof', 'Charlottenplatz', 'Stadtmitte', 'Schlossplatz', 'Bad Cannstatt Wilhelmsplatz', 'Vaihingen', 'Marienplatz', 'Feuersee'];
 
-export function MobilityPanel({ visible, toggle, select, flyTo, setLayer }: ModuleProps) {
-  const { parking, sharing, roadworks, traffic } = useData();
+type PrSite = { id: string | number; name: string; address: string; lat: number; lon: number; capacity: number | null; free: number | null; live: boolean; fee: string | null; restrictions: { type: string; capacity: number }[] };
+type BikeSite = { id: string | number; name: string; address: string; lat: number; lon: number; capacity: number | null; free: number | null; live: boolean; bookableUrl: string | null };
+type RadStation = { id: string; name: string; lat: number | null; lon: number | null; latestDate: string | null; latestDayCount: number | null; latestHourCount: number | null; total7d: number; temperatur: number | null; wetter: string | null };
+
+export function MobilityPanel({ visible, toggle, select, flyTo, setLayer, focus, center }: ModuleProps) {
+  // Je Anliegen sind nur die passenden Abschnitte offen. Ohne Fokus bleibt alles offen —
+  // der Zustand, den man über „Alle Themen“ erreicht.
+  const FOCUS_SECTIONS: Record<string, string[]> = {
+    parken: ['stop', 'parken', 'pr', 'rad'],
+    verkehr: ['stop', 'unfall', 'verkehr', 'bahn', 'puenktlich'],
+  };
+  const open = (k: string) => {
+    const list = focus ? FOCUS_SECTIONS[focus] : null;
+    return !list ? true : list.includes(k);
+  };
+  const { parking, sharing, roadworks, traffic, weather, unfaelle } = useData();
   const stops = useStops();
+  const pr = usePolling<{ sites: PrSite[] }>('/api/parkandride', 120_000);
+  const br = usePolling<{ sites: BikeSite[]; totalSites: number }>('/api/bikeandride', 120_000);
+  const rad = usePolling<{ stations: RadStation[]; latestDate: string | null; totalLatestDay: number }>('/api/radzaehler', 1800_000);
 
   const park = useMemo(() => {
     const sites = parking.data?.sites ?? [];
     const live = sites.filter((s) => s.free != null);
+    const high85 = live.filter((s) => s.capacity && s.free != null && (1 - s.free / s.capacity) >= 0.85);
+    const isPR = /^p\+r|park\s*\+?\s*ride/i;
+    const nearby = live
+      .filter((s) => !isPR.test(s.name))
+      .map((s) => ({ ...s, dist: distM(center, [s.lon, s.lat]) }))
+      .sort((a, b) => a.dist - b.dist);
     return {
       free: live.reduce((a, s) => a + (s.free ?? 0), 0),
       cap: live.reduce((a, s) => a + (s.capacity ?? 0), 0),
       live: live.length,
       total: sites.length,
-      top: [...live].sort((a, b) => (b.free ?? 0) - (a.free ?? 0)).slice(0, 5),
+      top: nearby.slice(0, 5),
       full: live.filter((s) => occupancy(s.free, s.capacity) === 'full').length,
+      high85: high85.length,
     };
-  }, [parking.data]);
+  }, [parking.data, center]);
 
   const share = useMemo(() => {
     const items = sharing.data?.items ?? [];
@@ -42,9 +69,32 @@ export function MobilityPanel({ visible, toggle, select, flyTo, setLayer }: Modu
 
   const quick = QUICK.map((n) => stops.find((s) => s.properties.name === n)).filter(Boolean);
 
+  // Park+Ride mit nächster S-/U-Bahn-Haltestelle verknüpfen (Vernetzung zu Parkhäusern & Baustellen)
+  const prRecommended = useMemo(() => {
+    const list = pr.data?.sites ?? [];
+    const stgtEdge = list.filter((s) => /stuttgart|vaihingen|sommerrain|weilimdorf|obertürkheim|rohr|zuffenhausen|österfeld|degerloch|plieningen|bad cannstatt|fellbach|korntal|leinfelden/i.test(`${s.name} ${s.address}`));
+    const pool = stgtEdge.length >= 4 ? stgtEdge : list;
+    return pool.slice(0, 6).map((s) => {
+      const nearStop = nearestStops(stops, [s.lon, s.lat], 1, 600)[0]?.stop ?? null;
+      return { site: s, stop: nearStop };
+    });
+  }, [pr.data, stops]);
+
+  const brStats = useMemo(() => {
+    const list = br.data?.sites ?? [];
+    const live = list.filter((s) => s.free != null && s.capacity != null);
+    return {
+      total: list.length,
+      liveCount: live.length,
+      free: live.reduce((sum, s) => sum + (s.free ?? 0), 0),
+      cap: live.reduce((sum, s) => sum + (s.capacity ?? 0), 0),
+      top: live.filter((s) => (s.free ?? 0) > 0).slice(0, 4),
+    };
+  }, [br.data]);
+
   return (
-    <div className="module">
-      <Section title="Haltestelle wählen" explain="abfahrten" aside="Echtzeit-Abfahrten">
+    <div className="module mobility" data-focus={focus ?? 'alle'}>
+      <Section className="sec-stop" title="Haltestelle wählen" explain="abfahrten" aside="Echtzeit-Abfahrten" collapsible defaultOpen={open('stop') && focus !== 'parken' && focus !== 'verkehr'}>
         <div className="chips">
           {quick.map((s) => (
             <button key={s!.properties.id} type="button" className="chip" onClick={() => {
@@ -58,7 +108,7 @@ export function MobilityPanel({ visible, toggle, select, flyTo, setLayer }: Modu
         </div>
       </Section>
 
-      <Section title="Auf der Karte">
+      <Section className="sec-map" title="Auf der Karte" collapsible defaultOpen={false}>
         <div className="layer-list">
           <LayerRow icon="train" tone="ink" title="Stadtbahn und S-Bahn" on={visible.network} onToggle={() => toggle('network')}
             meta="Liniennetz nach VVS-Fahrplan" />
@@ -78,10 +128,46 @@ export function MobilityPanel({ visible, toggle, select, flyTo, setLayer }: Modu
             meta={traffic.error && !traffic.data ? 'nicht erreichbar' : <><LiveDot stale={!!traffic.error} /> {meld.filter((t) => t.typ === 'Unfall').length} Unfälle · {meld.filter((t) => t.typ === 'Stau').length} Staus · {meld.filter((t) => t.typ === 'Sperrung').length} Sperrungen</>} />
           <LayerRow icon="route" tone="green" title="Hauptradrouten" on={visible.bike} onToggle={() => toggle('bike')}
             meta="Radnetz der Stadt Stuttgart" />
+          <LayerRow icon="warn" tone="amber" title="Unfallorte mit Personenschaden" on={visible.unfall} onToggle={() => toggle('unfall')}
+            loading={unfaelle.loading && !unfaelle.data}
+            meta={unfaelle.error && !unfaelle.data ? 'nicht erreichbar' : unfaelle.data ? `${fmtNum(unfaelle.data.stats.gesamt)} Unfälle ${unfaelle.data.stand}, davon ${fmtNum(unfaelle.data.stats.rad)} mit Rad` : 'wird geladen'} />
         </div>
       </Section>
 
-      <Section title="Verkehrsmeldungen" explain="verkehr" aside={traffic.updatedAt ? ago(traffic.updatedAt) : undefined}>
+      {unfaelle.data && (
+        <Section className="sec-unfall" title={`Unfallatlas ${unfaelle.data.stand}`} explain="unfall" aside={`${fmtNum(unfaelle.data.stats.gesamt)} Unfälle`} collapsible defaultOpen={open('unfall')}>
+          <p className="small">
+            Punktgenaue Unfälle mit Personenschaden im Stuttgarter Stadtgebiet. {fmtNum(unfaelle.data.stats.tote)} Menschen wurden getötet,
+            {' '}{fmtNum(unfaelle.data.stats.schwer)} schwer und {fmtNum(unfaelle.data.stats.leicht)} leicht verletzt.
+            {' '}Beteiligt: {fmtNum(unfaelle.data.stats.rad)} Radfahrende, {fmtNum(unfaelle.data.stats.fuss)} zu Fuß Gehende, {fmtNum(unfaelle.data.stats.pkw)} Pkw.
+          </p>
+          <div className="chips filter-chips">
+            <button type="button" className={`chip ${visible.unfall ? 'on' : ''}`} aria-pressed={visible.unfall} onClick={() => toggle('unfall')}>
+              {visible.unfall ? 'Unfallorte ausblenden' : 'Unfallorte einblenden'}
+            </button>
+            <button type="button" className="chip" onClick={() => { setLayer('unfall', true); flyTo([9.18, 48.779], 12); }}>Alle auf der Karte</button>
+          </div>
+          {unfaelle.data.schwerpunkte.length > 0 && (
+            <>
+              <h4 className="sub-head">Räumliche Schwerpunkte</h4>
+              <ul className="rank-list">
+                {unfaelle.data.schwerpunkte.slice(0, 5).map((s, i) => (
+                  <li key={`${s.lat},${s.lon},${i}`}>
+                    <button type="button" onClick={() => { setLayer('unfall', true); flyTo([s.lon, s.lat], 15.5); }}>
+                      <span className="rank-name">{s.anzahl} Unfälle auf engem Raum</span>
+                      <span className="rank-val">{s.rad ? `${s.rad}× Rad` : ''}{s.fuss ? `${s.rad ? ' · ' : ''}${s.fuss}× Fuß` : ''}{s.tote ? ` · ${s.tote} tödlich` : ''}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <p className="muted small">{unfaelle.data.hinweis}</p>
+          <Source>{unfaelle.data.source} · <a href={unfaelle.data.url} target="_blank" rel="noreferrer">Unfallatlas öffnen</a></Source>
+        </Section>
+      )}
+
+      <Section className="sec-verkehr" title="Verkehrsmeldungen" explain="verkehr" aside={traffic.updatedAt ? ago(traffic.updatedAt) : undefined} collapsible defaultOpen={open('verkehr')}>
         {traffic.error && !traffic.data && <ErrorNote text="Verkehrsmeldungen gerade nicht erreichbar." onRetry={traffic.reload} />}
         {traffic.data && !akut.length && <p className="muted small">Derzeit keine Unfälle, Staus oder Sperrungen gemeldet. {meld.length ? `${meld.length} Meldungen zu Baustellen und Sonstigem.` : ''}</p>}
         <ul className="traffic-list">
@@ -96,14 +182,14 @@ export function MobilityPanel({ visible, toggle, select, flyTo, setLayer }: Modu
           ))}
         </ul>
         {akut.length > 6 && <p className="muted small">Weitere {akut.length - 6} Meldungen auf der Karte.</p>}
-        <p className="muted small">Gemeldete Ereignisse. Eine Verkehrslage mit Geschwindigkeiten für Stadtstraßen ist offen nicht verfügbar.</p>
+        <p className="muted small">Gemeldete Ereignisse inkl. Baustellen-Linien und Sperrungen der Autobahn GmbH (A8, A81, A831).</p>
       </Section>
 
-      <PuenktlichkeitSection />
-      <Anschluss />
-      <BahnHbf />
+      <PuenktlichkeitSection className="sec-puenktlich" />
+      <Anschluss className="sec-anschluss" />
+      <BahnHbf className="sec-bahn" />
 
-      <Section title="Parkhäuser, aktuelle Belegung" explain="parken" aside={parking.updatedAt ? ago(parking.updatedAt) : undefined}>
+      <Section className="sec-parken" title="Parkhäuser in der Nähe" explain="parken" aside={parking.updatedAt ? `${ago(parking.updatedAt)} · nach Entfernung` : 'nach Entfernung'} collapsible defaultOpen={open('parken')}>
         {parking.error && !parking.data && <ErrorNote text="Parkdaten gerade nicht erreichbar." onRetry={parking.reload} />}
         {park.cap > 0 && (
           <div className="occ-summary">
@@ -125,7 +211,7 @@ export function MobilityPanel({ visible, toggle, select, flyTo, setLayer }: Modu
                 <button type="button" onClick={() => { select({ type: 'parking', id: s.id }); flyTo([s.lon, s.lat], 15.5); }}>
                   <span className={`occ-dot occ-${occ}`} aria-hidden />
                   <span className="rank-name">{s.name}</span>
-                  <span className="rank-val"><strong>{s.free}</strong> frei</span>
+                  <span className="rank-val"><strong>{s.free}</strong> frei <span className="rank-dist">{s.dist < 1000 ? `${Math.round(s.dist / 10) * 10} m` : `${(s.dist / 1000).toLocaleString('de-DE', { maximumFractionDigits: 1 })} km`}</span></span>
                 </button>
               </li>
             );
@@ -133,11 +219,80 @@ export function MobilityPanel({ visible, toggle, select, flyTo, setLayer }: Modu
         </ul>
       </Section>
 
-      <Source>
-        Fahrplan: VVS (CC BY 4.0). Abfahrten: EFA-BW/NVBW (dl-de/by-2-0). Parken: Stadt Stuttgart, PBW über MobiData BW.
-        Sharing: Anbieter über MobiData BW. Baustellen und Radrouten: Landeshauptstadt Stuttgart (Open Data).
-        Verkehrsmeldungen: Landesmeldestelle Baden-Württemberg und Integrierte Verkehrsleitzentrale Stuttgart über MobiData BW (dl-de/by-2-0); Autobahn GmbH des Bundes.
+      {prRecommended.length > 0 && (
+        <Section className="sec-pr" title="Park+Ride (P+R) am Stadtrand" explain="parkandride" aside={pr.data ? `${pr.data.sites.length} Anlagen in der Region` : undefined} collapsible defaultOpen={open('pr')}>
+          <p className="muted small">
+            {park.high85 > 0 || active > 10
+              ? `In der Innenstadt sind ${park.high85 ? `${park.high85} Parkhäuser zu über 85 % ausgelastet` : ''}${park.high85 && active > 10 ? ' und ' : ''}${active > 10 ? `${active} Baustellen im Bau` : ''}. P+R-Anlagen mit direktem S- und Stadtbahn-Anschluss:`
+              : 'P+R-Anlagen im VVS-Gebiet mit direktem Übergang zu S-Bahn und Stadtbahn:'}
+          </p>
+          <ul className="near-list">
+            {prRecommended.map(({ site, stop }) => (
+              <li key={site.id}>
+                <button type="button" onClick={() => {
+                  if (stop) {
+                    const c = stop.geometry.coordinates as [number, number];
+                    select({ type: 'stop', id: stop.properties.id, name: stop.properties.name, lngLat: c, lines: stop.properties.lines });
+                  }
+                  flyTo([site.lon, site.lat], 15.5);
+                }}>
+                  <span className="near-main">
+                    <span className="near-name">{site.name}</span>
+                    {stop && (
+                      <span className="near-lines">
+                        {stop.properties.lines.slice(0, 6).map((l) => <LineBadge key={l} line={l} size="sm" />)}
+                      </span>
+                    )}
+                    <span className="near-sub">
+                      {site.free != null && site.capacity != null
+                        ? `${site.free} von ${site.capacity} frei (Echtzeit)`
+                        : site.capacity != null ? `${site.capacity} Stellplätze` : 'P+R-Anlage'}
+                      {site.fee ? ` · ${site.fee}` : ''}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {(brStats.total > 0 || (rad.data?.stations?.length ?? 0) > 0) && (
+        <Section className="sec-rad" title="Radverkehr: Zählstellen und Bike+Ride" explain="radzaehler" aside={rad.data?.latestDate ? `Stand ${new Date(`${rad.data.latestDate}T12:00:00`).toLocaleDateString('de-DE')}` : undefined} collapsible defaultOpen={open('rad')}>
+          {brStats.total > 0 && (
+            <p className="small">
+              <strong>Bike+Ride-Fahrradboxen:</strong> {brStats.free} von {brStats.cap} Boxen an {brStats.liveCount} Echtzeit-Anlagen frei ({brStats.total} Anlagen im VVS-Gebiet). An Haltestellen mit Bike+Ride erscheint die Belegung direkt im Abfahrtsmonitor.
+            </p>
+          )}
+          {rad.data && rad.data.stations.length > 0 && (
+            <>
+              <p className="muted small">
+                Städtische Eco-Counter-Querschnitte: {rad.data.totalLatestDay > 0 ? <><strong>{fmtNum(rad.data.totalLatestDay)}</strong> gezählte Fahrten am letzten Messtag</> : `${rad.data.stations.length} aktive Zählstellen`}
+                {weather.data ? ` (aktuell ${fmtDec(weather.data.temperature)} °C, ${Math.round(weather.data.precipitation ?? 0)} mm Niederschlag)` : ''}.
+              </p>
+              <ul className="rank-list">
+                {rad.data.stations.slice(0, 6).map((st) => (
+                  <li key={st.id}>
+                    <button type="button" onClick={() => { setLayer('bike', true); if (st.lon != null && st.lat != null) flyTo([st.lon, st.lat], 15); }}>
+                      <span className="rank-name">{st.name}</span>
+                      <span className="rank-val">
+                        {st.latestDayCount != null ? <><strong>{fmtNum(st.latestDayCount)}</strong> / Tag</> : <><strong>{fmtNum(st.total7d)}</strong> (7 Tage)</>}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </Section>
+      )}
+
+      <Source disclosure>
+        Fahrplan: VVS (CC BY 4.0). Abfahrten: EFA-BW/NVBW (dl-de/by-2-0). Parken, P+R und Bike+Ride: Stadt Stuttgart, PBW, VRS, VVS, Kienzler über MobiData BW (ParkAPI).
+        Fahrradzählstellen: Landeshauptstadt Stuttgart über MobiData BW (Eco-Counter, CC BY 4.0). Sharing: Anbieter über MobiData BW.
+        Baustellen und Radrouten: Landeshauptstadt Stuttgart (Open Data). Verkehrsmeldungen: LMS BW / IVLZ Stuttgart über MobiData BW (dl-de/by-2-0); Autobahn GmbH des Bundes.
       </Source>
     </div>
   );
 }
+

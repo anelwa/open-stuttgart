@@ -10,7 +10,7 @@ export const aerialTiles = (year: string) =>
 
 export const BLANK_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
-export type OverlayKey = 'network' | 'stops' | 'parking' | 'sharing' | 'roadworks' | 'bike' | 'air' | 'water' | 'events' | 'places' | 'sun' | 'radar' | 'aerial' | 'nearby' | 'live' | 'route' | 'vehicles' | 'traffic';
+export type OverlayKey = 'network' | 'stops' | 'parking' | 'sharing' | 'roadworks' | 'bike' | 'air' | 'water' | 'events' | 'places' | 'sun' | 'radar' | 'aerial' | 'nearby' | 'live' | 'route' | 'vehicles' | 'traffic' | 'warnung' | 'flug' | 'kaltluft' | 'unfall' | 'hike';
 
 export const OVERLAY_LAYERS: Record<OverlayKey, string[]> = {
   bike: ['bike-routes'],
@@ -28,9 +28,14 @@ export const OVERLAY_LAYERS: Record<OverlayKey, string[]> = {
   aerial: ['aerial'],
   nearby: ['nearby-dot', 'nearby-label'],
   live: ['live-dot', 'live-label'],
-  route: ['route-casing', 'route-line', 'route-walk', 'route-end'],
+  route: ['route-glow', 'route-casing', 'route-line', 'route-walk', 'route-end', 'route-end-label'],
   vehicles: ['vehicles-path', 'vehicles-dot', 'vehicles-label'],
   traffic: ['traffic-line', 'traffic-dot'],
+  warnung: ['warnung-fill', 'warnung-line', 'warnung-label'],
+  flug: ['flug-dot', 'flug-label'],
+  kaltluft: ['kaltluft-line'],
+  unfall: ['unfall-dot'],
+  hike: ['hike-line', 'hike-label'],
 };
 
 export const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -70,6 +75,11 @@ export function addOverlays(map: MlMap, theme: Theme, visible: Record<OverlayKey
   map.addSource('vehicles', { type: 'geojson', data: EMPTY });
   map.addSource('vehicle-paths', { type: 'geojson', data: EMPTY });
   map.addSource('traffic', { type: 'geojson', data: EMPTY });
+  map.addSource('warnung', { type: 'geojson', data: EMPTY });
+  map.addSource('flug', { type: 'geojson', data: EMPTY });
+  map.addSource('kaltluft', { type: 'geojson', data: EMPTY });
+  map.addSource('unfall', { type: 'geojson', data: EMPTY });
+  map.addSource('hike', { type: 'geojson', data: EMPTY });
   map.addSource('selected', { type: 'geojson', data: EMPTY });
 
   const vis = (k: OverlayKey) => ({ visibility: visible[k] ? 'visible' : 'none' }) as const;
@@ -324,26 +334,60 @@ export function addOverlays(map: MlMap, theme: Theme, visible: Record<OverlayKey
       'text-variable-anchor': ['top', 'left', 'right'], 'text-radial-offset': 0.9, 'text-optional': true },
     paint: { 'text-color': ink, 'text-halo-color': dark ? '#1b1b1f' : '#ffffff', 'text-halo-width': 1.4 },
   });
-  // Gewählte Verbindung: Fußwege gestrichelt, Fahrten in Linienfarbe
+  // Gewählte Verbindung: breiter Schein, Fassung und kräftige Linie in Linienfarbe.
+  // Fußwege werden hell bzw. dunkel gestrichelt und bleiben so auch auf Luftbildern sichtbar.
+  map.addLayer({
+    id: 'route-glow', type: 'line', source: 'route', filter: ['==', ['geometry-type'], 'LineString'],
+    layout: { ...vis('route'), 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': ['get', 'color'],
+      'line-width': zl([[9, 10], [13, 18], [16, 24]]),
+      'line-opacity': dark ? 0.32 : 0.2,
+      'line-blur': 5,
+    },
+  });
   map.addLayer({
     id: 'route-casing', type: 'line', source: 'route', filter: ['==', ['geometry-type'], 'LineString'],
     layout: { ...vis('route'), 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': dark ? '#0C0C0C' : '#ffffff', 'line-width': zl([[10, 5], [15, 10]]), 'line-opacity': 0.9 },
+    paint: { 'line-color': card, 'line-width': zl([[9, 6], [13, 11], [16, 15]]), 'line-opacity': 0.95 },
   });
   map.addLayer({
     id: 'route-line', type: 'line', source: 'route', filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!', ['get', 'walk']]],
     layout: { ...vis('route'), 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': ['get', 'color'], 'line-width': zl([[10, 3], [15, 6]]) },
+    paint: { 'line-color': ['get', 'color'], 'line-width': zl([[9, 3.2], [13, 6], [16, 8.5]]) },
   });
   map.addLayer({
     id: 'route-walk', type: 'line', source: 'route', filter: ['all', ['==', ['geometry-type'], 'LineString'], ['get', 'walk']],
     layout: { ...vis('route'), 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': ['get', 'color'], 'line-width': zl([[10, 2.5], [15, 4.5]]), 'line-dasharray': [0.4, 1.6] },
+    paint: {
+      'line-color': dark ? '#ECEAE4' : '#26262C',
+      'line-width': zl([[9, 2.6], [13, 4.2], [16, 5.6]]),
+      'line-dasharray': [0.55, 1.6],
+      'line-opacity': 0.95,
+    },
   });
   map.addLayer({
     id: 'route-end', type: 'circle', source: 'route', filter: ['==', ['geometry-type'], 'Point'],
     layout: vis('route'),
-    paint: { 'circle-radius': 7, 'circle-color': ['get', 'color'], 'circle-stroke-color': dark ? '#0C0C0C' : '#ffffff', 'circle-stroke-width': 3 },
+    paint: {
+      'circle-radius': zl([[9, 5], [13, 7], [16, 9]]),
+      'circle-color': ['case', ['==', ['get', 'role'], 'start'], ink, '#FFB300'],
+      'circle-stroke-color': card,
+      'circle-stroke-width': 2.5,
+    },
+  });
+  map.addLayer({
+    id: 'route-end-label', type: 'symbol', source: 'route', filter: ['all', ['==', ['geometry-type'], 'Point'], ['has', 'label']],
+    layout: {
+      ...vis('route'), 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'],
+      'text-size': zl([[9, 10], [13, 11.5]]), 'text-anchor': 'bottom', 'text-offset': [0, -0.9],
+      'text-allow-overlap': true,
+    },
+    paint: {
+      'text-color': ['case', ['==', ['get', 'role'], 'end'], dark ? '#FFD166' : '#8A5A00', ink],
+      'text-halo-color': card,
+      'text-halo-width': 2.5,
+    },
   });
   // Amtliche Verkehrsmeldungen: Abschnitt als Linie, Meldung als Punkt, Farbe nach Art
   const trafficColor = ['match', ['get', 'typ'], 'Unfall', '#C62828', 'Stau', '#E65100', 'Sperrung', ink, 'Baustelle', '#C28800', '#8A8A90'] as ExpressionSpecification;
@@ -414,6 +458,92 @@ export function addOverlays(map: MlMap, theme: Theme, visible: Record<OverlayKey
     paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 2 },
   });
 
+  // Amtliche Warnungen (BBK NINA / MoWaS): betroffenes Gebiet als Fläche mit Kennzeichnung
+  const warnColor = ['match', ['get', 'severity'], 'Extreme', '#B71C1C', 'Severe', '#C62828', 'Moderate', '#E65100', '#C28800'] as ExpressionSpecification;
+  map.addLayer({
+    id: 'warnung-fill', type: 'fill', source: 'warnung', filter: ['==', ['geometry-type'], 'Polygon'],
+    layout: vis('warnung'),
+    paint: { 'fill-color': warnColor, 'fill-opacity': 0.22 },
+  });
+  map.addLayer({
+    id: 'warnung-line', type: 'line', source: 'warnung', filter: ['==', ['geometry-type'], 'Polygon'],
+    layout: { ...vis('warnung'), 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': warnColor, 'line-width': zl([[9, 2], [14, 4]]), 'line-dasharray': [2, 1.5] },
+  });
+  map.addLayer({
+    id: 'warnung-label', type: 'symbol', source: 'warnung', filter: ['==', ['geometry-type'], 'Point'],
+    layout: {
+      ...vis('warnung'), 'text-field': ['get', 'title'], 'text-font': ['Noto Sans Bold'], 'text-size': 11.5,
+      'text-max-width': 9, 'text-variable-anchor': ['top', 'left', 'right'], 'text-radial-offset': 1.1, 'text-optional': true,
+    },
+    paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 2 },
+  });
+
+  // Luftfahrzeuge im Umkreis (ADS-B): Hubschrauber gelb, tieffliegende Flugzeuge rot
+  map.addLayer({
+    id: 'flug-dot', type: 'circle', source: 'flug', minzoom: 9, layout: vis('flug'),
+    paint: {
+      'circle-radius': zl([[9, 3], [13, 5], [16, 8]]),
+      'circle-color': ['case', ['get', 'heli'], '#C28800', ['get', 'niedrig'], '#C62828', '#2B59C3'],
+      'circle-stroke-color': card, 'circle-stroke-width': 1.8,
+    },
+  });
+  map.addLayer({
+    id: 'flug-label', type: 'symbol', source: 'flug', minzoom: 11.5, layout: {
+      ...vis('flug'),
+      'text-field': ['concat', ['coalesce', ['get', 'callsign'], ['get', 'reg'], '?'], ' · ', ['to-string', ['get', 'alt']], ' ft'],
+      'text-font': ['Noto Sans Bold'], 'text-size': 10.5,
+      'text-variable-anchor': ['top', 'left', 'right'], 'text-radial-offset': 1, 'text-optional': true,
+    },
+    paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 1.8 },
+  });
+
+  // Kaltluftabfluss im Talkessel (Klimaatlas): Strömungspfeile nach Richtung und Geschwindigkeit
+  map.addLayer({
+    id: 'kaltluft-line', type: 'line', source: 'kaltluft', minzoom: 10,
+    layout: { ...vis('kaltluft'), 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': ['interpolate', ['linear'], ['get', 'ge'], 0.1, '#8FD3E8', 0.6, '#2B7FBF', 1.5, '#0F3D6B'],
+      'line-width': zl([[10, 1], [14, 2.6]]),
+      'line-opacity': zl([[10, 0.5], [13, 0.85]]),
+    },
+  });
+
+  // Ausgeschilderte Wander-, Weinwander- und Downhillwege (Geoserver der Stadt)
+  map.addLayer({
+    id: 'hike-line', type: 'line', source: 'hike', minzoom: 9.5,
+    layout: { ...vis('hike'), 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': ['coalesce', ['get', 'farbe'], '#8E2F4A'],
+      'line-width': zl([[10, 1.4], [14, 3], [16, 5]]),
+      'line-opacity': 0.9,
+      'line-dasharray': [2, 1.2],
+    },
+  }, 'stops-rail');
+  map.addLayer({
+    id: 'hike-label', type: 'symbol', source: 'hike', minzoom: 12.5, layout: {
+      ...vis('hike'), 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Bold'], 'text-size': 10.5,
+      'symbol-placement': 'line', 'text-max-angle': 30, 'text-optional': true,
+    },
+    paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 1.8 },
+  }, 'stops-rail');
+
+  // Unfallatlas: Unfälle mit Personenschaden, Farbe nach Schwere, Größe nach Schwere
+  map.addLayer({
+    id: 'unfall-dot', type: 'circle', source: 'unfall', minzoom: 9.5, layout: vis('unfall'),
+    paint: {
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        10, ['case', ['==', ['get', 'schwere'], 1], 5, ['==', ['get', 'schwere'], 2], 3.5, 2.5],
+        16, ['case', ['==', ['get', 'schwere'], 1], 10, ['==', ['get', 'schwere'], 2], 7, 5],
+      ],
+      'circle-color': ['match', ['get', 'schwere'], 1, '#B71C1C', 2, '#EF6C00', '#F9A825'],
+      'circle-opacity': 0.88,
+      'circle-stroke-color': card,
+      'circle-stroke-width': 1,
+    },
+  }, 'stops-rail');
+
   // Auswahl
   map.addLayer({
     id: 'selected-halo', type: 'circle', source: 'selected',
@@ -427,4 +557,4 @@ export function setOverlayVisibility(map: MlMap, key: OverlayKey, on: boolean) {
   }
 }
 
-export const INTERACTIVE_LAYERS = ['stops-rail', 'stops-bus', 'parking-icon', 'parking-dot', 'roadworks', 'share-point', 'share-cluster', 'air-circle', 'water-gauge', 'events-pin', 'places-icon', 'nearby-dot', 'live-dot', 'vehicles-dot', 'traffic-dot', 'traffic-line'];
+export const INTERACTIVE_LAYERS = ['stops-rail', 'stops-bus', 'parking-icon', 'parking-dot', 'roadworks', 'share-point', 'share-cluster', 'air-circle', 'water-gauge', 'events-pin', 'places-icon', 'nearby-dot', 'live-dot', 'vehicles-dot', 'traffic-dot', 'traffic-line', 'flug-dot', 'warnung-label', 'kaltluft-line', 'unfall-dot', 'hike-line'];

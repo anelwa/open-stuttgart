@@ -59,10 +59,10 @@ function item(f, r) {
   };
 }
 
-async function load(f) {
+async function load(f, days = 14) {
   const xml = await fetchText(f.url, { timeout: 30000, headers: { Accept: 'application/rss+xml, application/xml, text/xml' } });
   const seen = new Set();
-  const since = Date.now() - 14 * 86400_000;
+  const since = Date.now() - Math.max(1, Math.min(90, days)) * 86400_000;
   return parseRss(xml)
     .filter((r) => !f.stuttgart || /stuttgart/i.test(`${r.title} ${r.description} ${r.categories.join(' ')}`))
     .map((r) => item(f, r)).filter(Boolean)
@@ -73,9 +73,9 @@ async function load(f) {
 }
 
 /** Meldungen aus Stuttgart, neueste zuerst; Filter nach Thema und Stadtbezirk. */
-export async function news({ topic, district, limit = 60 } = {}) {
+export async function news({ topic, district, limit = 60, days = 14 } = {}) {
   const res = [];
-  for (const f of FEEDS) res.push({ f, r: await quelle(`news-${f.id}`, f.ttl, () => load(f)) });
+  for (const f of FEEDS) res.push({ f, r: await quelle(`news-${f.id}-${days}`, f.ttl, () => load(f, days)) });
   const all = res.flatMap(({ r }) => r.items).sort((a, b) => b.published.localeCompare(a.published));
   const items = all.filter((x) => (!topic || x.topic === topic) && (!district || x.district === district)).slice(0, Math.min(200, Number(limit) || 60));
   return {

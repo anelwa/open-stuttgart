@@ -36,6 +36,23 @@ export function nearestStops(stops: StopFeature[], p: [number, number], n = 3, m
   return unique.slice(0, n);
 }
 
+/** Kürzester Abstand eines Punkts zu einer Linie in Metern (ebene Näherung, für Korridore). */
+export function distToLine(p: [number, number], line: [number, number][]) {
+  const k = 111_320 * Math.cos((p[1] * Math.PI) / 180);
+  const xy = ([x, y]: [number, number]): [number, number] => [(x - p[0]) * k, (y - p[1]) * 111_320];
+  let best = Infinity;
+  for (let i = 1; i < line.length; i += 1) {
+    const [ax, ay] = xy(line[i - 1]);
+    const [bx, by] = xy(line[i]);
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len = dx * dx + dy * dy;
+    const t = len ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len)) : 0;
+    best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
+  }
+  return best;
+}
+
 export function within<T extends { lon?: number; lat?: number }>(items: T[], p: [number, number], maxM: number) {
   return items
     .filter((x) => x.lon != null && x.lat != null)

@@ -13,7 +13,7 @@ import { Icon, weatherIconName } from './Icon';
 import { RouteButtons } from './RouteButtons';
 import { LineBadge } from './LineBadge';
 import { SheetHead } from './Details';
-import { Section, Source } from './ui';
+import { Section, Source, DetailFallback } from './ui';
 
 type Nav = { select: (s: Selection) => void; flyTo: (c: [number, number], z?: number) => void };
 type Close = { onClose: () => void };
@@ -216,7 +216,10 @@ export function PlaceRow({ p, onClick, meta }: { p: Place; onClick: () => void; 
 export function EventDetail({ id, onClose, select, flyTo }: Close & Nav & { id: string }) {
   const { events } = useData();
   const e = events.data?.events.find((x) => x.id === id);
-  if (!e) return null;
+  if (!e) return (
+    <DetailFallback title="Veranstaltung" onClose={onClose} onRetry={events.error ? events.reload : undefined}
+      text={events.loading ? 'Die Veranstaltung wird geladen …' : events.error ? 'Der Veranstaltungskalender ist derzeit nicht abrufbar.' : 'Diese Veranstaltung ist nicht mehr im Kalender enthalten.'} />
+  );
   const lngLat: [number, number] | null = e.lon != null ? [e.lon, e.lat!] : null;
   const group = eventGroup(e);
   const same = (events.data?.events ?? []).filter((x) => x.id !== e.id && x.lat === e.lat && x.lon === e.lon && x.lat != null);
@@ -270,7 +273,10 @@ export function PlaceDetail({ id, onClose, select, flyTo }: Close & Nav & { id: 
   const p = places.data?.places.find((x) => x.id === id);
   const wiki = usePolling<WikiSummary>(p?.wiki ? `/api/wiki?title=${encodeURIComponent(p.wiki)}` : null, 24 * 3600_000);
   const [imgOk, setImgOk] = useState(true);
-  if (!p) return null;
+  if (!p) return (
+    <DetailFallback title="Ort" onClose={onClose} onRetry={places.error ? places.reload : undefined}
+      text={places.loading ? 'Der Ort wird geladen …' : places.error ? 'Die Ortsdaten sind derzeit nicht abrufbar.' : 'Dieser Ort ist nicht mehr in der Liste enthalten.'} />
+  );
   const k = PLACE_KINDS[p.kind];
   const lngLat: [number, number] = [p.lon, p.lat];
   const fs = p.kind === 'aussicht' ? fernsicht(weather.data?.visibility, weather.data?.cloud) : null;

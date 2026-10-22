@@ -8,7 +8,20 @@ export interface KesselHour { t: string; t2: number; t925: number; t850: number;
 export interface Kessel {
   model: { elevation: number | null; hours: KesselHour[] } | null;
   modelError: string | null;
-  profile: { n: number; slope: number | null; bands: { from: number; to: number; n: number; median: number | null }[] } | null;
+  profile: {
+    n: number;
+    scCount?: number;
+    osemInProfile?: number;
+    slope: number | null;
+    bands: { from: number; to: number; n: number; median: number | null }[];
+    opensensemap?: {
+      totalBoxes: number;
+      activeBoxes: number;
+      medianTemp: number | null;
+      medianPm10: number | null;
+      boxes: { id: string; name: string; lat: number | null; lon: number | null; alt: number | null; temp: number | null; pm10: number | null; pm25: number | null; measuredAt: string | null }[];
+    };
+  } | null;
   profileError: string | null;
   source: string;
 }
@@ -69,7 +82,10 @@ export function KesselSection() {
 
       {p && p.n > 0 && (
         <>
-          <h4 className="list-head">Gemessenes Höhenprofil, {p.n} Sensoren</h4>
+          <h4 className="list-head">
+            Gemessenes Höhenprofil, {p.n} Sensoren
+            {p.osemInProfile ? ` (${p.scCount ?? p.n - p.osemInProfile} Sensor.Community, ${p.osemInProfile} openSenseMap)` : ''}
+          </h4>
           <ul className="profile">
             {[...p.bands].reverse().map((b) => (
               <li key={b.from}>
@@ -86,10 +102,17 @@ export function KesselSection() {
               {measuredInv != null && modelInv != null && measuredInv !== modelInv && ' Messung und Modell weichen voneinander ab.'}
             </p>
           )}
+          {p.opensensemap && p.opensensemap.totalBoxes > 0 && (
+            <p className="muted small">
+              openSenseMap im Stadtgebiet: {p.opensensemap.activeBoxes} von {p.opensensemap.totalBoxes} Umweltmessboxen senden aktuell
+              {p.opensensemap.medianTemp != null ? ` · Median Temperatur ${fmtDec(p.opensensemap.medianTemp)} °C` : ''}
+              {p.opensensemap.medianPm10 != null ? ` · Median PM10 ${fmtDec(p.opensensemap.medianPm10)} µg/m³` : ''}.
+            </p>
+          )}
         </>
       )}
       <Source>
-        Modell: Open-Meteo (CC BY 4.0). Messung: Bürgersensoren von Sensor.Community (ODbL), Median je Höhenband,
+        Modell: Open-Meteo (CC BY 4.0). Messung: Bürgersensoren von Sensor.Community (ODbL) und openSenseMap (Universität Münster / ifgi, CC BY 4.0), Median je Höhenband,
         Ausreißer über 3 K entfernt. Einfache Sensoren können durch Sonneneinstrahlung zu hohe Werte liefern.
       </Source>
     </Section>

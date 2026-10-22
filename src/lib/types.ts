@@ -139,7 +139,9 @@ export type Selection =
   | { type: 'water' }
   | { type: 'event'; id: string }
   | { type: 'facility'; item: Facility }
-  | { type: 'place'; id: string };
+  | { type: 'place'; id: string }
+  | { type: 'verwaltung_gebaeude'; id: string; lngLat?: [number, number] }
+  | { type: 'verwaltung_leistung'; url: string; lat?: number; lon?: number };
 
 export interface CultureEvent {
   id: string;
@@ -170,6 +172,10 @@ export interface CultureEvent {
   endEstimated?: boolean;
   /** Quelle nennt keine Uhrzeit */
   noTime?: boolean;
+  /** Wie gut der Termin bestätigt ist: Hausseite vor Register/Ticket vor Aggregator. */
+  verified?: 'venue' | 'official' | 'ticket' | 'register' | 'aggregator' | null;
+  /** Wann die Quelle den Termin zuletzt bestätigt hat. */
+  lastSeen?: string | null;
 }
 
 export interface EventsResponse {
@@ -223,6 +229,8 @@ export interface Facility {
   wheelchair?: string | null;
   /** OpenStreetMap-Objekt, z. B. n29283708 */
   osm?: string | null;
+  /** Erfasste Ernährungsangabe aus OpenStreetMap (diet:vegan / diet:vegetarian) */
+  diet?: 'vegan-only' | 'vegan' | 'vegetarian-only' | 'vegetarian' | null;
 }
 
 export interface TrafficItem {
@@ -238,4 +246,167 @@ export interface TrafficItem {
   zeitverlust?: number | null;
   seit: string | null;
   bis: string | null;
+}
+
+/** Amtliche Warnmeldung (BBK NINA / MoWaS) mit Warngebiets-Polygon und Ausweich-Orten */
+export interface NinaWarnung {
+  id: string;
+  title: string;
+  severity: string;
+  msgType: string;
+  provider: string;
+  sent: string | null;
+  onset: string | null;
+  expires: string | null;
+  description: string | null;
+  instruction: string | null;
+  area: string;
+  /** GeoJSON-Koordinaten [lon, lat] des Warngebiets, sofern die Meldung eines ausweist */
+  polygon: [number, number][] | null;
+  notfall: { treffpunkt: (Facility & { dist: number }) | null; leuchtturm: (Facility & { dist: number }) | null } | null;
+}
+
+/** Luftfahrzeug im Umkreis (adsb.lol) */
+export interface Flugzeug {
+  hex: string;
+  callsign: string | null;
+  reg: string | null;
+  type: string | null;
+  lat: number;
+  lon: number;
+  dist: number;
+  altFt: number | null;
+  gsKt: number | null;
+  track: number | null;
+  rate: number | null;
+  heli: boolean;
+  niedrig: boolean;
+  gesehenVor: number | null;
+}
+
+export interface Wetterballon {
+  id: string;
+  type: string | null;
+  serial: string;
+  lat: number;
+  lon: number;
+  altM: number | null;
+  tempC: number | null;
+  velV: number | null;
+  heading: number | null;
+  distance: number;
+  seen: string | null;
+}
+
+export interface IssPosition {
+  lat: number;
+  lon: number;
+  altKm: number | null;
+  velocityKmh: number | null;
+  visibility: string | null;
+  footprintKm: number | null;
+  distance: number;
+  seen: string | null;
+}
+
+export interface FlugDaten {
+  aircraft: Flugzeug[];
+  hubschrauber: Flugzeug[];
+  anflug: Flugzeug[];
+  sonden?: Wetterballon[];
+  iss?: IssPosition | null;
+  mond?: { phase: number; illumination: number; name: string };
+  edds: {
+    metar: string | null;
+    gemessen: string | null;
+    windDir: number | null;
+    windKt: number | null;
+    betriebsrichtung: '07' | '25' | null;
+    hinweis: string;
+  };
+  count: number;
+  fetchedAt: string;
+  source: string;
+}
+
+/** Punktgenauer Unfall mit Personenschaden aus dem Unfallatlas (dl-de/by-2-0) */
+export interface Unfall {
+  id: string;
+  lat: number;
+  lon: number;
+  jahr: number;
+  monat: number | null;
+  stunde: number | null;
+  wochentag: number | null;
+  /** 1 = getötet, 2 = schwer verletzt, 3 = leicht verletzt */
+  kategorie: 1 | 2 | 3;
+  art: number | null;
+  typ: number | null;
+  licht: number | null;
+  rad: boolean;
+  fuss: boolean;
+  pkw: boolean;
+  krad: boolean;
+  gkfz: boolean;
+  sonstige: boolean;
+  plst: number | null;
+  dist?: number;
+}
+
+export interface UnfallAntwort {
+  stand: string;
+  items: Unfall[];
+  total: number;
+  stats: { gesamt: number; tote: number; schwer: number; leicht: number; rad: number; fuss: number; pkw: number };
+  schwerpunkte: { lat: number; lon: number; anzahl: number; rad: number; fuss: number; tote: number }[];
+  kodierung?: {
+    kategorie?: Record<string, string>;
+    art?: Record<string, string>;
+    licht?: Record<string, string>;
+    wochentag?: Record<string, string>;
+  };
+  hinweis: string;
+  source: string;
+  url: string;
+}
+
+/** Ausgeschilderter Wander-/Rundweg oder Downhill-Strecke aus dem Geoserver der Stadt */
+export interface Wanderweg {
+  id: string;
+  art: 'wein' | 'innenstadt' | 'downhill' | 'osm';
+  artLabel: string;
+  farbe: string;
+  name: string;
+  beschreibung: string | null;
+  laengeKm: number;
+  aufstiegM: number | null;
+  abstiegM: number | null;
+  start: string | null;
+  ziel: string | null;
+  startStop: { id: string; name: string; lines: string[]; dist: number; lat: number; lon: number } | null;
+  endStop: { id: string; name: string; lines: string[]; dist: number; lat: number; lon: number } | null;
+  naechsteHaltestellen: { id: string; name: string; lines: string[]; dist: number; lat: number; lon: number }[];
+  brunnen: number;
+  toiletten: number;
+  geometrie: GeoJSON.Geometry;
+  bbox: [number, number, number, number];
+}
+
+export interface WanderwegeAntwort {
+  items: Wanderweg[];
+  brunnen: number;
+  toiletten: number;
+  fetchedAt: string;
+  source: string;
+  hinweis: string;
+}
+
+/** Kaltluft-Vektor des Klimaatlas (Richtung in Grad, Geschwindigkeit m/s) */
+export interface KaltluftPunkt { lon: number; lat: number; ri: number; ge: number | null; vo: number | null }
+
+export interface KaltluftDaten {
+  punkte: KaltluftPunkt[];
+  anzahl: number;
+  fetchedAt: string;
+  source: string;
 }

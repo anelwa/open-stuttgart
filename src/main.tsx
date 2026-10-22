@@ -6,6 +6,7 @@ import '@fontsource/merriweather-sans/800.css';
 import '@fontsource-variable/dm-sans';
 import './styles/app.css';
 import App from './App';
+import './styles/design-pass.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

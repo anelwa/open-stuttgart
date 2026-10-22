@@ -1,0 +1,33 @@
+{
+  "stand": "2026-10-21",
+  "hinweis": "Kuratierte Stammliste Stuttgarter Kollektive und freier Reihen. Die Liste ist bewusst klein und wird über Gancio-Schlagworte (kollektiv:<slug>) sowie Nennungen in Terminen ergänzt. Keine Personendaten.",
+  "items": [
+    {
+      "id": "romantica-crew",
+      "name": "Romantica Crew",
+      "aliases": ["Romantica Crew"],
+      "szene": "Club",
+      "genre": "House, Techno, Electronica",
+      "url": null,
+      "festerOrtVenueId": "romantica"
+    },
+    {
+      "id": "steilwerk",
+      "name": "Steilwerk",
+      "aliases": ["Steilwerk"],
+      "szene": "Musik",
+      "genre": "Clubkultur, Konzerte",
+      "url": null,
+      "festerOrtVenueId": null
+    },
+    {
+      "id": "clubkollektiv-stuttgart",
+      "name": "Clubkollektiv Stuttgart",
+      "aliases": ["Clubkollektiv Stuttgart", "Clubkollektiv"],
+      "szene": "Netzwerk",
+      "genre": "Nachtökonomie, Clubbetreiber",
+      "url": "https://www.clubkollektiv.de/",
+      "festerOrtVenueId": null
+    }
+  ]
+}

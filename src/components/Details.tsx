@@ -5,12 +5,13 @@ import { AIR_COLOR, AIR_LABEL, ago, fmtDate, fmtNum, fmtTime, occupancy, opening
 import type { Departure, DeparturesResponse, Selection } from '../lib/types';
 import { Icon } from './Icon';
 import { LineBadge } from './LineBadge';
-import { ErrorNote, LiveDot } from './ui';
+import { ErrorNote, LiveDot, DetailFallback } from './ui';
 import { Sparkline } from './Sparkline';
 import { AroundStop, EventDetail, PlaceDetail } from './CultureDetails';
 import { RainLine } from './Rain';
 import { PlanB } from './PlanB';
 import { FacilityDetail } from './FacilityDetail';
+import { GebaeudeDetail, LeistungDetail } from './VerwaltungDetail';
 import { Explain } from '../lib/info';
 import { setVehicleTrips, type VehicleTrip } from '../lib/vehicles';
 
@@ -24,7 +25,7 @@ export function SheetHead({ eyebrow, title, onClose, children, tone = 'ink' }: C
         <span className="eyebrow">{eyebrow}</span>
         <button type="button" className="icon-btn ghost" onClick={onClose} aria-label="Schließen"><Icon name="close" size={20} /></button>
       </div>
-      <h2>{title}</h2>
+      <h2 id="detail-title">{title}</h2>
       {children}
     </header>
   );
@@ -105,6 +106,7 @@ export function StopDetail({ sel, onClose, select, flyTo }: Close & Nav & { sel:
             </li>
           ))}
         </ul>
+        <StopBikeAndRide stopId={sel.id} lngLat={sel.lngLat} />
         <StopVehicles stopId={sel.id} />
         <PlanB deps={deps} here={sel.lngLat} stopName={data?.stop.name ?? sel.name} now={now} select={select} flyTo={flyTo} />
         <LineWorks lines={lines} select={select} flyTo={flyTo} />
@@ -112,6 +114,65 @@ export function StopDetail({ sel, onClose, select, flyTo }: Close & Nav & { sel:
         <p className="source"><Icon name="info" size={14} /> Abfahrten: EFA-BW (NVBW), dl-de/by-2-0. Abfrage höchstens alle 20 Sekunden.</p>
       </div>
     </div>
+  );
+}
+
+type BikeBoxSite = {
+  id: string | number; name: string; address: string; beschreibung?: string | null; purpose?: string;
+  capacity: number | null; free: number | null; live: boolean; bookableUrl: string | null; photoUrl?: string | null;
+  fee: string | null; dist?: number | null;
+};
+
+/** Bike+Ride-Fahrradboxen und Gepäck-/Helmschließfächer an oder unmittelbar neben dieser Haltestelle (MobiData BW ParkAPI v3 / WFS) */
+function StopBikeAndRide({ stopId, lngLat }: { stopId: string; lngLat: [number, number] }) {
+  const [lon, lat] = lngLat;
+  const { data } = usePolling<{ sites: BikeBoxSite[] }>(`/api/bikeandride?stop=${encodeURIComponent(stopId)}&lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`, 120_000);
+  const sites = data?.sites ?? [];
+  if (!sites.length) return null;
+  const boxes = sites.filter((s) => s.purpose !== 'ITEM');
+  const lockers = sites.filter((s) => s.purpose === 'ITEM');
+  const freiSumme = (list: BikeBoxSite[]) => {
+    const live = list.filter((s) => s.free != null);
+    return live.length ? live.reduce((a, s) => a + (s.free ?? 0), 0) : null;
+  };
+  const capSumme = (list: BikeBoxSite[]) => list.reduce((a, s) => a + (s.capacity ?? 0), 0);
+  const freiBoxes = freiSumme(boxes);
+  const freiLockers = freiSumme(lockers);
+  return (
+    <section className="section">
+      <header className="section-head"><h3>Bike+Ride an dieser Haltestelle</h3><Explain id="bikeride" /></header>
+      <p className="muted small">
+        Bike+Ride am Gleis:{' '}
+        {freiBoxes != null ? `noch ${freiBoxes} von ${capSumme(boxes)} Boxen frei` : `${capSumme(boxes)} Stellplätze`}
+        {freiLockers != null ? ` · ${freiLockers} Schließfächer frei` : ''}
+      </p>
+      <ul className="near-list">
+        {sites.slice(0, 4).map((s) => (
+          <li key={s.id}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '6px 0' }}>
+              {s.photoUrl && <img src={s.photoUrl} alt="" loading="lazy" style={{ width: 64, height: 48, objectFit: 'cover', borderRadius: 8 }} />}
+              <span className="near-main">
+                <span className="near-name">{s.name}</span>
+                <span className="near-sub">
+                  {s.purpose === 'ITEM' ? 'Schließfach' : 'Fahrradbox'}:{' '}
+                  {s.free != null && s.capacity != null
+                    ? <><strong>{s.free}</strong> von {s.capacity} frei</>
+                    : s.capacity != null ? `${s.capacity} Stellplätze` : 'Bike+Ride-Anlage'}
+                  {s.dist != null && s.dist > 30 ? ` · ${s.dist} m` : ''}
+                  {s.fee ? ` · ${s.fee}` : ''}
+                </span>
+                {s.beschreibung && <span className="near-sub">{s.beschreibung.length > 90 ? `${s.beschreibung.slice(0, 90)} …` : s.beschreibung}</span>}
+              </span>
+              {s.bookableUrl && (
+                <a className="chip" href={s.bookableUrl} target="_blank" rel="noreferrer">
+                  Buchen <Icon name="external" size={14} />
+                </a>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -169,7 +230,10 @@ function LineWorks({ lines, select, flyTo }: Nav & { lines: string[] }) {
 export function ParkingDetail({ id, onClose }: Close & { id: number }) {
   const { parking } = useData();
   const s = parking.data?.sites.find((p) => p.id === id);
-  if (!s) return null;
+  if (!s) return (
+    <DetailFallback title="Parkhaus" onClose={onClose} onRetry={parking.error ? parking.reload : undefined}
+      text={parking.loading ? 'Die Parkdaten werden geladen …' : parking.error ? 'Die Parkdaten sind derzeit nicht abrufbar.' : 'Dieses Parkhaus ist nicht mehr in der Liste enthalten.'} />
+  );
   const occ = occupancy(s.free, s.capacity);
   const used = s.capacity && s.free != null ? 1 - s.free / s.capacity : null;
   const R: Record<string, string> = { DISABLED: 'Behindertenparkplätze', WOMEN: 'Frauenparkplätze', CHARGING: 'Ladeplätze', FAMILY: 'Familienparkplätze', CARSHARING: 'Carsharing' };
@@ -209,7 +273,10 @@ export function ParkingDetail({ id, onClose }: Close & { id: number }) {
 export function RoadworkDetail({ id, onClose }: Close & { id: string }) {
   const { roadworks } = useData();
   const r = roadworks.data?.items.find((x) => x.id === id);
-  if (!r) return null;
+  if (!r) return (
+    <DetailFallback title="Baustelle" onClose={onClose} onRetry={roadworks.error ? roadworks.reload : undefined}
+      text={roadworks.loading ? 'Die Baustellendaten werden geladen …' : roadworks.error ? 'Die Baustellendaten sind derzeit nicht abrufbar.' : 'Diese Baustelle ist nicht mehr in der Liste enthalten.'} />
+  );
   return (
     <div className="sheet-inner">
       <SheetHead eyebrow={r.status === 'active' ? 'Baustelle, im Bau' : 'Baustelle, geplant'} title={r.street} onClose={onClose} tone="amber">
@@ -244,7 +311,10 @@ export function RoadworkDetail({ id, onClose }: Close & { id: string }) {
 export function AirDetail({ id, onClose }: Close & { id: string }) {
   const { air } = useData();
   const s = air.data?.stations.find((x) => x.id === id);
-  if (!s) return null;
+  if (!s) return (
+    <DetailFallback title="Luftmessstation" onClose={onClose} onRetry={air.error ? air.reload : undefined}
+      text={air.loading ? 'Die Luftmesswerte werden geladen …' : air.error ? 'Die Luftmesswerte sind derzeit nicht abrufbar.' : 'Diese Messstation ist nicht mehr in der Liste enthalten.'} />
+  );
   return (
     <div className="sheet-inner">
       <SheetHead eyebrow={`Luftmessstation · ${s.type}`} title={s.name} onClose={onClose}>
@@ -287,7 +357,10 @@ export function AirDetail({ id, onClose }: Close & { id: string }) {
 export function WaterDetail({ onClose }: Close) {
   const { water } = useData();
   const w = water.data;
-  if (!w) return null;
+  if (!w) return (
+    <DetailFallback title="Neckarpegel" onClose={onClose} onRetry={water.error ? water.reload : undefined}
+      text={water.loading ? 'Der Pegelstand wird geladen …' : water.error ? 'Der Pegelstand ist derzeit nicht abrufbar.' : 'Für den Neckarpegel liegen keine Werte vor.'} />
+  );
   return (
     <div className="sheet-inner">
       <SheetHead eyebrow="Pegel" title="Neckar in Bad Cannstatt" onClose={onClose}>
@@ -308,7 +381,10 @@ export function WaterDetail({ onClose }: Close) {
 export function SharingDetail({ id, onClose }: Close & { id: string }) {
   const { sharing } = useData();
   const s = sharing.data?.items.find((x) => x.id === id);
-  if (!s) return null;
+  if (!s) return (
+    <DetailFallback title="Sharing-Fahrzeug" onClose={onClose} onRetry={sharing.error ? sharing.reload : undefined}
+      text={sharing.loading ? 'Die Sharing-Daten werden geladen …' : sharing.error ? 'Die Sharing-Daten sind derzeit nicht abrufbar.' : 'Dieses Fahrzeug ist nicht mehr verfügbar.'} />
+  );
   const kind = { car: 'Carsharing', bike: 'Leihrad', scooter: 'E-Scooter' }[s.kind];
   return (
     <div className="sheet-inner">
@@ -336,5 +412,7 @@ export function DetailSheet({ sel, onClose, select, flyTo }: Close & Nav & { sel
     case 'air': return <AirDetail id={sel.id} onClose={onClose} />;
     case 'water': return <WaterDetail onClose={onClose} />;
     case 'sharing': return <SharingDetail id={sel.id} onClose={onClose} />;
+    case 'verwaltung_gebaeude': return <GebaeudeDetail key={sel.id} id={sel.id} onClose={onClose} select={select} flyTo={flyTo} />;
+    case 'verwaltung_leistung': return <LeistungDetail key={sel.url} url={sel.url} lat={sel.lat} lon={sel.lon} onClose={onClose} select={select} flyTo={flyTo} />;
   }
 }

@@ -7,6 +7,7 @@ import { DataProvider, useData } from './lib/data';
 import type { Selection } from './lib/types';
 import { Icon, weatherIconName } from './components/Icon';
 import { Search } from './components/Search';
+import { DocumentReader } from './components/DocumentReader';
 import { DetailSheet } from './components/Details';
 import { BigEventBanner } from './components/BigEvent';
 import { AIR_COLOR, AIR_LABEL, fmtDec } from './lib/format';
@@ -17,9 +18,14 @@ import { useLive } from './lib/live';
 import { RouteProvider, type Place as RoutePlace } from './lib/routeCtx';
 import { LANGS, setLang, tr, useLang } from './lib/i18n';
 import { InfoPages } from './components/InfoPages';
+import { LayerSheet } from './components/LayerSheet';
+import { StartPanel } from './components/StartPanel';
+import { QuickActions } from './components/QuickActions';
+import { ANLIEGEN, type Anliegen } from './lib/anliegen';
+import { Disclosure } from './components/ui';
 
 const DEFAULT_VISIBLE: Record<OverlayKey, boolean> = {
-  network: true, stops: true, parking: true, sharing: false, roadworks: true, bike: false, air: true, water: true, events: true, places: true, sun: false, radar: true, aerial: false, nearby: true, live: true, route: true, vehicles: true, traffic: false,
+  network: true, stops: true, parking: true, sharing: false, roadworks: true, bike: false, air: true, water: true, events: true, places: true, sun: false, radar: true, aerial: false, nearby: true, live: true, route: true, vehicles: true, traffic: false, warnung: true, flug: false, kaltluft: false, unfall: false, hike: false,
 };
 
 function readPref<T>(key: string, fallback: T): T {
@@ -46,19 +52,27 @@ function useMedia(q: string) {
 function Shell() {
   const data = useData();
   const mapRef = useRef<MapHandle>(null);
-  const mobile = useMedia('(max-width: 760px)');
+  const panelScrollRef = useRef<HTMLDivElement>(null);
+  const mobile = useMedia('(max-width: 900px)');
+  const compact = useMedia('(max-width: 1180px)');
   const [theme, setTheme] = useState<Theme>(() => readPref('theme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-  const [moduleId, setModuleId] = useState(() => readPref('module', 'mobility'));
+  // null = Einstieg ohne vorgewähltes Thema. Der Startzustand fragt nach dem Anliegen,
+  // statt den Datenbestand eines Themas sofort zu zeigen.
+  const [moduleId, setModuleId] = useState<string | null>(() => readPref('module-v2', null));
+  const [focus, setFocus] = useState<string | null>(() => readPref('focus-v2', null));
+  const [anliegenId, setAnliegenId] = useState<string | null>(() => readPref('anliegen-v2', null));
   const [visible, setVisible] = useState<Record<OverlayKey, boolean>>(() => ({ ...DEFAULT_VISIBLE, ...readPref('layers', {}) }));
   const [selection, setSelection] = useState<Selection | null>(null);
   const [terrain, setTerrain] = useState(false);
-  const [sheet, setSheet] = useState<'peek' | 'open'>('peek');
+  const [sheet, setSheet] = useState<'mini' | 'peek' | 'open'>('peek');
   const [ready, setReady] = useState(false);
   const [center, setCenter] = useState<[number, number]>([9.18, 48.779]);
   const [sunImage, setSunImage] = useState<string | null>(null);
   const [radarFrame, setRadarFrame] = useState<number | null>(null);
   const [nearby, setNearby] = useState<MapData['nearby']>(null);
   const [info, setInfo] = useState<{ page: InfoPage; anchor?: string } | null>(null);
+  const [docId, setDocId] = useState<number | null>(null);
+  const [layersOpen, setLayersOpen] = useState(false);
   const openInfo = useCallback((page: InfoPage, anchor?: string) => setInfo({ page, anchor }), []);
   const [aerial, setAerial] = useState({ year: AERIAL_YEARS[AERIAL_YEARS.length - 1], opacity: 1 });
   const radarImg = useMemo(() => {
@@ -73,7 +87,9 @@ function Shell() {
     document.querySelector('meta[name=theme-color]')?.setAttribute('content', theme === 'dark' ? '#141414' : '#26262C');
     writePref('theme', theme);
   }, [theme]);
-  useEffect(() => writePref('module', moduleId), [moduleId]);
+  useEffect(() => {
+    writePref('module-v2', moduleId); writePref('focus-v2', focus); writePref('anliegen-v2', anliegenId);
+  }, [moduleId, focus, anliegenId]);
   useEffect(() => writePref('layers', visible), [visible]);
 
   const toggle = useCallback((k: OverlayKey) => setVisible((v) => ({ ...v, [k]: !v[k] })), []);
@@ -91,6 +107,8 @@ function Shell() {
       case 'event': { const e = data.events.data?.events.find((x) => x.id === selection.id); return e?.lon != null ? [e.lon, e.lat!] : null; }
       case 'facility': return [selection.item.lon, selection.item.lat];
       case 'place': { const p = data.places.data?.places.find((x) => x.id === selection.id); return p ? [p.lon, p.lat] : null; }
+      case 'verwaltung_gebaeude': return selection.lngLat ?? null;
+      case 'verwaltung_leistung': return selection.lon != null && selection.lat != null ? [selection.lon, selection.lat] : null;
     }
   }, [selection, data]);
 
@@ -99,14 +117,25 @@ function Shell() {
     if (s && mobile) setSheet('peek');
   }, [mobile]);
 
+  const sheetDrag = useRef<{ startY: number; moved: boolean } | null>(null);
+  const suppressSheetClick = useRef(false);
+  const cycleSheet = useCallback(() => {
+    setSheet((s) => (s === 'mini' ? 'peek' : s === 'peek' ? 'open' : 'mini'));
+  }, []);
+
+  const sheetBottom = sheet === 'mini' ? 0.1 : sheet === 'open' ? 0.86 : 0.46;
+
   const detailPadding = useMemo(() => mobile
-    ? { left: 0, right: 0, bottom: Math.round(window.innerHeight * 0.6) }
-    : { left: 440, right: 440, bottom: 0 }, [mobile]);
+    ? { left: 0, right: 0, bottom: Math.round(window.innerHeight * 0.62) }
+    : compact
+      ? { left: 0, right: 412, bottom: 0 }
+      : { left: 440, right: 440, bottom: 0 }, [mobile, compact]);
   const padding = useMemo(() => selection ? detailPadding : mobile
-    ? { left: 0, right: 0, bottom: Math.round(window.innerHeight * 0.45) }
-    : { left: 440, right: 0, bottom: 0 }, [mobile, selection, detailPadding]);
+    ? { left: 0, right: 0, bottom: Math.round(window.innerHeight * sheetBottom) }
+    : { left: compact ? 396 : 440, right: 0, bottom: 0 }, [mobile, compact, selection, detailPadding, sheetBottom]);
 
   const flyTo = useCallback((c: [number, number], z?: number) => mapRef.current?.flyTo(c, z), []);
+  const fitBounds = useCallback((bounds: [[number, number], [number, number]], opts?: { maxZoom?: number }) => mapRef.current?.fitBounds(bounds, opts), []);
 
   // Tiefe Links: ?stop=de:08111:6115
   useEffect(() => {
@@ -129,19 +158,62 @@ function Shell() {
   }, [selection]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelection(null); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setSelection(null); setDocId(null); setLayersOpen(false); }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const mod = MODULES.find((m) => m.id === moduleId) ?? MODULES[0];
+  const mod = MODULES.find((m) => m.id === moduleId) ?? null;
   const w = data.weather.data;
   const airWorst = (data.air.data?.stations ?? []).reduce<number | null>((m, s) => (s.index == null ? m : m == null || s.index > m ? s.index : m), null);
 
   const live = useLive(visible.live);
   const [routeGeo, setRouteGeo] = useState<GeoJSON.FeatureCollection | null>(null);
   const [routeTarget, setRouteTarget] = useState<RoutePlace | null>(null);
-  const planRoute = useCallback((p: RoutePlace) => { setRouteTarget(p); setModuleId('route'); setSelection(null); if (mobile) setSheet('open'); }, [mobile]);
+  const activeAnliegen = useMemo(() => ANLIEGEN.find((a) => a.id === anliegenId) ?? null, [anliegenId]);
+
+  const planRoute = useCallback((p: RoutePlace) => {
+    setRouteTarget(p); setModuleId('route'); setFocus('route'); setAnliegenId('anreise');
+    setSelection(null); if (mobile) setSheet('peek');
+  }, [mobile]);
+
+  /** Ein Anliegen öffnet das zuständige Panel, schaltet die passenden Ebenen zu und setzt den Fokus. */
+  const openAnliegen = useCallback((a: Anliegen) => {
+    setModuleId(a.module);
+    setFocus(a.focus);
+    setAnliegenId(a.id);
+    setSelection(null);
+    setVisible((v) => {
+      const next = { ...v };
+      for (const k of a.layers) next[k] = true;
+      return next;
+    });
+    if (mobile) setSheet('open');
+  }, [mobile]);
+
+  /**
+   * Öffnet ein Themenmodul direkt („Alle Themen") oder aus einer Statusanzeige.
+   * Der Anliegen-Kontext wird dabei bewusst gesetzt oder gelöscht, damit Brotkrume
+   * und aktive Schnellaktion immer dasselbe versprechen.
+   */
+  const openModule = useCallback((id: string, f?: string, aId: string | null = null) => {
+    setModuleId(id);
+    setFocus(f ?? null);
+    setAnliegenId(aId);
+    setSelection(null);
+    // Beim Weg bleibt mehr Karte sichtbar: Die Route soll beim Öffnen direkt erkennbar sein.
+    if (mobile) setSheet(id === 'route' ? 'peek' : 'open');
+  }, [mobile]);
+
+  // Beim Wechsel des Themas beginnt das Panel wieder oben. Sonst landet man nach
+  // einem Modulwechsel mitten im vorherigen Inhalt.
+  useEffect(() => {
+    panelScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [moduleId, focus, anliegenId]);
+
+  // Auf kleinen Desktops weicht das Panel dem Detail (siehe design-pass.css).
   const lang = useLang();
   const mapData = useMemo(() => ({
     parking: data.parking.data?.sites ?? null,
@@ -158,7 +230,12 @@ function Shell() {
     live,
     route: routeGeo,
     traffic: data.traffic.data?.items ?? null,
-  }), [data.traffic.data, sunImage, radarImg, nearby, live, routeGeo, data.parking.data, data.sharing.data, data.roadworks.data, data.air.data, data.water.data, data.bike.data, data.events.data, data.places.data]);
+    warnungen: data.warnungen.data?.items ?? null,
+    flug: data.flug.data?.aircraft ?? null,
+    kaltluft: data.kaltluft.data?.punkte ?? null,
+    unfall: data.unfaelle.data?.items ?? null,
+    wanderwege: data.wanderwege.data?.items ?? null,
+  }), [data.traffic.data, sunImage, radarImg, nearby, live, routeGeo, data.parking.data, data.sharing.data, data.roadworks.data, data.air.data, data.water.data, data.bike.data, data.events.data, data.places.data, data.warnungen.data, data.flug.data, data.kaltluft.data, data.unfaelle.data, data.wanderwege.data]);
 
   const showDetail = !!selection;
 
@@ -181,13 +258,51 @@ function Shell() {
         padding={padding}
         detailPadding={detailPadding}
       />
-      {!ready && <div className="map-loading" aria-hidden><span /></div>}
+      {!ready && (
+        <div className="map-loading" role="status" aria-live="polite">
+          <span className="map-loading-spinner" aria-hidden />
+          <p>Karte wird geladen …</p>
+        </div>
+      )}
       <a className="skip-link" href="#panel-content">{tr('Zum Inhalt springen')}</a>
 
-      <aside className="panel" aria-label="Themen und Ebenen">
+      <QuickActions
+        active={anliegenId}
+        onPick={(a) => { setAnliegenId(a.id); openAnliegen(a); }}
+      />
+
+      <aside className={`panel ${mod ? 'has-module' : ''}`} aria-label="Themen und Ebenen">
         {mobile && (
-          <button type="button" className="sheet-handle" aria-label={sheet === 'open' ? 'Bereich verkleinern' : 'Bereich vergrößern'}
-            onClick={() => setSheet((s) => (s === 'open' ? 'peek' : 'open'))}><span /></button>
+          <button
+            type="button"
+            className="sheet-handle"
+            aria-label={sheet === 'mini' ? 'Bereich öffnen' : sheet === 'peek' ? 'Bereich vergrößern' : 'Bereich verkleinern'}
+            aria-controls="panel-content"
+            title="Ziehen oder tippen, um den Bereich zu vergrößern oder zu verkleinern"
+            onPointerDown={(e) => {
+              sheetDrag.current = { startY: e.clientY, moved: false };
+              e.currentTarget.setPointerCapture?.(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              if (!sheetDrag.current) return;
+              if (Math.abs(e.clientY - sheetDrag.current.startY) > 8) sheetDrag.current.moved = true;
+            }}
+            onPointerUp={(e) => {
+              const drag = sheetDrag.current;
+              sheetDrag.current = null;
+              if (!drag?.moved) return;
+              suppressSheetClick.current = true;
+              window.setTimeout(() => { suppressSheetClick.current = false; }, 400);
+              const dy = e.clientY - drag.startY;
+              if (dy > 36) setSheet((s) => (dy > 150 ? 'mini' : s === 'open' ? 'peek' : 'mini'));
+              else if (dy < -36) setSheet((s) => (dy < -150 ? 'open' : s === 'mini' ? 'peek' : 'open'));
+            }}
+            onPointerCancel={() => { sheetDrag.current = null; }}
+            onClick={() => {
+              if (suppressSheetClick.current) { suppressSheetClick.current = false; return; }
+              cycleSheet();
+            }}
+          ><span /></button>
         )}
         <header className="brand">
           <div className="brand-row">
@@ -198,49 +313,51 @@ function Shell() {
             </div>
             <span className="demo-tag">Demo</span>
           </div>
-          <Search onPick={(s) => {
-            const c = s.geometry.coordinates as [number, number];
-            select({ type: 'stop', id: s.properties.id, name: s.properties.name, lngLat: c, lines: s.properties.lines });
-            flyTo(c, 15);
-          }} />
         </header>
 
-        <nav className="module-tabs" role="tablist" aria-label="Themen">
-          {MODULES.map((m) => (
-            <button key={m.id} role="tab" type="button" aria-selected={m.id === mod.id} className={m.id === mod.id ? 'active' : ''}
-              onClick={() => { setModuleId(m.id); if (mobile) setSheet('open'); }}>
-              <Icon name={m.icon} size={18} />
-              <span>{tr(m.label)}</span>
-              {m.status === 'soon' && <small className="soon">bald</small>}
-            </button>
-          ))}
-        </nav>
-
-        <div className="panel-scroll" id="panel-content" tabIndex={-1}>
-          <mod.Panel visible={visible} toggle={toggle} select={select} flyTo={flyTo} setLayer={setLayer} center={center} setSunImage={setSunImage} radarFrame={radarFrame} setRadarFrame={setRadarFrame} setNearby={setNearby} setRoute={setRouteGeo} routeTarget={routeTarget} />
-          <nav className="about-links" aria-label="Über diese Anwendung">
-            <button type="button" onClick={() => openInfo('grundsaetze')}>{tr('Grundsätze')}</button>
-            <button type="button" onClick={() => openInfo('werte')}>{tr('Wie entstehen die Werte?')}</button>
-            <button type="button" onClick={() => openInfo('daten')}>{tr('Offene Daten')}</button>
-            <button type="button" onClick={() => openInfo('barrierefreiheit')}>{tr('Barrierefreiheit')}</button>
-            <button type="button" onClick={() => openInfo('leicht')}>{tr('Leichte Sprache')}</button>
-            {LANGS.filter((l) => l.id !== lang).map((l) => (
-              <button key={l.id} type="button" lang={l.id} onClick={() => setLang(l.id)}>{l.label}</button>
-            ))}
-          </nav>
+        <div className="panel-scroll" id="panel-content" tabIndex={-1} ref={panelScrollRef}>
+          {mod ? (
+            <>
+              <div className="panel-crumb">
+                <button type="button" className="crumb-back" onClick={() => { setModuleId(null); setFocus(null); setAnliegenId(null); setSelection(null); }}>
+                  <Icon name="chevron" size={15} className="chev-left" />
+                  <span>{tr('Einstieg')}</span>
+                </button>
+                <div className="crumb-titles">
+                  <h2 className="crumb-title">{tr(activeAnliegen?.label ?? mod.label)}</h2>
+                  {activeAnliegen && activeAnliegen.module !== mod.id && <span className="crumb-context">{tr(mod.label)}</span>}
+                </div>
+              </div>
+              <mod.Panel focus={focus ?? undefined} visible={visible} toggle={toggle} select={select} flyTo={flyTo} fitBounds={fitBounds} setLayer={setLayer} center={center} setSunImage={setSunImage} radarFrame={radarFrame} setRadarFrame={setRadarFrame} setNearby={setNearby} setRoute={setRouteGeo} routeTarget={routeTarget} />
+            </>
+          ) : (
+            <StartPanel onModule={(id) => openModule(id)} />
+          )}
+          <Disclosure label="Über diese Anwendung" defaultOpen={false} count={6}>
+            <nav className="about-links" aria-label="Über diese Anwendung">
+              <button type="button" onClick={() => openInfo('grundsaetze')}>{tr('Grundsätze')}</button>
+              <button type="button" onClick={() => openInfo('werte')}>{tr('Wie entstehen die Werte?')}</button>
+              <button type="button" onClick={() => openInfo('daten')}>{tr('Offene Daten')}</button>
+              <button type="button" onClick={() => openInfo('barrierefreiheit')}>{tr('Barrierefreiheit')}</button>
+              <button type="button" onClick={() => openInfo('leicht')}>{tr('Leichte Sprache')}</button>
+              {LANGS.filter((l) => l.id !== lang).map((l) => (
+                <button key={l.id} type="button" lang={l.id} onClick={() => setLang(l.id)}>{l.label}</button>
+              ))}
+            </nav>
+          </Disclosure>
         </div>
       </aside>
 
       {!mobile && <BigEventBanner select={select} flyTo={flyTo} />}
       <div className="status-cluster">
         {w && (
-          <button type="button" className="status-pill" onClick={() => setModuleId('environment')} aria-label={`Wetter ${fmtDec(w.temperature)} Grad, Details anzeigen`}>
+          <button type="button" className="status-pill" title="Wetter und Vorhersage" onClick={() => openModule('environment', 'wetter', 'wetter')} aria-label={`Wetter ${fmtDec(w.temperature)} Grad, Details anzeigen`}>
             <Icon name={weatherIconName(w.icon)} size={18} />
             <strong>{fmtDec(w.temperature)}°</strong>
           </button>
         )}
         {airWorst != null && (
-          <button type="button" className="status-pill" onClick={() => setModuleId('environment')} aria-label={`Luftqualität ${AIR_LABEL[airWorst]}`}>
+          <button type="button" className="status-pill" title="Luftqualität" onClick={() => openModule('environment', 'wetter', 'wetter')} aria-label={`Luftqualität ${AIR_LABEL[airWorst]}, Details anzeigen`}>
             <span className="dot" style={{ background: AIR_COLOR[airWorst] }} />
             <span>Luft {AIR_LABEL[airWorst]}</span>
           </button>
@@ -248,17 +365,21 @@ function Shell() {
       </div>
 
       <div className="map-controls" role="group" aria-label="Kartensteuerung">
-        <button type="button" className="ctrl" onClick={() => mapRef.current?.zoomBy(1)} aria-label="Hineinzoomen"><Icon name="plus" /></button>
-        <button type="button" className="ctrl" onClick={() => mapRef.current?.zoomBy(-1)} aria-label="Herauszoomen"><Icon name="minus" /></button>
+        <button type="button" className="ctrl" data-tip="Hineinzoomen" onClick={() => mapRef.current?.zoomBy(1)} aria-label="Hineinzoomen"><Icon name="plus" /></button>
+        <button type="button" className="ctrl" data-tip="Herauszoomen" onClick={() => mapRef.current?.zoomBy(-1)} aria-label="Herauszoomen"><Icon name="minus" /></button>
         <span className="ctrl-gap" />
-        <button type="button" className={`ctrl ${terrain ? 'on' : ''}`} onClick={() => setTerrain((t) => !t)} aria-pressed={terrain} aria-label="3D-Ansicht mit Gelände" title="3D-Gelände">
+        <button type="button" className={`ctrl ${layersOpen ? 'on' : ''}`} data-tip="Kartenebenen" onClick={() => setLayersOpen((v) => !v)} aria-pressed={layersOpen} aria-label="Kartenebenen" title="Ebenen">
+          <Icon name="layers" />
+        </button>
+        <button type="button" className={`ctrl ${terrain ? 'on' : ''}`} data-tip="3D-Gelände" onClick={() => setTerrain((t) => !t)} aria-pressed={terrain} aria-label="3D-Ansicht mit Gelände" title="3D-Gelände">
           <span className="ctrl-txt">3D</span>
         </button>
-        <button type="button" className={`ctrl ${visible.aerial ? 'on' : ''}`} onClick={() => toggle('aerial')} aria-pressed={visible.aerial} aria-label="Luftbilder 2006 bis 2025" title="Luftbilder">
+        <button type="button" className={`ctrl ${visible.aerial ? 'on' : ''}`} data-tip="Luftbilder" onClick={() => toggle('aerial')} aria-pressed={visible.aerial} aria-label="Luftbilder 2006 bis 2025" title="Luftbilder">
           <Icon name="image" />
         </button>
-        <button type="button" className="ctrl" onClick={() => mapRef.current?.resetNorth()} aria-label="Nach Norden ausrichten"><Icon name="compass" /></button>
-        <button type="button" className="ctrl" onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} aria-label={theme === 'dark' ? 'Helle Ansicht' : 'Dunkle Ansicht'}>
+        <button type="button" className="ctrl" data-tip="Nach Norden" onClick={() => mapRef.current?.resetNorth()} aria-label="Nach Norden ausrichten"><Icon name="compass" /></button>
+        <span className="ctrl-gap" />
+        <button type="button" className="ctrl" data-tip={theme === 'dark' ? 'Helle Ansicht' : 'Dunkle Ansicht'} onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} aria-label={theme === 'dark' ? 'Helle Ansicht' : 'Dunkle Ansicht'}>
           <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
         </button>
       </div>
@@ -283,11 +404,22 @@ function Shell() {
       )}
 
       {showDetail && (
-        <aside className="detail" aria-label="Details" aria-live="polite">
+        <aside className="detail" aria-label="Details" aria-labelledby="detail-title">
           <DetailSheet sel={selection!} onClose={() => setSelection(null)} select={select} flyTo={flyTo} />
         </aside>
       )}
       {info && <InfoPages page={info.page} anchor={info.anchor} onPage={(page) => setInfo({ page })} onClose={() => setInfo(null)} />}
+      <DocumentReader id={docId} onClose={() => setDocId(null)} />
+      <Search
+        onPickStop={(s) => {
+          const c = s.geometry.coordinates as [number, number];
+          select({ type: 'stop', id: s.properties.id, name: s.properties.name, lngLat: c, lines: s.properties.lines });
+          flyTo(c, 15);
+        }}
+        onOpenDocument={(id) => setDocId(id)}
+        onRoute={() => { setAnliegenId('anreise'); openModule('route', 'route', 'anreise'); }}
+      />
+      <LayerSheet open={layersOpen} onClose={() => setLayersOpen(false)} visible={visible} toggle={toggle} />
     </div>
     </RouteProvider>
     </InfoProvider>

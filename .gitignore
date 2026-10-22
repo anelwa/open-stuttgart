@@ -6,3 +6,15 @@ server/.cache
 .env
 .env.*
 server.log
+tsconfig.tsbuildinfo
+# Datenbestände: erzeugt mit npm run data:*, nicht im Git (per rsync auf den Server, siehe docs/deploy-dokploy.md)
+server/data/suche.sqlite
+server/data/suche.sqlite-wal
+server/data/suche.sqlite-shm
+server/data/verwaltung.sqlite
+server/data/verwaltung.json
+server/data/verwaltung-dock.json
+server/data/gebaeude.geojson
+server/data/geocaches.json
+server/data/unfaelle-stuttgart.json
+server/data/wanderwege-osm.json
