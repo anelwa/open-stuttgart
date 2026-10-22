@@ -33,6 +33,9 @@ sudo mkdir -p /opt/open-stuttgart/data /opt/open-stuttgart/cache
 sudo chown -R 1000:1000 /opt/open-stuttgart   # UID des Container-Nutzers „node“
 ```
 
+Die kleinen Grunddaten (`venues.json`, `iris-codes.json`, `feste-maerkte.json`, …) legt der Container beim ersten
+Start selbst im Volume nach (`docker-entrypoint.sh`); rsync muss nur die erzeugten Datenbestände liefern.
+
 Daten aus dem Entwicklungsverzeichnis hochladen (Datenbestände, die vor Ort erzeugt wurden):
 
 ```bash

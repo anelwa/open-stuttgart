@@ -17,9 +17,15 @@ ENV PORT=8787
 WORKDIR /app
 COPY server ./server
 COPY --from=build /app/dist ./dist
-RUN mkdir -p server/data server/.cache && chown -R node:node /app
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+# Grunddaten (venues.json, iris-codes.json, feste-maerkte.json, …) überleben ein leeres Volume:
+# sie liegen als seed-data im Image und werden vom Einstiegsskript nachgelegt.
+RUN cp -r server/data /app/seed-data \
+  && mkdir -p server/data server/.cache \
+  && chown -R node:node /app \
+  && chmod +x /app/docker-entrypoint.sh
 USER node
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
   CMD node -e "fetch('http://127.0.0.1:8787/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
-CMD ["node", "server/index.mjs"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

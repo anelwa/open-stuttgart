@@ -4,8 +4,17 @@ dist
 docs
 gancio
 scripts
-server/data
-server/.cache
 *.log
 tsconfig.tsbuildinfo
 .DS_Store
+# per npm run data:* erzeugte Datenbestände (kommen per rsync ins Volume)
+server/data/suche.sqlite
+server/data/suche.sqlite-wal
+server/data/suche.sqlite-shm
+server/data/verwaltung.sqlite
+server/data/verwaltung.json
+server/data/verwaltung-dock.json
+server/data/gebaeude.geojson
+server/data/geocaches.json
+server/data/unfaelle-stuttgart.json
+server/data/wanderwege-osm.json
