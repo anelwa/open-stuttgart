@@ -5,11 +5,16 @@
   "private": true,
   "description": "Open Stuttgart: offene Daten der Landeshauptstadt und der Region auf einer Karte (nicht kommerzielles Open-Source-Projekt)",
   "type": "module",
+  "bin": {
+    "open-stuttgart-mcp": "server/mcp/stdio.mjs"
+  },
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "tsc -p tsconfig.json && vite build",
     "start": "npm run build && node server/index.mjs",
     "serve": "node server/index.mjs",
+    "mcp:http": "node server/mcp/standalone.mjs",
+    "check:mcp": "node scripts/check-mcp.mjs",
     "data:gtfs": "python3 scripts/build_gtfs.py",
     "data:verwaltung": "node scripts/crawl-verwaltung.mjs",
     "data:unfall": "node scripts/build-unfaelle.mjs",

@@ -166,12 +166,31 @@ optionaler Gancio-Anbindung — steht in [`docs/deploy-dokploy.md`](docs/deploy-
   `server/env.mjs` geladen, `.env` ist ignoriert) oder als Umgebungsvariable gesetzt werden. Standardmodell ist
   `gemini-2.5-flash-lite`, Tagesbudget 0,50 USD (`OS_BOT_DAILY_USD`), Rate-Limit 40 Anfragen pro Stunde und IP
   (`OS_BOT_RATE`). Kill-Switch: `OS_BOT=0`. Werkzeugkatalog: `GET /api/bot/tools`, Abdeckung:
-  `GET /api/bot/coverage`, Fortschritt: `POST /api/bot/stream` (SSE), öffentlicher Read-only-MCP-Server: `POST /mcp`.
+  `GET /api/bot/coverage`, Fortschritt: `POST /api/bot/stream` (SSE);
+  der öffentliche Read-only-MCP-Server liegt unter `/mcp` (siehe unten).
   Konzept, Prompting, Kosten und Datenschutz: [`docs/stuttbot.md`](docs/stuttbot.md). Rauchtest: `npm run check:bot`.
   Die Weiterentwicklung zum Kommandodeck steht in [`docs/stuttbot-2-konzept.md`](docs/stuttbot-2-konzept.md).
 
 Teilbare Links: Der Kartenausschnitt steht in der Adresse (`#karte=zoom/lat/lon`), eine gewählte Haltestelle als
 `?stop=de:08111:6115`.
+
+## MCP-Server für andere Agenten
+
+Open Stuttgart ist zugleich ein vollständiger, **read-only MCP-Server**. Andere Agenten und
+Assistenten können dieselben Daten abfragen, die auch die Karte zeigt – mit Quelle, Lizenz und
+Zeitstand an jeder Antwort.
+
+- **In der App:** `http://localhost:8787/mcp` (Streamable HTTP, dual-era: MCP `2026-07-28` und
+  abwärtskompatibel bis `2024-11-05`).
+- **Eigener Prozess:** `npm run mcp:http` → `http://127.0.0.1:8788/mcp`.
+- **stdio:** `node server/mcp/stdio.mjs` für Claude Desktop, Cursor und andere lokale Clients
+  (direkt starten, nicht über `npm run`, damit nur JSON-RPC auf stdout landet).
+- **Umfang:** 34 Werkzeuge (Suche, Verwaltung, Adressprofil, Weg/Abfahrten, Verkehr, Parken,
+  Termine, Kultur, Umwelt, Gesundheit, WFS/Open Data), 4 Ressourcen, 6 Vorlagen und 6 Prompts.
+- **Grenzen:** keine Buchungen, Anträge oder Schreibzugriffe; jede Quelle mit Lizenz; Rate-Limit
+  pro IP und Werkzeug; keine Standortabfrage ohne übergebene Koordinaten.
+- **Dokumentation:** [`docs/mcp.md`](docs/mcp.md) mit Client-Konfigurationen, Header-Beispielen
+  und Betriebshinweisen. Rauchtest: `npm run check:mcp`.
 
 ## Aufbau
 
@@ -181,6 +200,7 @@ server/            Node-Server ohne Abhängigkeiten
   cache.mjs        Zwischenspeicher mit Ablaufzeit, höflicher Abruf je Host, letzter guter Wert bei Ausfall
   sources/         eine Datei je Quelle (efa, parking, sharing, roadworks, environment, culture, events-extra, radar, kessel,
                    nearby, adresse, verwaltung, verlauf, routing, aufzuege, hitze, beteiligung, partner, bot, bot-katalog)
+  mcp/             MCP-Server: Streamable HTTP (/mcp), stdio, 34 Werkzeuge, Ressourcen und Prompts (siehe docs/mcp.md)
   .cache/          dauerhafter Zwischenspeicher (iCal-Details, Verortungen), nicht im Git
 src/
   map/             Kartenstil (mapStyle.ts), Fachebenen (overlays.ts), Symbole (icons.ts), MapView.tsx

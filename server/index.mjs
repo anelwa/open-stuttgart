@@ -39,7 +39,8 @@ import { archivDatei, archivTage, startVerlauf } from './sources/verlauf.mjs';
 import { abfall, adresse, baeder, buergerbueros, categories, facilities, freizeitRouten, gesundheit, gruenstrom, laden, schulbezirk } from './sources/nearby.mjs';
 import { tankpreise } from './sources/tanken.mjs';
 import { verwaltungGebaeude, verwaltungLeistung, verwaltungSuche, verwaltungWerkzeug, verwaltungWo } from './sources/verwaltung.mjs';
-import { botAllowRequest, botCoverage, botReply, botStatus, botToolCatalog, runBotTool } from './sources/bot.mjs';
+import { botCoverage, botReply, botStatus, botToolCatalog } from './sources/bot.mjs';
+import { handleMcpHttp } from './mcp/index.mjs';
 import { stadtpalais } from './sources/stadtpalais.mjs';
 import {
   addressSearch, bibliothek, dcatKatalog, foodsharing, fragdenstaat, fragdenstaatRss, gbif,
@@ -277,106 +278,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ---------- MCP: Open Stuttgart als read-only Werkzeugquelle für andere Agenten ----------
-  if (url.pathname === '/mcp') {
-    const cors = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Mcp-Session-Id, MCP-Protocol-Version',
-    };
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204, cors);
-      res.end();
-      return;
-    }
-    if (req.method !== 'POST') {
-      res.writeHead(405, { ...cors, 'Content-Type': 'application/json; charset=utf-8', Allow: 'POST, OPTIONS' });
-      res.end(JSON.stringify({ error: 'MCP nutzt POST (Streamable HTTP).' }));
-      return;
-    }
-    try {
-      if (!botAllowRequest(clientIp(req))) {
-        res.writeHead(429, { ...cors, 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Zu viele Anfragen.' } }));
-        return;
-      }
-      const body = await readJsonBody(req, 131_072);
-      const calls = Array.isArray(body) ? body : [body];
-      const catalog = botToolCatalog();
-      const allowed = new Set(catalog.tools.map((t) => t.name).filter((n) => n !== 'karte_steuern'));
-      const resources = [
-        { uri: 'stuttgart://catalog', name: 'Werkzeugkatalog', description: 'Verfügbare Werkzeuge, Quellen und Grenzen', mimeType: 'application/json' },
-        { uri: 'stuttgart://coverage', name: 'Datenabdeckung', description: 'live, cached, nur verlinkt oder fehlend', mimeType: 'application/json' },
-      ];
-      const mcpResult = async (msg) => {
-        const id = msg?.id ?? null;
-        const method = String(msg?.method ?? '');
-        if (method === 'notifications/initialized' || method === 'notifications/cancelled') return null;
-        if (method === 'initialize') {
-          return {
-            jsonrpc: '2.0', id,
-            result: {
-              protocolVersion: msg?.params?.protocolVersion ?? '2025-06-18',
-              capabilities: { tools: { listChanged: false }, resources: { listChanged: false } },
-              serverInfo: { name: 'open-stuttgart', version: '0.2.0' },
-              instructions: 'Open Stuttgart: offene Daten der Landeshauptstadt. Read-only. Jede Antwort nennt Quelle und Zeitstand. Keine Terminbuchung, keine Anträge.',
-            },
-          };
-        }
-        if (method === 'ping') return { jsonrpc: '2.0', id, result: {} };
-        if (method === 'tools/list') {
-          return {
-            jsonrpc: '2.0', id,
-            result: {
-              tools: catalog.tools.filter((t) => allowed.has(t.name)).map((t) => ({
-                name: t.name,
-                description: t.description,
-                inputSchema: t.parameters ?? { type: 'object', properties: {} },
-                annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
-              })),
-            },
-          };
-        }
-        if (method === 'tools/call') {
-          const name = String(msg?.params?.name ?? '');
-          if (!allowed.has(name)) {
-            return { jsonrpc: '2.0', id, error: { code: -32602, message: `Unbekanntes oder nicht freigegebenes Werkzeug: ${name}` } };
-          }
-          const out = await runBotTool(name, msg?.params?.arguments ?? {}, null);
-          const text = JSON.stringify({ facts: out.facts, sources: out.sources, limits: out.limits }, null, 2);
-          return {
-            jsonrpc: '2.0', id,
-            result: {
-              content: [{ type: 'text', text }],
-              structuredContent: { facts: out.facts, sources: out.sources, limits: out.limits },
-              isError: false,
-            },
-          };
-        }
-        if (method === 'resources/list') return { jsonrpc: '2.0', id, result: { resources } };
-        if (method === 'resources/read') {
-          const uri = String(msg?.params?.uri ?? '');
-          if (uri === 'stuttgart://catalog') {
-            return { jsonrpc: '2.0', id, result: { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(catalog, null, 2) }] } };
-          }
-          if (uri === 'stuttgart://coverage') {
-            return { jsonrpc: '2.0', id, result: { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(botCoverage(), null, 2) }] } };
-          }
-          return { jsonrpc: '2.0', id, error: { code: -32602, message: `Unbekannte Ressource: ${uri}` } };
-        }
-        if (method === 'prompts/list') return { jsonrpc: '2.0', id, result: { prompts: [] } };
-        return { jsonrpc: '2.0', id, error: { code: -32601, message: `Methode nicht unterstützt: ${method}` } };
-      };
-      const results = [];
-      for (const msg of calls) {
-        const r = await mcpResult(msg);
-        if (r) results.push(r);
-      }
-      res.writeHead(200, { ...cors, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-      res.end(JSON.stringify(Array.isArray(body) ? results : results[0] ?? { jsonrpc: '2.0', id: null, result: {} }));
-    } catch (err) {
-      res.writeHead(err.status ?? 400, { ...cors, 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: err.message ?? 'Ungültige Anfrage' } }));
-    }
+  // Streamable HTTP unter /mcp, dual-era (2026-07-28 zustandslos, ältere Fassungen mit
+  // initialize/Sitzung). Der Katalog, die Ressourcen und die Prompts liegen in server/mcp/.
+  if (url.pathname === '/mcp' || url.pathname === '/mcp/') {
+    await handleMcpHttp(req, res, { ip: clientIp(req) });
     return;
   }
 

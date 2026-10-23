@@ -84,6 +84,13 @@ mit den dorthin kopierten Crawl-Dateien neu erzeugt werden (`npm run data:search
    | `OS_SCENE_JUGENDAGENTUR=1` | Jugendagentur-Termine dazu |
    | `OS_OPENINGS=1` | OSM-Auswertung neu erfasster Orte (nicht im Dauerbetrieb geprüft) |
    | `OS_VEHICLES=0`, `OS_GTFSRT=0`, `OS_VERLAUF=0` | rechenintensive Hintergrunddienste abschalten |
+   | `OS_MCP=0` | MCP-Endpunkt `/mcp` abschalten |
+   | `OS_MCP_RATE` / `OS_MCP_HEAVY_RATE` | Rate-Limit pro Minute und IP (Standard 120 / 20) |
+   | `OS_MCP_ORIGINS` | erlaubte Browser-Origins für `/mcp`, kommasepariert; Standard `*` |
+   | `OS_TRUST_PROXY=1` | echte Client-IP aus `X-Forwarded-For` für Limits und Logs |
+
+   Der MCP-Endpunkt liegt automatisch unter `https://deine-domain/mcp`; Details in
+   [`docs/mcp.md`](mcp.md).
 
 9. **Deploy** klicken. Der Build läuft durch zwei Stages (`npm ci` + `vite build`, dann Runtime-Image) und startet
    `node server/index.mjs`. Die `HEALTHCHECK`-Zeile im Dockerfile prüft `/api/health`.
@@ -95,6 +102,14 @@ curl -s https://open-stuttgart.example.de/api/health
 # {"ok":true,"time":"..."}
 
 curl -s https://open-stuttgart.example.de/api/search/stats | head -c 300   # Suchdatenbank vorhanden?
+
+# MCP: moderner Handshake (erwartet result.supportedVersions)
+curl -s https://open-stuttgart.example.de/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2026-07-28' \
+  -H 'Mcp-Method: server/discover' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 
 Im Browser öffnen. Fehlt die Suchdatenbank, antwortet `/api/search` mit `503` und dem Hinweis
