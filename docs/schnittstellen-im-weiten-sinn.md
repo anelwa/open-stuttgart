@@ -95,7 +95,7 @@ Stuttgarters offizieller Kanal für Ideen und Beschwerden im öffentlichen Raum 
 
 * **Die Idee:** Jedes Objekt, das das Projekt schon kennt (Baumkataster-ID, Denkmal,
   Haltestelle, Brunnen, Notfall-Treffpunkt), bekommt einen QR-Code mit Deep Link
-  `https://open-stuttgart.de/o/<typ>/<id>` — die App wird zum **Erklärer der realen Welt**.
+  `https://openstuttgart.de/o/<typ>/<id>` — die App wird zum **Erklärer der realen Welt**.
   Kein Login, kein App-Store, kein nfc-spezifisches Backend: die vorhandenen
   `/api/*`-Routen und das vorhandene Routing reichen.
 * **Warum out of the box:** Die Schnittstelle ist physisch. Sie erreicht Menschen, die nie

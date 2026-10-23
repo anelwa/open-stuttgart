@@ -171,11 +171,11 @@ export async function wfsRss({ layer } = {}) {
     const p = f.properties ?? {};
     const title = p.NAME ?? p.name ?? p.TITEL ?? p.BEZEICHNUNG ?? p.STRASSE ?? p._layerTitle;
     const c = geomCenter(f.geometry);
-    const link = c ? `https://open-stuttgart.de/o/wissen/${encodeURIComponent(entry.name)}/${encodeURIComponent(f.id)}` : `https://open-stuttgart.de/?layer=${encodeURIComponent(entry.name)}`;
+    const link = c ? `https://openstuttgart.de/o/wissen/${encodeURIComponent(entry.name)}/${encodeURIComponent(f.id)}` : `https://openstuttgart.de/?layer=${encodeURIComponent(entry.name)}`;
     return `<item><title>${esc(title)}</title><link>${link}</link><guid>${link}</guid><description>${esc(p.BESCHREIBUNG ?? p.BEMERKUNG ?? '')}</description></item>`;
   }).join('');
   return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Open Stuttgart · ${esc(entry.title)}</title>`
-    + `<link>https://open-stuttgart.de/</link><description>${esc(entry.title)} aus dem Geoserver der Stadt Stuttgart</description>${items}</channel></rss>`;
+    + `<link>https://openstuttgart.de/</link><description>${esc(entry.title)} aus dem Geoserver der Stadt Stuttgart</description>${items}</channel></rss>`;
 }
 
 // ---------- Amtlicher Geocoder ----------

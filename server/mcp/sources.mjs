@@ -182,7 +182,7 @@ export const SOURCES = {
   },
   szene: {
     name: 'Haus- und Szenequellen (Theaterhaus, Im Wizemann, Bix, Wagenhallen, Hochschulen, stuvus …)',
-    url: 'https://open-stuttgart.de/',
+    url: 'https://openstuttgart.de/',
     license: 'Keine einheitliche Lizenz; nur Termin, Ort, Preis und Link',
     note: 'Einzelne Quellen mit OS_SCENE_<KEY>=0 abschaltbar.',
   },

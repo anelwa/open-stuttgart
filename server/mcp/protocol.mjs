@@ -48,7 +48,7 @@ export function serverInfo() {
     name: SERVER_NAME,
     title: SERVER_TITLE,
     version: SERVER_VERSION,
-    websiteUrl: 'https://open-stuttgart.de/',
+    websiteUrl: 'https://openstuttgart.de/',
   };
 }
 

@@ -26,7 +26,7 @@ export function createAboutTool({ tools, resources, prompts }) {
         coverage: COVERAGE,
         limits: LIMITS,
         attribution: 'Open Stuttgart, EUPL-1.2. Daten der Landeshauptstadt Stuttgart und Dritter; Quelle und Lizenz an jeder Antwort.',
-        documentation: 'https://open-stuttgart.de/ (Repository: docs/mcp.md)',
+        documentation: 'https://openstuttgart.de/ (Repository: docs/mcp.md)',
       };
       if (detail === 'tools' || detail === 'all') {
         overview.tools = tools.map((t) => ({

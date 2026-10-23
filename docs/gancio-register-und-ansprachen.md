@@ -78,7 +78,7 @@ Die Anbindung ist in [`server/sources/wasgeht/termine.mjs`](../server/sources/wa
 
 | Umgebungsvariable | Beschreibung | Standard |
 |---|---|---|
-| `OS_GANCIO_URL` | Basisadresse der Gancio-Instanz (z. B. `http://localhost:13120` oder `https://register.open-stuttgart.de`) | leer (vorbereitet) |
+| `OS_GANCIO_URL` | Basisadresse der Gancio-Instanz (z. B. `http://localhost:13120` oder `https://register.openstuttgart.de`) | leer (vorbereitet) |
 | `OS_GANCIO_FILE` | Optionaler Dateipfad zu einem lokalen JSON-Abzug im Format von `/api/events` für Offline-Tests | leer |
 | `OS_SCENE_GANCIO` | Mit `0` lässt sich die Register-Quelle im laufenden Betrieb einzeln abschalten | `1` |
 

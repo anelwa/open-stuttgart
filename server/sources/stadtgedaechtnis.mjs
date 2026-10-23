@@ -203,7 +203,7 @@ export async function stadtgedaechtnisRss({ days = 30 } = {}) {
   const d = await stadtgedaechtnis({ days });
   const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<rss version="2.0">', '<channel>',
-    '<title>Open Stuttgart – Stadtgedächtnis</title>', '<link>https://open-stuttgart.de</link>',
+    '<title>Open Stuttgart – Stadtgedächtnis</title>', '<link>https://openstuttgart.de</link>',
     '<description>Was sich in Stuttgart geändert hat, mit Quelle und Datum.</description>', '<language>de-DE</language>',
     `<lastBuildDate>${new Date().toUTCString()}</lastBuildDate>`];
   for (const x of d.items) {
