@@ -1,6 +1,11 @@
-# StuttBot: Entwurf und Umsetzung
+# StuttBot (StuggiAI): Entwurf und Umsetzung
 
-Stand: 22.10.2026. StuttBot ist der Bürgeranliegen-Assistent von Open Stuttgart. Er beantwortet Fragen wie „Ich will einen Personalausweis beantragen“, fragt die fehlenden Angaben ab, findet das passende Bürgerbüro, rechnet Wartezeit und Fahrzeit zusammen und verlinkt die Terminbuchung.
+Stand: 23.10.2026. StuttBot ist der Bürgeranliegen-Assistent von Open Stuttgart. In der Oberfläche heißt er seit dem Redesign **StuggiAI**.
+
+> Weiterentwicklung: [`docs/stuttbot-2-konzept.md`](stuttbot-2-konzept.md) beschreibt StuttBot 2.0 als
+> Kommandoschicht über der Karte – mit Voice Mode, typisierten UI-Aktionen, Tool-Gateway und MCP-Anbindung.
+
+Er beantwortet Fragen wie „Ich will einen Personalausweis beantragen“, fragt die fehlenden Angaben ab, findet das passende Bürgerbüro, rechnet Wartezeit und Fahrzeit zusammen und verlinkt die Terminbuchung.
 
 ## 1. Ziel und Abgrenzung
 
@@ -190,23 +195,28 @@ Hinter Dokploy/nginx muss `OS_TRUST_PROXY=1` gesetzt sein, damit das Rate-Limit 
 - Für Produktion ist der bezahlte Gemini-Tier zu empfehlen. Im Free Tier kann Google die Daten laut Preisseite zur Produktverbesserung nutzen; das ist für eine Stadt-Anwendung nicht der richtige Standard.
 - Der Bot fragt nie nach Ausweisnummer, IBAN, Gesundheitsdaten oder ähnlichem. Das steht auch im Systemprompt.
 
-## 9. Oberfläche und Maskottchen
+## 9. Oberfläche, Name und Zeichen
 
-Einstieg ist eine amberfarbene **StuttBot**-Pille ganz links in den Schnellaktionen. Auf Desktop öffnet sich rechts ein Chat-Panel, auf Mobil ein Vollbild-Blatt. Die Karte rückt auf Desktop um die Panelbreite zur Seite; Suche und Kartensteuerung bleiben erreichbar.
+Einstieg ist eine amberfarbene **StuggiAI**-Pille ganz links in den Schnellaktionen. Auf Desktop öffnet sich rechts die Gesprächsschiene, auf Mobil ein Blatt. Die Karte rückt auf Desktop um die Panelbreite zur Seite; Suche und Kartensteuerung bleiben erreichbar.
 
 Das Panel enthält:
 
-- Einstieg mit Maskottchen und vier Beispielen,
-- Blasen für Nutzer und Bot,
-- Antwortkarten für das empfohlene Bürgerbüro mit Wartezeit, Anfahrt und Gesamtzeit,
+- Einstieg mit dem StuggiAI-Zeichen und vier Beispielen,
+- Blasen für Nutzer und Bot, Antwortkarten für Bürgerbüro, Route, Termine, Wetter, Parken und Wissen,
 - Aktionen „Termin buchen“, „Online erledigen“, „Route öffnen“, „Auf Karte“,
+- Voice Mode mit Push-to-Talk, Freihändig, Vorlesen und Untertiteln,
+- Quittungen für Kartenaktionen mit „Rückgängig“,
 - Nachfrage-Chips („Welche Unterlagen brauche ich?“, „Kann ich das online erledigen?“),
 - Hinweis „Regelbasiert beantwortet“, wenn der Fallback greift,
+- Quellen und Grenzen an jeder Antwort,
 - Fußzeile mit Modellhinweis und „Keine Rechtsberatung“.
 
-### Das Maskottchen: Fernsehtürmli
+### Das Zeichen: Büste mit leuchtenden Augen
 
-`src/components/StuttBotMark.tsx` zeichnet ein **schwarzes Fernsehtürmli auf Gold**: Turmkorb mit Gesicht, schlanker Schaft, Sockel, Antenne. Es ist eine reduzierende Kurzform des Stuttgarter Fernsehturms und gleichzeitig ein kleiner Roboter. Die schwarze Fläche bleibt ruhig; nur Augen, Mund und Aussichtsplattform sind gold. Die Form funktioniert von 18 px (Pille) bis 92 px (Einstieg) und vermeidet bewusst ein großes Gesicht im Nahformat.
+`src/components/StuggiMark.tsx` zeichnet eine **stilisierte Büste im Anzug** als schwarze Silhouette auf
+gelber Kachel, mit Hemd, Krawatte und zwei leuchtenden Augen. Das Zeichen ist als SVG skalierbar und
+funktioniert von 18 px (Pille) bis 92 px (Einstieg); bei `badge={false}` übernimmt die Büste die Textfarbe.
+Der Kompatibilitätsname `StuttBotMark` bleibt für ältere Importe erhalten.
 
 ## 10. Ausfälle und Fallbacks
 
@@ -243,8 +253,9 @@ Die Fälle laufen ohne Gemini-Key und prüfen damit den wichtigsten Pfad: Der Bo
 | `server/sources/bot-katalog.mjs` | kuratierte Anliegen, Slots, Synonyme, Leistungs-URLs |
 | `server/index.mjs` | `POST /api/bot`, `GET /api/bot/health` |
 | `src/components/StuttBot.tsx` | Chat-Panel, Aktionen, Standort, Karten-/Routen-Übergabe |
-| `src/components/StuttBotMark.tsx` | Fernsehtürmli-Maskottchen |
-| `src/styles/stuttbot.css` | Panel, Karten, Mobil-Layout, Maskottchen-Umfeld |
+| `src/components/StuggiMark.tsx` | Büste mit leuchtenden Augen, gelbe oder dunkle Kachel |
+| `src/components/StuttBotMark.tsx` | Kompatibilitätsname für ältere Importe |
+| `src/styles/stuttbot.css` | Panel, Karten, Voice Mode, Quittungen, Mobil-Layout |
 | `scripts/bot-eval.mjs` | deterministische Gesprächsprüfung |
 
 Umgebungsvariablen:

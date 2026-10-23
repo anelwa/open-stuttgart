@@ -418,6 +418,11 @@ h1, h2, h3 { font-family: var(--font-head); margin: 0; }
 .walk svg { color: var(--muted); }
 .walk strong { font-family: var(--font-head); font-size: 16px; }
 .walk small { font-size: 10.5px; color: var(--muted); }
+.tank-price { width: 78px; flex: none; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+.tank-price strong { font-family: var(--font-head); font-size: 15px; font-weight: 800; white-space: nowrap; }
+.tank-price small { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tank-closed { margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--warn); }
+.tank-list .near-sub { display: block; }
 .near-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .near-name { font-weight: 600; }
 .near-lines { display: flex; flex-wrap: wrap; gap: 3px; }

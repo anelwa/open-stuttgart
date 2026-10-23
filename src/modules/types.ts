@@ -1,7 +1,15 @@
 import type { ComponentType } from 'react';
 import type { OverlayKey } from '../map/overlays';
 import type { Facility, Selection } from '../lib/types';
-import type { Place } from '../lib/routeCtx';
+import type { RouteRequest } from '../lib/routeCtx';
+
+/** Ein typisierter Befehl aus dem Bot an das aktive Panel (z. B. Modus wechseln). */
+export interface ModuleCommand {
+  id: string;
+  module: string;
+  command: string;
+  args?: Record<string, unknown>;
+}
 
 export interface ModuleProps {
   visible: Record<OverlayKey, boolean>;
@@ -28,10 +36,14 @@ export interface ModuleProps {
   setNearby: (d: { items: Facility[]; color: Record<string, string> } | null) => void;
   /** Freie WFS-/Arten-/Fairteiler-Punkte für die Ebene „Stadtwissen“ */
   setWissen: (fc: GeoJSON.FeatureCollection | null) => void;
+  /** Route und Stationen des Stadtspiels als eigene Kartenebene */
+  setSpiel: (fc: GeoJSON.FeatureCollection | null) => void;
   /** Gewählte Verbindung als Linien auf der Karte */
   setRoute: (fc: GeoJSON.FeatureCollection | null) => void;
-  /** Ziel aus „Verbindung suchen“ einer Detailansicht */
-  routeTarget: Place | null;
+  /** Ziel aus „Verbindung suchen“ einer Detailansicht oder aus dem Bot */
+  routeTarget: RouteRequest | null;
+  /** Einmaliger Befehl aus dem Bot; das Panel wendet ihn an und ignoriert fremde Module. */
+  botCommand?: ModuleCommand | null;
 }
 
 /**

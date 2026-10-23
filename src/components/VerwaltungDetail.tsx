@@ -123,13 +123,15 @@ function waitDotClass(w: WartezeitInfo | null | undefined) {
   return 'w-kurz';
 }
 
-function CopyField({ label, value }: { label: string; value: string }) {
+function CopyField({ label, value, href }: { label: string; value: string; href: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div>
       <dt>{label}</dt>
       <dd style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span>{value}</span>
+        <a href={href} style={{ color: 'inherit', fontWeight: 600 }}>
+          {value}
+        </a>
         <button
           type="button"
           className="link-quiet small"
@@ -140,7 +142,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
             }, () => {});
           }}
         >
-          {copied ? 'Kopiert' : 'Kopieren'}
+          <Icon name={copied ? 'check' : 'copy'} size={13} /> {copied ? 'Kopiert' : 'Kopieren'}
         </button>
       </dd>
     </div>
@@ -208,8 +210,8 @@ function EinheitBlock({ e, lat, lon, select }: { e: GebaeudeEinheit; lat: number
       )}
       {(e.phone || e.email) && (
         <dl className="facts">
-          {e.phone && <CopyField label="Telefon" value={e.phone} />}
-          {e.email && <CopyField label="E-Mail" value={e.email} />}
+          {e.phone && <CopyField label="Telefon" value={e.phone} href={`tel:${e.phone.replace(/[^\d+]/g, '')}`} />}
+          {e.email && <CopyField label="E-Mail" value={e.email} href={`mailto:${e.email}`} />}
         </dl>
       )}
 

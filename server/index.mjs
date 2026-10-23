@@ -23,9 +23,12 @@ import { hitze } from './sources/hitze.mjs';
 import { flug } from './sources/flug.mjs';
 import { unfaelle, unfallStatistik } from './sources/unfall.mjs';
 import { wanderwege, wanderwegeGeoJson } from './sources/wanderwege.mjs';
+import { bartour, bartourGpx, bartouren, bartourenGeoJson } from './sources/bartouren.mjs';
+import { spielAbschluss, spielPruefen, spielRoute, spielRouten } from './sources/spiel.mjs';
 import { stadtgedaechtnis, stadtgedaechtnisRss } from './sources/stadtgedaechtnis.mjs';
 import { geocaches } from './sources/geocaching.mjs';
 import { documentDetail, related, search, searchStats, suggest } from './sources/search.mjs';
+import { kontaktDetail, kontakteStats, kontakteSuche } from './sources/kontakte.mjs';
 import { beobachtungen, giessRadar, pollenKarte } from './sources/natur.mjs';
 import { mensen } from './sources/mensa.mjs';
 import { ortSuche, route } from './sources/routing.mjs';
@@ -34,8 +37,9 @@ import { bebauungsplaene, beteiligungen, wahlergebnisse } from './sources/beteil
 import { maengelUebergabe, partnerDaten, partnerStatus } from './sources/partner.mjs';
 import { archivDatei, archivTage, startVerlauf } from './sources/verlauf.mjs';
 import { abfall, adresse, baeder, buergerbueros, categories, facilities, freizeitRouten, gesundheit, gruenstrom, laden, schulbezirk } from './sources/nearby.mjs';
+import { tankpreise } from './sources/tanken.mjs';
 import { verwaltungGebaeude, verwaltungLeistung, verwaltungSuche, verwaltungWerkzeug, verwaltungWo } from './sources/verwaltung.mjs';
-import { botReply, botStatus } from './sources/bot.mjs';
+import { botAllowRequest, botCoverage, botReply, botStatus, botToolCatalog, runBotTool } from './sources/bot.mjs';
 import { stadtpalais } from './sources/stadtpalais.mjs';
 import {
   addressSearch, bibliothek, dcatKatalog, foodsharing, fragdenstaat, fragdenstaatRss, gbif,
@@ -61,6 +65,11 @@ const routes = {
   '/api/search': (q) => search({ q: q.get('q'), type: q.get('type'), limit: q.get('limit'), offset: q.get('offset') }),
   '/api/search/suggest': (q) => suggest(q.get('q')),
   '/api/search/stats': () => searchStats(),
+  '/api/kontakte': (q) => kontakteSuche({
+    q: q.get('q'), kind: q.get('kind'), gruppe: q.get('gruppe'),
+    limit: q.get('limit'), offset: q.get('offset'),
+  }),
+  '/api/kontakte/stats': () => kontakteStats(),
   '/api/news': (q) => news({ topic: q.get('topic'), district: q.get('district') }),
   '/api/stadtgedaechtnis': (q) => stadtgedaechtnis({ days: q.get('days'), district: q.get('district'), topic: q.get('topic'), limit: q.get('limit') }),
   '/api/puenktlichkeit': () => puenktlichkeitJetzt(),
@@ -87,9 +96,13 @@ const routes = {
   '/api/kessel': () => kessel(),
   '/api/nearby/categories': async () => categories(),
   '/api/nearby/facilities': (q) => facilities(q.get('cat'), { diet: q.get('diet') }),
+  '/api/nearby/tanken': () => tankpreise(),
   '/api/freizeit/routen': () => freizeitRouten(),
   '/api/wanderwege': () => wanderwege(),
   '/api/wanderwege.geojson': () => wanderwegeGeoJson(),
+  '/api/bartouren': () => bartouren(),
+  '/api/bartouren.geojson': () => bartourenGeoJson(),
+  '/api/spiel/routen': () => spielRouten(),
   '/api/nearby/buergerbueros': () => buergerbueros(),
   '/api/nearby/baeder': () => baeder(),
   '/api/nearby/abfall': (q) => abfall(q.get('street'), q.get('nr')),
@@ -129,6 +142,8 @@ const routes = {
   '/api/mensa': (q) => mensen(q.get('date')),
   '/api/health': async () => ({ ok: true, time: new Date().toISOString() }),
   '/api/bot/health': async () => botStatus(),
+  '/api/bot/tools': async () => botToolCatalog(),
+  '/api/bot/coverage': async () => botCoverage(),
   // Schnittstellen im weiten Sinn: Stadt-Layer, Geocoder, Statistik, Transparenz, Arten, Katalog
   '/api/stadt/wfs/katalog': () => wfsKatalog(),
   '/api/stadt/wfs': (q) => wfsFeatures({ layer: q.get('layer'), lat: q.get('lat'), lon: q.get('lon'), r: q.get('r'), limit: q.get('limit') }),
@@ -203,6 +218,41 @@ async function serveStatic(res, pathname) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
 
+  // Fortschritt und Aktionen als Server-Sent Events. Der Client kann auch weiterhin
+  // den kompakten JSON-Endpunkt nutzen; beide liefern denselben BotTurn.
+  if (req.method === 'POST' && url.pathname === '/api/bot/stream') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-store',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.flushHeaders?.();
+    const send = (event, data) => {
+      try { res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch { /* Client weg */ }
+    };
+    try {
+      const body = await readJsonBody(req);
+      send('status', { text: 'Ich schaue nach …' });
+      const data = await botReply({
+        sessionId: body.sessionId,
+        message: body.message,
+        location: body.location,
+        context: body.context,
+        ip: clientIp(req),
+      });
+      for (const action of data.ui ?? []) send('action', action);
+      for (const card of data.cards ?? []) send('card', card);
+      const text = String(data.reply ?? '');
+      for (let i = 0; i < text.length; i += 60) send('token', { text: text.slice(i, i + 60) });
+      send('done', data);
+    } catch (err) {
+      send('error', { message: err.message ?? 'StuttBot nicht erreichbar' });
+    }
+    res.end();
+    return;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/bot') {
     const t0 = Date.now();
     try {
@@ -211,6 +261,7 @@ const server = http.createServer(async (req, res) => {
         sessionId: body.sessionId,
         message: body.message,
         location: body.location,
+        context: body.context,
         ip: clientIp(req),
       });
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -221,6 +272,140 @@ const server = http.createServer(async (req, res) => {
       console.warn(`/api/bot: ${err.message}`);
       res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: err.message ?? 'StuttBot nicht erreichbar' }));
+    }
+    return;
+  }
+
+  // ---------- MCP: Open Stuttgart als read-only Werkzeugquelle für andere Agenten ----------
+  if (url.pathname === '/mcp') {
+    const cors = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Mcp-Session-Id, MCP-Protocol-Version',
+    };
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, cors);
+      res.end();
+      return;
+    }
+    if (req.method !== 'POST') {
+      res.writeHead(405, { ...cors, 'Content-Type': 'application/json; charset=utf-8', Allow: 'POST, OPTIONS' });
+      res.end(JSON.stringify({ error: 'MCP nutzt POST (Streamable HTTP).' }));
+      return;
+    }
+    try {
+      if (!botAllowRequest(clientIp(req))) {
+        res.writeHead(429, { ...cors, 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Zu viele Anfragen.' } }));
+        return;
+      }
+      const body = await readJsonBody(req, 131_072);
+      const calls = Array.isArray(body) ? body : [body];
+      const catalog = botToolCatalog();
+      const allowed = new Set(catalog.tools.map((t) => t.name).filter((n) => n !== 'karte_steuern'));
+      const resources = [
+        { uri: 'stuttgart://catalog', name: 'Werkzeugkatalog', description: 'Verfügbare Werkzeuge, Quellen und Grenzen', mimeType: 'application/json' },
+        { uri: 'stuttgart://coverage', name: 'Datenabdeckung', description: 'live, cached, nur verlinkt oder fehlend', mimeType: 'application/json' },
+      ];
+      const mcpResult = async (msg) => {
+        const id = msg?.id ?? null;
+        const method = String(msg?.method ?? '');
+        if (method === 'notifications/initialized' || method === 'notifications/cancelled') return null;
+        if (method === 'initialize') {
+          return {
+            jsonrpc: '2.0', id,
+            result: {
+              protocolVersion: msg?.params?.protocolVersion ?? '2025-06-18',
+              capabilities: { tools: { listChanged: false }, resources: { listChanged: false } },
+              serverInfo: { name: 'open-stuttgart', version: '0.2.0' },
+              instructions: 'Open Stuttgart: offene Daten der Landeshauptstadt. Read-only. Jede Antwort nennt Quelle und Zeitstand. Keine Terminbuchung, keine Anträge.',
+            },
+          };
+        }
+        if (method === 'ping') return { jsonrpc: '2.0', id, result: {} };
+        if (method === 'tools/list') {
+          return {
+            jsonrpc: '2.0', id,
+            result: {
+              tools: catalog.tools.filter((t) => allowed.has(t.name)).map((t) => ({
+                name: t.name,
+                description: t.description,
+                inputSchema: t.parameters ?? { type: 'object', properties: {} },
+                annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+              })),
+            },
+          };
+        }
+        if (method === 'tools/call') {
+          const name = String(msg?.params?.name ?? '');
+          if (!allowed.has(name)) {
+            return { jsonrpc: '2.0', id, error: { code: -32602, message: `Unbekanntes oder nicht freigegebenes Werkzeug: ${name}` } };
+          }
+          const out = await runBotTool(name, msg?.params?.arguments ?? {}, null);
+          const text = JSON.stringify({ facts: out.facts, sources: out.sources, limits: out.limits }, null, 2);
+          return {
+            jsonrpc: '2.0', id,
+            result: {
+              content: [{ type: 'text', text }],
+              structuredContent: { facts: out.facts, sources: out.sources, limits: out.limits },
+              isError: false,
+            },
+          };
+        }
+        if (method === 'resources/list') return { jsonrpc: '2.0', id, result: { resources } };
+        if (method === 'resources/read') {
+          const uri = String(msg?.params?.uri ?? '');
+          if (uri === 'stuttgart://catalog') {
+            return { jsonrpc: '2.0', id, result: { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(catalog, null, 2) }] } };
+          }
+          if (uri === 'stuttgart://coverage') {
+            return { jsonrpc: '2.0', id, result: { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(botCoverage(), null, 2) }] } };
+          }
+          return { jsonrpc: '2.0', id, error: { code: -32602, message: `Unbekannte Ressource: ${uri}` } };
+        }
+        if (method === 'prompts/list') return { jsonrpc: '2.0', id, result: { prompts: [] } };
+        return { jsonrpc: '2.0', id, error: { code: -32601, message: `Methode nicht unterstützt: ${method}` } };
+      };
+      const results = [];
+      for (const msg of calls) {
+        const r = await mcpResult(msg);
+        if (r) results.push(r);
+      }
+      res.writeHead(200, { ...cors, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(Array.isArray(body) ? results : results[0] ?? { jsonrpc: '2.0', id: null, result: {} }));
+    } catch (err) {
+      res.writeHead(err.status ?? 400, { ...cors, 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: err.message ?? 'Ungültige Anfrage' } }));
+    }
+    return;
+  }
+
+  // Stadtspiel: Antworten und Lösungswort werden serverseitig geprüft.
+  if (req.method === 'POST' && (url.pathname === '/api/spiel/pruefen' || url.pathname === '/api/spiel/abschluss')) {
+    try {
+      const body = await readJsonBody(req, 16_384);
+      const data = url.pathname.endsWith('/pruefen')
+        ? spielPruefen({ routeId: String(body.routeId ?? ''), stationId: String(body.stationId ?? ''), answer: body.answer })
+        : spielAbschluss({ routeId: String(body.routeId ?? ''), word: body.word });
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(data));
+    } catch (err) {
+      const status = err.status ?? 400;
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: err.message ?? 'Antwort konnte nicht geprüft werden' }));
+    }
+    return;
+  }
+
+  const spielRouteMatch = /^\/api\/spiel\/routen\/([^/]+)$/.exec(url.pathname);
+  if (spielRouteMatch) {
+    try {
+      const data = spielRoute(decodeURIComponent(spielRouteMatch[1]));
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(data));
+    } catch (err) {
+      res.writeHead(err.status ?? 500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: err.message ?? 'Spielroute nicht erreichbar' }));
     }
     return;
   }
@@ -241,6 +426,30 @@ const server = http.createServer(async (req, res) => {
     }
     return;
   }
+  const bartourGpxMatch = /^\/api\/bartouren\/([^/]+)\.gpx$/.exec(url.pathname);
+  if (bartourGpxMatch) {
+    const gpx = bartourGpx(decodeURIComponent(bartourGpxMatch[1]));
+    if (!gpx) {
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: 'Tour nicht gefunden' }));
+    } else {
+      res.writeHead(200, { 'Content-Type': 'application/gpx+xml; charset=utf-8', 'Content-Disposition': `attachment; filename="open-stuttgart-${bartourGpxMatch[1]}.gpx"` });
+      res.end(gpx);
+    }
+    return;
+  }
+  const bartourMatch = /^\/api\/bartouren\/([^/]+)$/.exec(url.pathname);
+  if (bartourMatch) {
+    const data = bartour(decodeURIComponent(bartourMatch[1]));
+    if (!data) {
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: 'Tour nicht gefunden' }));
+    } else {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=300' });
+      res.end(JSON.stringify(data));
+    }
+    return;
+  }
   const docMatch = /^\/api\/documents\/(\d+)(\/related)?$/.exec(url.pathname);
   if (docMatch) {
     try {
@@ -255,6 +464,23 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       res.writeHead(err.status ?? 500, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: err.message ?? 'Suchdatenbank nicht erreichbar' }));
+    }
+    return;
+  }
+  const kontaktMatch = /^\/api\/kontakte\/([^/]+)$/.exec(url.pathname);
+  if (kontaktMatch) {
+    try {
+      const data = kontaktDetail(decodeURIComponent(kontaktMatch[1]));
+      if (!data) {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Kontakt nicht gefunden' }));
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=300' });
+        res.end(JSON.stringify(data));
+      }
+    } catch (err) {
+      res.writeHead(err.status ?? 500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: err.message ?? 'Kontaktregister nicht erreichbar' }));
     }
     return;
   }

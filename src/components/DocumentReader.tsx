@@ -4,8 +4,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { getJson } from '../lib/api';
 import { fmtTime } from '../lib/format';
+import type { Kontakt } from '../lib/kontakt';
+import { KontaktBody } from './KontaktDetail';
 import { Icon } from './Icon';
 import '../styles/search.css';
+import '../styles/kontakt.css';
 
 type Step = { ord: number; title: string; text: string };
 type SourceLink = { role: string; label: string | null; id: number | null; title: string | null; url: string | null; doc_type: string | null };
@@ -21,19 +24,21 @@ export type DocumentDetail = {
   };
   steps: Step[]; sources: SourceLink[]; backlinks: LinkItem[]; outlinks: LinkItem[]; related: (LinkItem & { shared: number })[];
   chunks: { ord: number; text: string }[];
+  contact?: Kontakt | null;
   lizenz?: string;
 };
 
 export const TYPE_ICON: Record<string, string> = {
-  leistung: 'home', dienststelle: 'pin', seite: 'info', pressemitteilung: 'calendar', online_angebot: 'external', dokument: 'info', haltestelle: 'stop',
+  leistung: 'home', dienststelle: 'pin', kontakt: 'phone', seite: 'info', pressemitteilung: 'calendar', online_angebot: 'external', dokument: 'info', haltestelle: 'stop',
 };
 
 const ROLE_LABEL: Record<string, string> = {
   'angeboten_in': 'angeboten in', 'verweis': 'Verweis', 'zuständig': 'zuständig', 'online': 'Online-Dienst', 'quelle': 'Quelle',
 };
 
-export function DocumentView({ d, loading, error, onOpen }: {
+export function DocumentView({ d, loading, error, onOpen, onShowOnMap }: {
   d: DocumentDetail; loading: boolean; error: string | null; onOpen: (id: number) => void;
+  onShowOnMap?: (k: Kontakt) => void;
 }) {
   const text = d.text ?? '';
   const shown = text.length > 4200 ? `${text.slice(0, 4200).replace(/\s\S*$/, '')} …` : text;
@@ -45,13 +50,17 @@ export function DocumentView({ d, loading, error, onOpen }: {
         <span className={`cmdk-type type-${d.doc_type}`}><Icon name={TYPE_ICON[d.doc_type] ?? 'info'} size={15} />{d.typeLabel}</span>
         <h2>{d.title}</h2>
         <p className="cmdk-meta">
-          {d.source}{d.district ? ` · ${d.district}` : ''}
+          {(d.contact?.source ?? d.source)}{d.district ? ` · ${d.district}` : ''}
           {d.modified_at ? ` · zuletzt geändert ${new Date(d.modified_at).toLocaleDateString('de-DE')}` : ''}
           {d.service ? ` · ${d.service.digital ? 'Online-Dienst vorhanden' : 'kein Online-Dienst hinterlegt'}` : ''}
         </p>
       </div>
 
-      {d.summary && <p className="cmdk-summary">{d.summary}</p>}
+      {d.contact ? (
+        <KontaktBody k={d.contact} onOpenDoc={onOpen} onShowOnMap={onShowOnMap} />
+      ) : (
+        <>
+          {d.summary && <p className="cmdk-summary">{d.summary}</p>}
 
       {d.service && (
         <section className="cmdk-section">
@@ -83,6 +92,8 @@ export function DocumentView({ d, loading, error, onOpen }: {
           {text.length > 4200 && <p className="muted small">Gekürzt. Der vollständige Text steht auf der Originalseite.</p>}
         </section>
       )}
+        </>
+      )}
 
       {d.sources.length > 0 && (
         <section className="cmdk-section">
@@ -100,21 +111,21 @@ export function DocumentView({ d, loading, error, onOpen }: {
         </section>
       )}
 
-      {d.related.length > 0 && (
+      {!d.contact && d.related.length > 0 && (
         <section className="cmdk-section">
           <h3>Verwandte Dokumente <span className="muted small">(gemeinsame Bezüge)</span></h3>
           <ul className="cmdk-links">
             {d.related.map((r) => (
               <li key={r.id}>
                 <button type="button" className="link-quiet" onClick={() => r.id != null && onOpen(r.id)}>{r.title}</button>
-                <span className="muted small">{r.shared} gemeinsame {r.shared === 1 ? 'Verbindung' : 'Verbindungen'}</span>
+                <span className="muted small">{r.shared >= 2 ? `${r.shared} gemeinsame Bezüge` : 'thematisch verwandt'}</span>
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      {d.backlinks.length > 0 && (
+      {!d.contact && d.backlinks.length > 0 && (
         <section className="cmdk-section">
           <h3>Verweist hierher</h3>
           <ul className="cmdk-links">
@@ -131,7 +142,7 @@ export function DocumentView({ d, loading, error, onOpen }: {
       )}
 
       <footer className="cmdk-detail-foot">
-        <a className="chip" href={d.url} target="_blank" rel="noreferrer">Originalseite öffnen <Icon name="external" size={14} /></a>
+        <a className="chip" href={d.contact?.url ?? d.contact?.sourceUrl ?? d.url} target="_blank" rel="noreferrer">Originalseite öffnen <Icon name="external" size={14} /></a>
         {d.fetched_at && <span className="muted small">Abgerufen {fmtTime(d.fetched_at)} Uhr</span>}
         {d.lizenz && <span className="muted small">{d.lizenz}</span>}
       </footer>
@@ -144,7 +155,11 @@ export function DocumentView({ d, loading, error, onOpen }: {
  * Dokument gewählt wird — und über alle Bezugsquellen, verwandten Dokumente und
  * Backlinks hinweg weiterverfolgt, ohne die Suche zu verlassen.
  */
-export function DocumentReader({ id, onClose }: { id: number | null; onClose: () => void }) {
+export function DocumentReader({ id, onClose, onShowOnMap }: {
+  id: number | null;
+  onClose: () => void;
+  onShowOnMap?: (k: Kontakt) => void;
+}) {
   const [doc, setDoc] = useState<DocumentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -188,7 +203,7 @@ export function DocumentReader({ id, onClose }: { id: number | null; onClose: ()
         </header>
         <div className="reader-body">
           {error && <p className="cmdk-error">{error}</p>}
-          {doc && <DocumentView d={doc} loading={loading} error={error} onOpen={(next) => { setDoc(null); setLoading(true); getJson<DocumentDetail>(`/api/documents/${next}`).then(setDoc).catch((e) => setError((e as Error).message)).finally(() => setLoading(false)); }} />}
+          {doc && <DocumentView d={doc} loading={loading} error={error} onShowOnMap={onShowOnMap} onOpen={(next) => { setDoc(null); setLoading(true); getJson<DocumentDetail>(`/api/documents/${next}`).then(setDoc).catch((e) => setError((e as Error).message)).finally(() => setLoading(false)); }} />}
         </div>
       </aside>
     </div>

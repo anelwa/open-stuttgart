@@ -9,6 +9,11 @@ Stand: 22. Oktober 2026 · Für Open Stuttgart · Entwurf · Arbeitstitel „Kes
 > Sanierung, Baustellen oder Umbauten ändern. Jede Station braucht ein Prüfdatum und eine zweite Person,
 > die die Antwort unabhängig bestätigt.
 
+> **Umsetzung:** Die erste Fassung ist als Modul `spiel` eingebaut. Die redaktionellen Daten liegen in
+> `scripts/build-spiel-data.mjs` (generiert `server/data/spiel/routen.json`), die Antwortprüfung in
+> `server/sources/spiel.mjs`. Die Zahlen in diesem Konzept sind die Planung; maßgeblich für die App ist
+> der Datensatz.
+
 ## Inhalt
 
 1. Die Idee

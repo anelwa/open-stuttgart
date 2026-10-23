@@ -4,11 +4,13 @@
 // Einrichtungsebenen ändern sich selten: einmal am Tag je Ebene, Live-Daten höchstens einmal pro Minute.
 import { cached, fetchJson, fetchText } from '../cache.mjs';
 import { bestToday, quote, since, usual } from './verlauf.mjs';
+import { tankpreise } from './tanken.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // Gastronomie aus OpenStreetMap (Auszug für das Stadtgebiet, ODbL), siehe public/data/gastro.geojson
 const GASTRO_FILE = fileURLToPath(new URL('../../public/data/gastro.geojson', import.meta.url));
+const POIS_FILE = fileURLToPath(new URL('../data/pois-stuttgart.json', import.meta.url));
 const KUECHE = { italian: 'italienisch', regional: 'regional', pizza: 'Pizza', kebab: 'Kebab', german: 'deutsch', burger: 'Burger', asian: 'asiatisch',
   turkish: 'türkisch', greek: 'griechisch', vietnamese: 'vietnamesisch', indian: 'indisch', swabian: 'schwäbisch', chinese: 'chinesisch', japanese: 'japanisch',
   sushi: 'Sushi', thai: 'thailändisch', coffee_shop: 'Kaffee', cake: 'Kuchen', ice_cream: 'Eis', sandwich: 'Sandwiches', mexican: 'mexikanisch',
@@ -41,6 +43,22 @@ function dietMatch(diet, want) {
   if (want === 'vegetarian-only') return diet === 'vegan-only' || diet === 'vegetarian-only';
   return true;
 }
+let poisCache = null;
+/** Lokaler OSM-POI-Bestand (Einkaufen, Banken, Automaten), gebaut von scripts/build-pois.mjs. */
+function pois(cat, wantCat) {
+  poisCache ??= JSON.parse(readFileSync(POIS_FILE, 'utf8'));
+  return poisCache.items.filter((x) => x.cat === wantCat).map((x) => ({
+    id: x.id, cat, name: x.name, lat: x.lat, lon: x.lon,
+    address: x.address ?? null, phone: x.phone ?? null, web: x.website ?? null, hours: x.hours ?? null,
+    wheelchair: x.wheelchair ?? null, osmUrl: x.osm ?? null,
+    info: [...(x.info ?? []), x.operator ? `Betreiber: ${x.operator}` : null, x.brand && x.brand !== x.name ? `Marke: ${x.brand}` : null].filter(Boolean),
+  }));
+}
+function poisStand() {
+  const stand = poisCache?.stand;
+  return stand ? `, Stand ${stand.split('-').reverse().join('.')}` : '';
+}
+
 function gastro(cat, wantDiet = null) {
   gastroCache ??= JSON.parse(readFileSync(GASTRO_FILE, 'utf8'));
   const kinds = GASTRO_ART[cat];
@@ -83,6 +101,14 @@ export const CATEGORIES = {
   kita: { label: 'Kitas', group: 'familie', layers: ['IP_2_01_10_KITA'], map: infopool },
   grundschule: { label: 'Grundschulen', group: 'familie', layers: ['IP_2_04_01_GRUNDSCHULE'], map: infopool },
   gymnasium: { label: 'Gymnasien', group: 'familie', layers: ['IP_2_04_05_GYMNASIUM'], map: infopool },
+  realschule: { label: 'Realschulen', group: 'familie', layers: ['IP_2_04_04_REALSCHULE'], map: infopool },
+  werkrealschule: { label: 'Werkrealschulen', group: 'familie', layers: ['IP_2_04_47_WERKREALSCHULE'], map: infopool },
+  gemeinschaftsschule: { label: 'Gemeinschaftsschulen', group: 'familie', layers: ['IP_2_04_49_GEMEINSCHAFTSSCHULE'], map: infopool },
+  foerderschule: { label: 'Förderschulen', group: 'familie', layers: ['IP_2_04_07-16_FOERDERSCHULE'], map: infopool },
+  berufsschule: { label: 'Berufsschulen', group: 'familie', layers: ['IP_2_04_20_BERUFSSCHULE'], map: infopool },
+  hochschule: { label: 'Hochschulen', group: 'familie', layers: ['IP_2_04_25-27_UNI_HOCHSCHULE'], map: infopool },
+  vhs: { label: 'Volkshochschulen', group: 'familie', layers: ['IP_2_04_31_VHS'], map: infopool },
+  sonstige_bildung: { label: 'Sonstige Bildung', group: 'familie', layers: ['IP_2_04_32u33_SONSTIGE_BILDUNG'], map: infopool },
   spielplatz: {
     label: 'Spielplätze', group: 'familie', layers: ['A62_SPF_SPIELPLAETZE'],
     map: (p) => ({ name: `Spielplatz ${p.NAME}`, address: p.STADTTEIL_NAME, closed: yes(p.GESPERRT),
@@ -272,6 +298,28 @@ export const CATEGORIES = {
       info: [p.ANZAHL ? `${p.ANZAHL} Stellplätze` : 'Behindertenstellplatz', p.ZEITBEGRENZUNG ?? p.BEMERKUNG ?? p.ZUSATZZEICHEN].filter(Boolean),
     }),
   },
+  // Einkaufen und Geld: lokaler OSM-Bestand aus scripts/build-pois.mjs.
+  supermarkt: { label: 'Supermärkte', group: 'einkaufen', local: 'pois', poiCat: 'supermarkt' },
+  baeckerei: { label: 'Bäckereien', group: 'einkaufen', local: 'pois', poiCat: 'baeckerei' },
+  kiosk: { label: 'Kioske und Convenience', group: 'einkaufen', local: 'pois', poiCat: 'kiosk' },
+  metzgerei: { label: 'Metzgereien', group: 'einkaufen', local: 'pois', poiCat: 'metzgerei' },
+  obst_gemuese: { label: 'Obst und Gemüse', group: 'einkaufen', local: 'pois', poiCat: 'obst_gemuese' },
+  tabak: { label: 'Tabakläden', group: 'einkaufen', local: 'pois', poiCat: 'tabak' },
+  hofladen_osm: { label: 'Hofläden (OSM)', group: 'einkaufen', local: 'pois', poiCat: 'hofladen_osm' },
+  geschaeft: { label: 'Alle Geschäfte', group: 'einkaufen', local: 'pois', poiCat: 'geschaeft' },
+  bank: { label: 'Banken', group: 'geld', local: 'pois', poiCat: 'bank' },
+  geldautomat: { label: 'Geldautomaten', group: 'geld', local: 'pois', poiCat: 'geldautomat' },
+  zigarettenautomat: { label: 'Zigarettenautomaten (unvollständig)', group: 'geld', local: 'pois', poiCat: 'zigarettenautomat' },
+  // Notfall und Alltag: ergänzende OSM-Angaben aus derselben Datei.
+  defibrillator: { label: 'Defibrillatoren (AED)', group: 'notfall', local: 'pois', poiCat: 'defibrillator' },
+  paketstation: { label: 'Paketstationen', group: 'alltag', local: 'pois', poiCat: 'paketstation' },
+  briefkasten: { label: 'Briefkästen', group: 'alltag', local: 'pois', poiCat: 'briefkasten' },
+  buecherschrank: { label: 'Bücherschränke', group: 'alltag', local: 'pois', poiCat: 'buecherschrank' },
+  waschsalon: { label: 'Waschsalons', group: 'alltag', local: 'pois', poiCat: 'waschsalon' },
+  hundepark: { label: 'Hundeparks', group: 'alltag', local: 'pois', poiCat: 'hundepark' },
+  wickeltisch: { label: 'Toiletten mit Wickeltisch', group: 'alltag', local: 'pois', poiCat: 'wickeltisch' },
+  soziales: { label: 'Tafeln und Sozialkaufhäuser', group: 'alltag', local: 'pois', poiCat: 'soziales' },
+  tanken: { label: 'Tankstellen', group: 'unterwegs', local: 'tanken' },
 };
 
 function geomPoint(g) {
@@ -297,6 +345,25 @@ async function layer(name) {
 export async function facilities(cat, { diet = null } = {}) {
   const c = CATEGORIES[cat];
   if (!c) throw new Error('Unbekannte Kategorie');
+  if (c.local === 'pois') {
+    const items = pois(cat, c.poiCat);
+    return { cat, label: c.label, items, source: `© OpenStreetMap-Mitwirkende (ODbL)${poisStand()}` };
+  }
+  if (c.local === 'tanken') {
+    const t = await tankpreise();
+    const eur = (v) => (v == null ? null : `${v.toFixed(3).replace('.', ',')} €/l`);
+    const line = (s) => [['E5', s.e5], ['E10', s.e10], ['Diesel', s.diesel]]
+      .filter(([, v]) => v != null).map(([l, v]) => `${l} ${eur(v)}`).join(' · ') || 'keine Preise gemeldet';
+    const standDate = new Date(t.stand);
+    const stand = `${standDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} ${standDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+    const items = t.stations.map((s) => ({
+      id: `tanken-${s.id}`, cat, name: s.name, lat: s.lat, lon: s.lon,
+      address: s.address, live: `${line(s)} · ${s.isOpen ? 'geöffnet' : 'geschlossen'}`,
+      info: [s.brand && s.brand !== s.name ? `Marke: ${s.brand}` : null, `Preisstand: ${stand}`, 'Preise ohne Gewähr; maßgeblich ist die Zapfsäule.'].filter(Boolean),
+      source: `${t.source}. Abgerufen ${stand} Uhr.`,
+    }));
+    return { cat, label: c.label, items, source: t.source };
+  }
   if (c.local) return { cat, label: c.label, items: gastro(cat, diet), source: '© OpenStreetMap-Mitwirkende (ODbL), Auszug Stand 17.10.2026' };
   const { value } = await cached(`fac-${cat}`, 24 * 3600_000, async () => {
     const out = [];

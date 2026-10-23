@@ -16,6 +16,8 @@ ENV NODE_ENV=production
 ENV PORT=8787
 WORKDIR /app
 COPY server ./server
+# Kontakt-Synonyme werden zur Laufzeit aus src/data gelesen (server/sources/kontakte.mjs).
+COPY src/data ./src/data
 COPY --from=build /app/dist ./dist
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 # Grunddaten (venues.json, iris-codes.json, feste-maerkte.json, …) überleben ein leeres Volume:

@@ -8,7 +8,7 @@ import { BLANK_PNG, aerialTiles, addOverlays, setOverlayVisibility, INTERACTIVE_
 import { registerIcons } from './icons';
 import { getVehicleTrips, subscribeVehicles, vehiclePaths, vehiclePositions } from '../lib/vehicles';
 import { fmtTime, occupancy } from '../lib/format';
-import type { AirStation, CultureEvent, Facility, Flugzeug, KaltluftPunkt, NinaWarnung, ParkingSite, Place, Roadwork, Selection, SharingItem, TrafficItem, Unfall, Wanderweg, Water } from '../lib/types';
+import type { AirStation, Bartour, CultureEvent, Facility, Flugzeug, KaltluftPunkt, NinaWarnung, ParkingSite, Place, Roadwork, Selection, SharingItem, TrafficItem, Unfall, Wanderweg, Water } from '../lib/types';
 
 export interface MapData {
   parking: ParkingSite[] | null;
@@ -18,6 +18,7 @@ export interface MapData {
   water: Water | null;
   bike: GeoJSON.FeatureCollection | null;
   events: CultureEvent[] | null;
+  bartouren: Bartour[] | null;
   places: Place[] | null;
   sunImage: string | null;
   nearby: { items: Facility[]; color: Record<string, string> } | null;
@@ -30,6 +31,7 @@ export interface MapData {
   unfall: Unfall[] | null;
   wanderwege: Wanderweg[] | null;
   wissen: GeoJSON.FeatureCollection | null;
+  spiel: GeoJSON.FeatureCollection | null;
   radarImage: { url: string; coords: [[number, number], [number, number], [number, number], [number, number]] } | null;
 }
 
@@ -40,6 +42,8 @@ export interface MapHandle {
   resetNorth: () => void;
   /** Eigenen Standort als Marker setzen und dorthin fahren. */
   locate: (lngLat: [number, number], zoom?: number) => void;
+  /** Aktueller Ausschnitt für den Bot-Kontext. */
+  getView: () => { center: [number, number]; zoom: number; bbox: [number, number, number, number] } | null;
   getMap: () => MlMap | null;
 }
 
@@ -88,6 +92,22 @@ function toGeo(data: MapData) {
     places: fc((data.places ?? []).map((p) => pt(p.lon, p.lat, { id: p.id, name: p.name, kind: p.kind, rank: p.rank }))),
     nearby: fc((data.nearby?.items ?? []).map((f, i) => pt(f.lon, f.lat, { id: f.id, i, name: f.name, closed: !!f.closed, rank: i, color: data.nearby?.color[f.cat] ?? '#26262C' }))),
     events: fc(eventVenues(data.events ?? [])),
+    bartouren: fc((data.bartouren ?? []).flatMap((t) => [
+      {
+        type: 'Feature' as const,
+        geometry: { type: 'LineString' as const, coordinates: t.stops.map((s) => [s.lon, s.lat]) },
+        properties: {
+          kind: 'tour', id: t.id, title: t.title, subtitle: t.subtitle,
+          color: t.color, durationMin: t.durationMin, distanceM: t.distanceM, stops: t.stopCount,
+        },
+      },
+      ...t.stops.map((s) => pt(s.lon, s.lat, {
+        kind: 'stop', tourId: t.id, tourTitle: t.title, stopIndex: s.index,
+        name: s.name, address: s.address, role: s.role, color: t.color,
+        openingHours: s.openingHours, wheelchair: s.wheelchair, optional: !!s.optional,
+        label: `${s.index}. ${s.name}`,
+      })),
+    ])),
     live: fc((data.live ?? []).map((f, i) => pt(f.lon, f.lat, { i, name: f.name, level: f.level, short: f.short, live: f.live ?? '' }))),
     traffic: fc((data.traffic ?? []).flatMap((t) => {
       const props = { typ: t.typ, text: `${t.typ}: ${t.text}` };
@@ -216,6 +236,17 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
         essential: true,
       });
     },
+    getView: () => {
+      const m = mapRef.current;
+      if (!m) return null;
+      const c = m.getCenter();
+      const b = m.getBounds();
+      return {
+        center: [c.lng, c.lat],
+        zoom: m.getZoom(),
+        bbox: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()],
+      };
+    },
     getMap: () => mapRef.current,
   }));
 
@@ -248,6 +279,7 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
     (m.getSource('bike') as GeoJSONSource).setData(g.bike);
     (m.getSource('places') as GeoJSONSource).setData(g.places);
     (m.getSource('events') as GeoJSONSource).setData(g.events);
+    (m.getSource('bartouren') as GeoJSONSource | undefined)?.setData(g.bartouren);
     (m.getSource('nearby') as GeoJSONSource).setData(g.nearby);
     (m.getSource('live') as GeoJSONSource | undefined)?.setData(g.live);
     (m.getSource('route') as GeoJSONSource | undefined)?.setData(propsRef.current.data.route ?? fc([]));
@@ -258,6 +290,7 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
     (m.getSource('unfall') as GeoJSONSource | undefined)?.setData(g.unfall);
     (m.getSource('hike') as GeoJSONSource | undefined)?.setData(g.hike);
     (m.getSource('wissen') as GeoJSONSource | undefined)?.setData(propsRef.current.data.wissen ?? fc([]));
+    (m.getSource('spiel') as GeoJSONSource | undefined)?.setData(propsRef.current.data.spiel ?? fc([]));
     pushVehicles(true);
     const sun = m.getSource('sun') as ImageSource | undefined;
     const img = propsRef.current.data.sunImage ?? BLANK_PNG;
@@ -370,6 +403,7 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
         case 'wissen-dot': case 'wissen-line': case 'wissen-fill': return String(pr._name ?? pr.NAME ?? pr.TITEL ?? '');
         case 'vehicles-dot': case 'traffic-dot': case 'traffic-line': return String(pr.text);
         case 'events-pin': return `${pr.time} · ${pr.title}${Number(pr.count) > 1 ? ` (und ${Number(pr.count) - 1} weitere hier)` : ''}`;
+        case 'bartour-stop': return `${pr.tourTitle}: ${pr.name}`;
         default: return null;
       }
     };
@@ -413,6 +447,9 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
         case 'water-gauge': propsRef.current.onSelect({ type: 'water' }); break;
         case 'share-point': propsRef.current.onSelect({ type: 'sharing', id: String(pr.id) }); break;
         case 'events-pin': propsRef.current.onSelect({ type: 'event', id: String(pr.id) }); break;
+        case 'bartour-stop': propsRef.current.onSelect({
+          type: 'bartour-stop', tourId: String(pr.tourId), stopIndex: Number(pr.stopIndex), lngLat: coord,
+        }); break;
         case 'places-icon': propsRef.current.onSelect({ type: 'place', id: String(pr.id) }); break;
         case 'nearby-dot': {
           const item = propsRef.current.data.nearby?.items[Number(pr.i)];

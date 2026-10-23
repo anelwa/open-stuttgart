@@ -1,8 +1,17 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
 export type Place = { lat: number; lon: number; label: string; id?: string };
-const Ctx = createContext<(nach: Place) => void>(() => {});
-export const RouteProvider = ({ plan, children }: { plan: (nach: Place) => void; children: ReactNode }) => <Ctx.Provider value={plan}>{children}</Ctx.Provider>;
+
+/** Ein Routenwunsch kann Start, Modus und Profil schon mitbringen (z. B. aus dem Bot). */
+export type RouteRequest = Place & {
+  from?: Place;
+  mode?: 'oepnv' | 'rad' | 'fuss' | 'auto';
+  profile?: 'standard' | 'rollstuhl' | 'kinderwagen';
+  fit?: boolean;
+};
+
+const Ctx = createContext<(nach: RouteRequest) => void>(() => {});
+export const RouteProvider = ({ plan, children }: { plan: (nach: RouteRequest) => void; children: ReactNode }) => <Ctx.Provider value={plan}>{children}</Ctx.Provider>;
 export const usePlanRoute = () => useContext(Ctx);
 
 /** Übergabe an Navigations-Apps. Start ist jeweils der aktuelle Standort der App, sofern nicht angegeben. */

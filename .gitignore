@@ -18,3 +18,6 @@ server/data/gebaeude.geojson
 server/data/geocaches.json
 server/data/unfaelle-stuttgart.json
 server/data/wanderwege-osm.json
+server/data/pois-stuttgart.json
+
+server/data/spiel/

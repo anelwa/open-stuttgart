@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ModuleProps } from '../types';
 import { useData } from '../../lib/data';
 import { useNow } from '../../lib/api';
@@ -19,7 +19,7 @@ function endOf(e: CultureEvent) {
   return e.end ? Date.parse(e.end) : Date.parse(e.start) + 150 * 60_000;
 }
 
-export function CulturePanel({ visible, toggle, select, flyTo, focus }: ModuleProps) {
+export function CulturePanel({ visible, toggle, select, flyTo, focus, botCommand }: ModuleProps) {
   const { events, eventDate, setEventDate, places, weather } = useData();
   const stops = useStops();
   const now = useNow(60_000);
@@ -30,6 +30,21 @@ export function CulturePanel({ visible, toggle, select, flyTo, focus }: ModulePr
   const [showAllDay, setShowAllDay] = useState(false);
   const [kind, setKind] = useState<PlaceKind | 'all'>('all');
   const [placeCount, setPlaceCount] = useState(6);
+  const lastBotCommand = useRef('');
+
+  // Filter aus dem Bot: „nur Museen“, „nur heute“, „nur indoor“.
+  useEffect(() => {
+    if (!botCommand || botCommand.module !== 'culture' || lastBotCommand.current === botCommand.id) return;
+    lastBotCommand.current = botCommand.id;
+    const value = String(botCommand.args?.value ?? '');
+    if (botCommand.command === 'kind' && value) {
+      setKind(value as PlaceKind | 'all');
+    } else if (botCommand.command === 'filter' && value) {
+      setFilter(value as Filter);
+    } else if (botCommand.command === 'tag' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      setEventDate(value);
+    }
+  }, [botCommand, setEventDate]);
 
   const list = events.data?.events ?? [];
   const groups = useMemo(() => {

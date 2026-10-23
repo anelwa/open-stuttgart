@@ -15,9 +15,12 @@
     "data:unfall": "node scripts/build-unfaelle.mjs",
     "data:wanderwege": "node scripts/build-wanderwege.mjs",
     "data:geocaches": "node scripts/build-geocaches.mjs",
+    "data:pois": "node scripts/build-pois.mjs",
     "data:search": "node scripts/build-search-db.mjs",
+    "check:kontakte": "node scripts/check-kontakte.mjs",
     "check:wasgeht": "node scripts/check-wasgeht-quellen.mjs",
-    "check:bot": "node scripts/bot-eval.mjs"
+    "check:bot": "node scripts/bot-eval.mjs",
+    "data:spiel": "node scripts/build-spiel-data.mjs"
   },
   "engines": {
     "node": ">=22.5"

@@ -19,7 +19,7 @@ Quelle ist `server/data/verwaltung.sqlite` aus dem vorhandenen Crawl:
 
 Daraus entstehen in `server/data/suche.sqlite`:
 
-- **10.289 Dokumente** (Seiten, Leistungen, Dienststellen, Online-Dienste, Pressemitteilungen)
+- **10.318 Dokumente** (Seiten, Leistungen, Dienststellen, Kontakte, Online-Dienste, Pressemitteilungen)
 - **392 Leistungen** mit **2.075 Ablaufschritten**
 - **4.195 Bezugsquellen** (zuständige Stellen, Online-Dienste)
 - **167.098 Links**, davon **100.806** auf ein bekanntes Dokument aufgelöst
@@ -84,6 +84,21 @@ read-only. FTS5 und `sqlite-vec` sind virtuelle Tabellen/Erweiterungen, die Pris
 abbildet; die Kernabfragen wären ohnehin Raw SQL. Prisma wird erst interessant, wenn
 Postgres + pgvector, Redaktionsworkflows und Mehrbenutzerbetrieb dazukommen.
 
+## Kontaktregister
+
+Seit 22.10.2026 enthält dieselbe Datenbank ein strukturiertes Kontaktregister
+(`contacts`, `contact_services`, `contacts_fts`). Dienststellen werden im
+Dokumentenleser nicht mehr als flacher Text, sondern mit Anrufen, E-Mail,
+Öffnungszeiten, Leistungen und Adresse angezeigt. Die wichtigsten Notrufe liegen
+zusätzlich als redaktionell geprüfte Datei `src/data/kontakte-wichtig.json` vor
+und sind ohne Netzanfrage im App-Bundle verfügbar. Details:
+[`kontaktregister.md`](./kontaktregister.md).
+
+Die Suche liefert Kontakte als eigenen Dokumenttyp mit; jede Trefferzeile kann
+direkt angerufen werden. Verwandte Dokumente werden nach der Seltenheit der
+gemeinsamen Links gewichtet, damit globale Navigation (Impressum, Kontakt,
+Startseite) nicht mehr als inhaltliche Verwandtschaft zählt.
+
 ## Grenzen
 
 - Die Suche ist eine abgeleitete Datenbank, keine amtliche Auskunft.
@@ -92,3 +107,5 @@ Postgres + pgvector, Redaktionsworkflows und Mehrbenutzerbetrieb dazukommen.
 - Keine Personenprofile, keine Nutzerdaten, keine externen Suchanfragen.
 - Backlinks/Related sind Hinweise auf gemeinsame Bezüge, keine inhaltliche Bewertung.
 - Die Datenbank muss nach einem neuen Crawl mit `npm run data:search` neu erzeugt werden.
+- Notdienst-Nummern werden redaktionell gepflegt; ohne offizielle API gibt es keine
+  Live-Garantie für Apotheken- oder Bereitschaftspraxen-Belegung.

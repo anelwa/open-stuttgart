@@ -2,7 +2,7 @@
 // Die Haltestellen werden lokal in den 724 Halten des Fahrplans gefunden (sofort), die
 // übrigen Treffer kommen aus der lokalen SQLite-/FTS5-Datenbank. Bisher gab es zwei
 // getrennte Suchfelder nebeneinander — das war der offensichtlichste Mangel am Einstieg.
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, forwardRef, useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { LineBadge } from './LineBadge';
 import { searchStops, useStops, type StopFeature } from '../lib/stops';
@@ -15,6 +15,8 @@ type Facet = { type: string; label: string; count: number };
 type DocResult = {
   id: number; title: string; url: string; type: string; typeLabel: string; source: string;
   district: string | null; modified: string | null; snippet: string | null; rank: number | null;
+  contactId?: string | null;
+  phone?: { label: string; number: string; tel: string } | null;
 };
 type SearchResponse = {
   q: string; type: string | null; total: number; limit: number; offset: number;
@@ -57,14 +59,19 @@ type Hit =
   | { kind: 'stop'; stop: StopFeature }
   | { kind: 'doc'; doc: DocResult };
 
-export function Search({
-  onPickStop, onOpenDocument, onRoute,
-}: {
+export interface SearchHandle {
+  open: (query?: string) => void;
+  focus: () => void;
+}
+
+export const Search = forwardRef<SearchHandle, {
   onPickStop: (s: StopFeature) => void;
   onOpenDocument: (id: number) => void;
   /** Aktion rechts im Pill — führt zur Routenplanung */
   onRoute?: () => void;
-}) {
+  /** Öffnet StuggiAI und startet den Voice Mode. */
+  onVoice?: () => void;
+}>(function Search({ onPickStop, onOpenDocument, onRoute, onVoice }, ref) {
   const stops = useStops();
   const [q, setQ] = useState('');
   const [type, setType] = useState<string | null>(null);
@@ -75,19 +82,31 @@ export function Search({
   const box = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  useImperativeHandle(ref, () => ({
+    open: (query?: string) => {
+      if (query != null) setQ(query);
+      setOpen(true);
+      window.setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select(); }, 0);
+    },
+    focus: () => { inputRef.current?.focus(); setOpen(true); },
+  }), []);
+
   const stopHits = useMemo<StopFeature[]>(
     () => (q.trim().length >= 2 ? searchStops(stops, q).slice(0, 5) : []),
     [stops, q],
   );
   const { data, error, loading } = useDocSearch(open, q, type, limit);
   const docs = data?.items ?? [];
+  const contactDocs = useMemo(() => docs.filter((d) => d.type === 'kontakt'), [docs]);
+  const otherDocs = useMemo(() => docs.filter((d) => d.type !== 'kontakt'), [docs]);
 
   const hits = useMemo<Hit[]>(() => {
     const out: Hit[] = [];
     for (const s of stopHits) out.push({ kind: 'stop', stop: s });
-    for (const d of docs) out.push({ kind: 'doc', doc: d });
+    for (const d of contactDocs) out.push({ kind: 'doc', doc: d });
+    for (const d of otherDocs) out.push({ kind: 'doc', doc: d });
     return out;
-  }, [stopHits, docs]);
+  }, [stopHits, contactDocs, otherDocs]);
 
   useEffect(() => { setActive(0); setLimit(12); }, [q, type]);
 
@@ -139,8 +158,8 @@ export function Search({
         ref={inputRef}
         type="search"
         value={q}
-        placeholder="Ort, Haltestelle, Amt …"
-        aria-label="Alles durchsuchen: Ort, Haltestelle, Amt, Leistung oder Anliegen"
+        placeholder="Ort, Amt, Kontakt oder Notruf …"
+        aria-label="Alles durchsuchen: Ort, Haltestelle, Amt, Kontakt, Leistung oder Anliegen"
         role="combobox"
         aria-expanded={showPanel && hits.length > 0}
         aria-controls={listId}
@@ -163,6 +182,11 @@ export function Search({
         ) : (
           <>
             <kbd className="search-kbd">⌘ K</kbd>
+            {onVoice && (
+              <button type="button" className="search-mic" aria-label="StuggiAI fragen und sprechen" title="StuggiAI fragen" onClick={onVoice}>
+                <Icon name="mic" size={18} />
+              </button>
+            )}
             {onRoute && (
               <button type="button" className="search-go" aria-label="Route planen" title="Route planen" onClick={onRoute}>
                 <Icon name="route" size={18} />
@@ -228,33 +252,54 @@ export function Search({
               );
             })}
 
-            {docs.length > 0 && (
-              <li className="search-group" role="presentation">
-                <span className="search-group-label">Seiten, Leistungen und Dokumente</span>
-              </li>
-            )}
-            {docs.map((d) => {
+            {[...contactDocs, ...otherDocs].map((d, index) => {
               const i = hits.findIndex((h) => h.kind === 'doc' && h.doc === d);
+              const isFirstContact = index === 0 && contactDocs.length > 0;
+              const isFirstOther = index === contactDocs.length && otherDocs.length > 0;
               return (
-                <li
-                  key={d.id}
-                  id={`${listId}-${i}`}
-                  role="option"
-                  aria-selected={i === active}
-                  className={`search-hit ${i === active ? 'active' : ''}`}
-                  onMouseEnter={() => setActive(i)}
-                  onMouseDown={(e) => { e.preventDefault(); choose({ kind: 'doc', doc: d }); }}
-                >
-                  <span className="search-hit-icon"><Icon name={d.type === 'leistung' ? 'home' : d.type === 'dienststelle' ? 'pin' : d.type === 'online_angebot' ? 'external' : 'info'} size={17} /></span>
-                  <span className="search-hit-main">
-                    <span className="search-hit-title">{d.title}</span>
-                    {d.snippet && <span className="search-hit-snippet"><Highlight text={d.snippet} /></span>}
-                    <span className="search-hit-meta">
-                      {d.typeLabel}{d.district ? ` · ${d.district}` : ''} · {d.source}
+                <Fragment key={d.id}>
+                  {isFirstContact && (
+                    <li className="search-group" role="presentation">
+                      <span className="search-group-label">Kontakte & Notdienste</span>
+                    </li>
+                  )}
+                  {isFirstOther && (
+                    <li className="search-group" role="presentation">
+                      <span className="search-group-label">Seiten, Leistungen und Dokumente</span>
+                    </li>
+                  )}
+                  <li
+                    id={`${listId}-${i}`}
+                    role="option"
+                    aria-selected={i === active}
+                    className={`search-hit ${i === active ? 'active' : ''}`}
+                    onMouseEnter={() => setActive(i)}
+                    onMouseDown={(e) => { e.preventDefault(); choose({ kind: 'doc', doc: d }); }}
+                  >
+                    <span className="search-hit-icon"><Icon name={d.type === 'leistung' ? 'home' : d.type === 'dienststelle' ? 'pin' : d.type === 'kontakt' ? 'phone' : d.type === 'online_angebot' ? 'external' : 'info'} size={17} /></span>
+                    <span className="search-hit-main">
+                      <span className="search-hit-title">{d.title}</span>
+                      {d.snippet && <span className="search-hit-snippet"><Highlight text={d.snippet} /></span>}
+                      <span className="search-hit-meta">
+                        {d.typeLabel}{d.district ? ` · ${d.district}` : ''} · {d.source}
+                      </span>
                     </span>
-                  </span>
-                  <Icon name="chevron" size={15} className="muted" />
-                </li>
+                    {d.phone ? (
+                      <a
+                        className="search-hit-call"
+                        href={`tel:${d.phone.tel}`}
+                        aria-label={`${d.title} anrufen: ${d.phone.number}`}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Icon name="phone" size={15} />
+                        <span>{d.phone.number}</span>
+                      </a>
+                    ) : (
+                      <Icon name="chevron" size={15} className="muted" />
+                    )}
+                  </li>
+                </Fragment>
               );
             })}
 
@@ -283,4 +328,4 @@ export function Search({
       )}
     </div>
   );
-}
+});

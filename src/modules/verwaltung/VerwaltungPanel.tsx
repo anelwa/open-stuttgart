@@ -1,6 +1,6 @@
 // Themenmodul "Verwaltung": Kartenebene, Suche über Leistungen/Einheiten/Straßen,
 // Filter-Chips nach Rubrik, Live-Wartezeit der Bürgerbüros und Einstieg in die Panels "Gebäude" und "Leistung".
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ModuleProps } from '../types';
 import { usePolling } from '../../lib/api';
 import { distM, walkMin } from '../../lib/geo';
@@ -89,10 +89,18 @@ function waitDotClass(w: WartezeitInfo | null | undefined) {
   return 'w-kurz';
 }
 
-export function VerwaltungPanel({ center, flyTo, select, setNearby, setLayer, visible, toggle }: ModuleProps) {
+export function VerwaltungPanel({ center, flyTo, select, setNearby, setLayer, visible, toggle, botCommand }: ModuleProps) {
   useLang();
   const [q, setQ] = useState('');
   const [rubriken, setRubriken] = useState<string[]>(DEFAULT_RUBRIKEN);
+  const lastBotCommand = useRef('');
+
+  // Suche aus dem Bot: „Suche nach Personalausweis“.
+  useEffect(() => {
+    if (!botCommand || botCommand.module !== 'verwaltung' || lastBotCommand.current === botCommand.id) return;
+    lastBotCommand.current = botCommand.id;
+    if (botCommand.command === 'query') setQ(String(botCommand.args?.value ?? ''));
+  }, [botCommand]);
 
   const origin = useMemo<[number, number]>(() => {
     try {

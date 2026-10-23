@@ -229,7 +229,33 @@ const SYNONYME = [
   [/\b(?:geburt|geburtsurkunde|baby)\b/g, 'geburtsurkunde geburt'],
   [/\b(?:führungszeugnis|fuehrungszeugnis)\b/g, 'fuehrungszeugnis'],
   [/\b(?:baustelle|sondernutzung|halteverbot)\b/g, 'sondernutzung strasse'],
+  // Die Ausländerbehörde heißt im Datensatz „Amt für öffentliche Ordnung“ bzw.
+  // „Ausländerrecht“ und ihre Teams „Aufenthaltstitel“. Ohne diese Brücke findet
+  // die Suche nach „Ausländerbehörde“ nur vereinzelte Leistungen.
+  [/\b(?:auslaenderbehoerde|auslaender)\b/g, 'auslaenderrecht aufenthaltstitel auslaenderbehoerde'],
+  [/\b(?:aufenthaltstitel|aufenthalt|migration)\b/g, 'aufenthaltstitel aufenthalt migration auslaenderrecht'],
+  // Duldung ist ein eigener Tatbestand (Chancen-Aufenthaltsrecht), nicht nur
+  // ein Unterfall der allgemeinen Aufenthaltserlaubnis.
+  [/\b(?:duldung|gestattung)\b/g, 'duldung gestattung chancen aufenthaltsrecht'],
+  [/\b(?:abschiebung|aufschiebung)\b/g, 'abschiebung aufschiebung duldung aufenthalt'],
+  [/\b(?:asyl|asylbewerber)\b/g, 'asyl aufenthalt migration'],
+  [/\b(?:niederlassungserlaubnis|einbuergerung)\b/g, 'niederlassungserlaubnis einbuergerung aufenthaltstitel'],
 ];
+
+// Füllwörter tragen bei der Suche nichts bei und sorgen sonst dafür, dass
+// „Wie hoch ist die Hundesteuer?“ jeden Text mit „hoch“ oder „ist“ trifft.
+const STOPWORDS = new Set([
+  'der', 'die', 'das', 'den', 'dem', 'des', 'ein', 'eine', 'einen', 'einem', 'einer', 'eines',
+  'und', 'oder', 'aber', 'für', 'fuer', 'mit', 'ohne', 'mein', 'meine', 'meinen', 'meinem', 'meiner',
+  'ich', 'mir', 'mich', 'du', 'dir', 'dich', 'wir', 'uns', 'zu', 'zum', 'zur', 'von', 'vom',
+  'im', 'in', 'am', 'an', 'auf', 'aus', 'bei', 'nach', 'über', 'ueber', 'unter', 'vor', 'um',
+  'es', 'ist', 'sind', 'war', 'waren', 'wie', 'was', 'wer', 'wo', 'wann', 'warum', 'wieso',
+  'bitte', 'mal', 'noch', 'nur', 'sich', 'sie', 'er', 'ihr', 'ihre', 'ihren', 'kein', 'keine',
+  'keinen', 'nicht', 'mehr', 'als', 'auch', 'so', 'dass', 'wenn', 'ob', 'man', 'kann', 'koennen',
+  'können', 'muss', 'muessen', 'müssen', 'soll', 'sollen', 'wird', 'werden', 'haben', 'hat', 'habe',
+  'brauche', 'brauchen', 'möchte', 'moechte', 'will', 'willst', 'benötige', 'benoetige', 'geht',
+  'gibt', 'hoch', 'viel', 'viele', 'etwas',
+]);
 
 export function normSearch(s) {
   return String(s ?? '')
@@ -240,9 +266,17 @@ export function normSearch(s) {
 }
 
 function expandQuery(q) {
-  let s = normSearch(q);
-  for (const [re, rep] of SYNONYME) s = s.replace(re, rep);
-  return [...new Set(s.split(/\s+/).filter((w) => w.length >= 2))];
+  const base = normSearch(q);
+  // Grundbegriffe immer behalten; Synonyme nur ergänzen. So verdrängt eine
+  // Erweiterung wie „Ausländerbehörde → Ausländerrecht“ nicht das eigentliche
+  // Suchwort (etwa „Duldung“).
+  const terms = new Set(base.split(/\s+/).filter((w) => w.length >= 2 && !STOPWORDS.has(w)));
+  for (const [re, rep] of SYNONYME) {
+    re.lastIndex = 0;
+    if (!re.test(base)) continue;
+    for (const w of rep.split(/\s+/)) if (w.length >= 2 && !STOPWORDS.has(w)) terms.add(w);
+  }
+  return [...terms];
 }
 
 const R = 6371000;
@@ -1329,7 +1363,9 @@ export async function verwaltungSuche(q) {
       const body = `${e.amt ?? ''} ${e.address ?? ''} ${(e.leistungen ?? []).map((s) => s.name).join(' ')}`;
       return { e, score: scoreItem(e.name, body) };
     })
-    .filter((x) => x.score > 0)
+    // Biografische Einträge wie „Friedrich Hölderlin – Aufenthaltsort …“ sind bei
+    // aufenthaltsrechtlichen Fragen kein Treffer, sondern nur ein Wortspiel.
+    .filter((x) => x.score > 0 && !(/aufenthaltsort/i.test(x.e.name) && !/aufenthaltsort|\bort\b/.test(normSearch(raw))))
     .sort((a, b) => b.score - a.score || a.e.name.localeCompare(b.e.name, 'de'))
     .slice(0, 8)
     .map(({ e }) => ({

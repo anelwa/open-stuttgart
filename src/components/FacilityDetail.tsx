@@ -16,6 +16,7 @@ export function FacilityDetail({ f, onClose, select, flyTo }: Nav & { f: Facilit
   if (f.id.startsWith('verw-') || f.cat.startsWith('verwaltung')) {
     return <GebaeudeDetail id={f.id.replace(/^verw-/, '')} onClose={onClose} select={select} flyTo={flyTo} />;
   }
+  const osmUrl = f.osmUrl ?? (f.osm ? `https://www.openstreetmap.org/${OSM_TYPE[f.osm[0]] ?? 'node'}/${f.osm.slice(1)}` : null);
   return (
     <div className="sheet-inner">
       <SheetHead eyebrow={CAT_LABEL[f.cat] ?? 'Einrichtung'} title={f.name} onClose={onClose}>
@@ -29,7 +30,7 @@ export function FacilityDetail({ f, onClose, select, flyTo }: Nav & { f: Facilit
           </div>
         )}
         {f.info && f.info.length > 0 && <ul className="fac-info">{f.info.map((i) => <li key={i}>{i}</li>)}</ul>}
-        {f.hours && f.osm && (() => {
+        {f.hours && (f.osm || f.osmUrl) && (() => {
           const st = openState(f.hours);
           return (
             <>
@@ -38,7 +39,7 @@ export function FacilityDetail({ f, onClose, select, flyTo }: Nav & { f: Facilit
             </>
           );
         })()}
-        {f.hours && !f.osm && (
+        {f.hours && !f.osm && !f.osmUrl && (
           <dl className="facts">
             {f.hours.split('\n').map((l) => { const [d, ...t] = l.split(':'); return <div key={l}><dt>{d}</dt><dd>{t.join(':').trim()}</dd></div>; })}
           </dl>
@@ -53,14 +54,14 @@ export function FacilityDetail({ f, onClose, select, flyTo }: Nav & { f: Facilit
         {f.web && <a className="link-btn secondary" href={f.web} target="_blank" rel="noreferrer">Seite der Einrichtung <Icon name="external" size={16} /></a>}
         <NaturHinweis f={f} />
         <GettingThere lngLat={[f.lon, f.lat]} select={select} flyTo={flyTo} label={f.name} />
-        {f.osm && (
+        {osmUrl && (
           <p className="small muted">
             Angaben aus OpenStreetMap, nicht amtlich. Öffnungszeiten bitte beim Betrieb prüfen.{' '}
-            <a href={`https://www.openstreetmap.org/${OSM_TYPE[f.osm[0]] ?? 'node'}/${f.osm.slice(1)}`} target="_blank" rel="noreferrer">Eintrag ansehen</a>{' · '}
+            <a href={osmUrl} target="_blank" rel="noreferrer">{f.osm ? 'Eintrag ansehen' : 'Position ansehen'}</a>{' · '}
             <a href={`https://www.openstreetmap.org/note/new#map=19/${f.lat}/${f.lon}`} target="_blank" rel="noreferrer">Fehler melden</a>
           </p>
         )}
-        <Source>{f.cat === 'laden' ? 'MobiData BW, OCPDB.' : f.osm ? '© OpenStreetMap-Mitwirkende (ODbL).' : 'Landeshauptstadt Stuttgart, Geodaten (CC BY 4.0).'} Fahrplan EFA-BW.</Source>
+        <Source>{f.source ?? (f.cat === 'laden' ? 'MobiData BW, OCPDB.' : (f.osm || f.osmUrl) ? '© OpenStreetMap-Mitwirkende (ODbL).' : 'Landeshauptstadt Stuttgart, Geodaten (CC BY 4.0).')}{f.cat === 'tanken' ? '' : ' Fahrplan EFA-BW.'}</Source>
       </div>
     </div>
   );

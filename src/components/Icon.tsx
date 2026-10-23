@@ -25,6 +25,7 @@ export const ICON_PATHS: Record<string, string> = {
   culture: 'M4 21h16M5 21V10M19 21V10M9 21v-7M15 21v-7M3 10l9-6 9 6z',
   calendar: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
   clock: 'M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0M12 7v5l3 2',
+  refresh: 'M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5',
   info: 'M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0M12 11v5M12 8h.01',
   warn: 'M12 3l10 18H2zM12 10v5M12 18h.01',
   chevron: 'M9 6l6 6-6 6',
@@ -41,6 +42,7 @@ export const ICON_PATHS: Record<string, string> = {
   monument: 'M10.5 4L12 2l1.5 2v12h-3zM7 17h10v4H7z',
   mask: 'M4 5c5 2 11 2 16 0v6a8 8 0 0 1-16 0zM9 10h.01M15 10h.01M9 15c2 1.5 4 1.5 6 0',
   ticket: 'M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4zM15 7v10',
+  cocktail: 'M3 4h18l-9 10v5M8 19h8M6 8h12',
   walk: 'M13 4.5m-1.5 0a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0M9 21l2.5-6 2.5 2.5V21M8 12l2.5-4 3.5 1 2 3M11.5 15l1-5',
   home: 'M3 11l9-7 9 7M5 10v10h14V10M10 20v-5h4v5',
   sunset: 'M3 18h18M7 18a5 5 0 0 1 10 0M12 4v4M10 6l2 2 2-2M4.9 11.9l1.4 1.4M19.1 11.9l-1.4 1.4M8 21h8',
@@ -51,6 +53,17 @@ export const ICON_PATHS: Record<string, string> = {
   swap: 'M8 3v18M8 21l-3-3M8 21l3-3M16 21V3M16 3l-3 3M16 3l3 3',
   play: 'M7 4l13 8-13 8z',
   pause: 'M7 4h3v16H7zM14 4h3v16h-3z',
+  mic: 'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3M8 21h8',
+  phone: 'M6.5 3h3L11 7 9 8.5a12 12 0 0 0 6 6l1.5-2 4 1.5v3A2.5 2.5 0 0 1 18 19.5 15.5 15.5 0 0 1 4.5 6 2.5 2.5 0 0 1 6.5 3z',
+  mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
+  copy: 'M8 8h12v12H8zM16 8V4H4v12h4',
+  contact: 'M4 5h16v14H4zM8 9h.01M8 13h.01M8 17h.01M12 9h5M12 13h5M12 17h3',
+  health: 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6z',
+  book: 'M4 5h7v15H4zM13 5h7v15h-7zM4 5c2-1 5-1 7 0M13 5c2-1 5-1 7 0',
+  volume: 'M4 10v4h4l5 4V6L8 10H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11',
+  volumeOff: 'M4 10v4h4l5 4V6L8 10H4zM16 9l5 6M21 9l-5 6',
+  check: 'M4 12l5 5L20 6',
+  undo: 'M9 7H5v4M5.5 11a7 7 0 1 0 2-5',
 };
 const P = ICON_PATHS;
 

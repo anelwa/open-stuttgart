@@ -2,12 +2,14 @@
 // Keine Navigation mit Ansage: für den Weg selbst wird an Navigations-Apps übergeben.
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ModuleProps } from '../types';
-import { usePolling } from '../../lib/api';
+import { useOnDemand, usePolling } from '../../lib/api';
 import { useData } from '../../lib/data';
 import { distToLine } from '../../lib/geo';
 import { fmtTime } from '../../lib/format';
 import { lineColors } from '../../lib/lines';
 import { handoffLinks, type Place } from '../../lib/routeCtx';
+import { FUELS, fmtPrice, fmtStand, fuelPrice, tankFacility, type Fuel, type TankResponse } from '../../lib/tanken';
+import { tr } from '../../lib/i18n';
 import { SuggestionList, suggestionKeys, useSuggestions, type SuggestItem } from '../../components/AddressSuggest';
 import { Icon } from '../../components/Icon';
 import { LineBadge } from '../../components/LineBadge';
@@ -266,15 +268,42 @@ function boundsOf(fc: GeoJSON.FeatureCollection): [[number, number], [number, nu
   return minLon <= maxLon ? [[minLon, minLat], [maxLon, maxLat]] : null;
 }
 
-export function RoutePanel({ center, flyTo, fitBounds, select, setRoute, routeTarget, setLayer }: ModuleProps) {
+export function RoutePanel({ center, flyTo, fitBounds, select, setRoute, routeTarget, setLayer, setNearby, botCommand }: ModuleProps) {
   const { unfaelle } = useData();
-  const [von, setVon] = useState<Place | null>(() => readAddr());
+  const [von, setVon] = useState<Place | null>(() => routeTarget?.from ?? readAddr());
   const [nach, setNach] = useState<Place | null>(routeTarget);
-  const [profil, setProfil] = useState('standard');
-  const [mode, setMode] = useState<string>('oepnv');
+  const [profil, setProfil] = useState<string>(routeTarget?.profile ?? 'standard');
+  const [mode, setMode] = useState<string>(routeTarget?.mode ?? 'oepnv');
   const [sel, setSel] = useState(0);
   const [zeit, setZeit] = useState('');
-  useEffect(() => { if (routeTarget) { setNach(routeTarget); setSel(0); } }, [routeTarget]);
+  useEffect(() => {
+    if (!routeTarget) return;
+    if (routeTarget.from) setVon(routeTarget.from);
+    setNach(routeTarget);
+    if (routeTarget.mode) setMode(routeTarget.mode);
+    if (routeTarget.profile) setProfil(routeTarget.profile);
+    setSel(0);
+  }, [routeTarget]);
+
+  // Typisierte Wünsche aus dem Bot: „nimm das Rad“, „stufenlos“, „in einer Stunde“.
+  const lastBotCommand = useRef('');
+  useEffect(() => {
+    if (!botCommand || botCommand.module !== 'route') return;
+    if (lastBotCommand.current === botCommand.id) return;
+    lastBotCommand.current = botCommand.id;
+    const a = botCommand.args ?? {};
+    if (botCommand.command === 'mode' && ['oepnv', 'rad', 'fuss', 'auto'].includes(String(a.mode))) {
+      setMode(String(a.mode)); setSel(0);
+    } else if (botCommand.command === 'profile' && ['standard', 'rollstuhl', 'kinderwagen'].includes(String(a.profile))) {
+      setProfil(String(a.profile)); setSel(0);
+    } else if (botCommand.command === 'time') {
+      setZeit(String(a.time ?? '')); setSel(0);
+    } else if (botCommand.command === 'now') {
+      setZeit(''); setSel(0);
+    } else if (botCommand.command === 'swap') {
+      setVon(nach); setNach(von); setSel(0);
+    }
+  }, [botCommand, nach, von]);
   useEffect(() => { setLayer('route', true); return () => setRoute(null); }, [setLayer, setRoute]);
 
   const base = von && nach ? `/api/route?von=${encodeURIComponent(pid(von))}&nach=${encodeURIComponent(pid(nach))}&profil=${profil}${zeit ? `&zeit=${encodeURIComponent(zeit)}` : ''}` : null;
@@ -285,6 +314,8 @@ export function RoutePanel({ center, flyTo, fitBounds, select, setRoute, routeTa
   const res: Record<string, typeof oepnv> = { oepnv, rad, fuss, auto };
   const cur = res[mode];
   const v = cur.data?.varianten[Math.min(sel, (cur.data?.varianten.length ?? 1) - 1)];
+  const [tankFuel, setTankFuel] = useState<Fuel>('e10');
+  const tanken = useOnDemand<TankResponse>(mode === 'auto' && base ? '/api/nearby/tanken' : null);
 
   // Unfallatlas im 30-Meter-Korridor der gewählten Route (nur Unfälle mit Personenschaden)
   const unfallRoute = useMemo(() => {
@@ -307,6 +338,32 @@ export function RoutePanel({ center, flyTo, fitBounds, select, setRoute, routeTa
       items: pts.sort((a, b) => a.dist - b.dist).slice(0, 4),
     };
   }, [v, unfaelle.data]);
+
+  // Günstigste Tankstellen im 1,5-km-Korridor der Auto-Route.
+  const tankRoute = useMemo(() => {
+    if (mode !== 'auto') return null;
+    const lines = (v?.abschnitte ?? []).flatMap((l) => (l.geometrie && l.geometrie.length > 1 ? [l.geometrie] : []));
+    const all = tanken.data?.stations ?? [];
+    if (!lines.length || !all.length) return null;
+    const lons = lines.flat().map((p) => p[0]);
+    const lats = lines.flat().map((p) => p[1]);
+    const pad = 0.02;
+    const minLon = Math.min(...lons) - pad, maxLon = Math.max(...lons) + pad;
+    const minLat = Math.min(...lats) - pad, maxLat = Math.max(...lats) + pad;
+    const near = all
+      .filter((s) => s.lon >= minLon && s.lon <= maxLon && s.lat >= minLat && s.lat <= maxLat)
+      .map((s) => ({ ...s, dist: Math.min(...lines.map((line) => distToLine([s.lon, s.lat], line))) }))
+      .filter((s) => s.dist <= 1500);
+    const withPrice = near.filter((s) => fuelPrice(s, tankFuel) != null);
+    return {
+      total: near.length,
+      items: withPrice.sort((a, b) => {
+        if (a.isOpen !== b.isOpen) return a.isOpen ? -1 : 1;
+        return (fuelPrice(a, tankFuel)! - fuelPrice(b, tankFuel)!) || a.dist - b.dist;
+      }).slice(0, 3),
+      all: near,
+    };
+  }, [mode, v, tanken.data, tankFuel]);
 
   // Gewählte Variante auf der Karte: Linien, Start und Ziel. Der Ausschnitt wird nur bei
   // einem echten Wechsel neu gesetzt, nicht bei jeder Aktualisierung der Echtzeitdaten.
@@ -460,7 +517,65 @@ export function RoutePanel({ center, flyTo, fitBounds, select, setRoute, routeTa
                   Unfallorte auf der Karte
                 </button>
               </div>
-              <p className="muted small">Unfallatlas 2025 (dl-de/by-2-0); nur Unfälle mit Personenschaden, keine Sachschäden. Der Korridor ist eine Näherung, keine Bewertung der Sicherheit der Route.</p>
+              <p className="muted small">Unfallatlas 2025 (dl-de/by-2-0); nur Unfälle mit Personenschaden, keine Sachschäden. Der Korridor ist eine Näherung, keine Bewertung der Sicherheit der Route. Blitzerwarnungen sind für Fahrende in Deutschland nicht erlaubt; deshalb zeigt die App Unfallschwerpunkte statt Messstellen.</p>
+            </Section>
+          )}
+
+          {mode === 'auto' && v && (
+            <Section title={tr('Günstigste Tankstelle auf der Route')} explain="tanken">
+              <div className="chips filter-chips">
+                {FUELS.map((f) => (
+                  <button key={f.id} type="button" className={`chip ${tankFuel === f.id ? 'on' : ''}`} aria-pressed={tankFuel === f.id} onClick={() => setTankFuel(f.id)}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              {!tanken.data && !tanken.error && <SkeletonRows rows={2} />}
+              {tanken.error && !tanken.data && <p className="small">{tr('Tankpreise derzeit nicht abrufbar.')}</p>}
+              {tanken.error && tanken.data && <p className="muted small">Aktualisierung fehlgeschlagen; angezeigt wird der letzte geladene Stand.</p>}
+              {tanken.data && tankRoute && (
+                tankRoute.items.length ? (
+                  <ul className="near-list">
+                    {tankRoute.items.map((s) => (
+                      <li key={s.id}>
+                        <button type="button" onClick={() => {
+                          const f = tankFacility(s, tanken.data!.stand, tanken.data!.source);
+                          select({ type: 'facility', item: f });
+                          flyTo([f.lon, f.lat], 16);
+                        }}>
+                          <span className="tank-price">
+                            <strong>{fmtPrice(fuelPrice(s, tankFuel))}</strong>
+                            <small>{FUELS.find((f) => f.id === tankFuel)?.label}</small>
+                          </span>
+                          <span className="near-main">
+                            <span className="near-name">{s.name}{!s.isOpen && <span className="tank-closed">geschlossen</span>}</span>
+                            <span className="near-sub">{[`${Math.round(s.dist)} m neben der Route`, s.address].filter(Boolean).join(' · ')}</span>
+                          </span>
+                          <Icon name="chevron" size={16} className="muted" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="small">Keine Tankstelle mit {FUELS.find((f) => f.id === tankFuel)?.label}-Preis im 1,5-km-Korridor der Route.</p>
+                )
+              )}
+              {tankRoute && tankRoute.items.length > 0 && (
+                <div className="row-actions">
+                  <button type="button" className="chip" onClick={() => {
+                    setNearby({ items: tankRoute.all.map((s) => tankFacility(s, tanken.data!.stand, tanken.data!.source)), color: { tanken: '#D97706' } });
+                    setLayer('nearby', true);
+                  }}>
+                    <Icon name="pin" size={16} /> {tr('Tankstellen auf der Karte')}
+                  </button>
+                </div>
+              )}
+              {tanken.data && (
+                <Source>{tanken.data.source}. Abgerufen {fmtStand(tanken.data.stand)} Uhr. Preise ohne Gewähr; maßgeblich ist die Zapfsäule.</Source>
+              )}
+              {tanken.data?.provider === 'infranode' && (
+                <p className="muted small">Keyloser Abruf: nur 5 km um die Stadtmitte. Für Routen in die Außenbezirke ist ein Tankerkönig-Key nötig.</p>
+              )}
             </Section>
           )}
 

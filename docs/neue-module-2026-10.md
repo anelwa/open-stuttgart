@@ -118,7 +118,24 @@ Diese waren im Projekt schon angebunden und wurden nicht neu aufgebaut:
 - iNaturalist und OpenMensa als eigene Abschnitte.
 - Kaltluft, Mineralbrunnen, Chillorte und Gute Fee in `nearby.mjs`.
 
-## 10. Betriebsgrenzen und bewusste Auslassungen
+## 10. Bar-Touren
+
+- **Datenmodell:** `server/data/bartouren.json` mit sieben kuratierten Touren, 37 Stationen, Koordinaten,
+  Öffnungszeiten, Barrierefreiheit, alkoholfreien Optionen, Varianten und Quellen. Grundlage ist der
+  OSM-Auszug `public/data/gastro.geojson` (ODbL, 20.10.2026) sowie die Websites der Betriebe.
+- **Server:** `server/sources/bartouren.mjs` ergänzt die nächsten Haltestellen und liefert Liste, Detail,
+  GeoJSON und GPX. API: `GET /api/bartouren`, `GET /api/bartouren/:id`,
+  `GET /api/bartouren.geojson`, `GET /api/bartouren/:id.gpx`.
+- **Frontend:** Modul „Bar-Touren“ (`src/modules/bartouren/BartourenPanel.tsx`) mit Filterchips,
+  Tourkarten, Stationen, Karten-Layer, Detailansicht je Stopp und Übergabe an das Weg-Modul.
+  Schnellaktion „Ausgehen“ und Eintrag unter „Alle Themen“.
+- **Karte:** Ebene `bartouren` mit gestricheltem Verlauf und nummerierten Stationen; die Linie
+  verbindet die Stationen und ist keine Navigation.
+- **Grenzen:** Öffnungszeiten, Einlass und Barrierefreiheit sind Momentaufnahmen. Bei Widersprüchen
+  (Beispiel Kabi: OSM Mo–Fr, Website Di–Sa) wird der Widerspruch angezeigt, nicht geglättet.
+  Die Touren sind redaktionelle Vorschläge, keine bezahlte Platzierung und keine Rangliste.
+
+## 11. Betriebsgrenzen und bewusste Auslassungen
 
 - Keine Social-Media-Scrapes (Instagram, TikTok, Facebook, Telegram).
 - Keine kostenpflichtigen Bulk-Datenbanken (Google Places, Foursquare, Yelp, HappyCow).

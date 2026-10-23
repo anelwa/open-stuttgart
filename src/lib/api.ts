@@ -51,6 +51,25 @@ export function usePolling<T>(url: string | null, intervalMs: number): Polled<T>
   return { ...state, reload: () => setTick((t) => t + 1) };
 }
 
+/**
+ * Holt `url` genau einmal (und erneut nur über `reload`). Für Quellen, deren
+ * Bedingungen keinen automatischen Dauerabruf erlauben, z. B. Tankpreise.
+ */
+export function useOnDemand<T>(url: string | null): Polled<T> {
+  const [state, setState] = useState<Omit<Polled<T>, 'reload'>>({ data: null, error: null, loading: !!url, updatedAt: null });
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!url) return;
+    const ctrl = new AbortController();
+    setState((s) => ({ ...s, loading: true }));
+    getJson<T>(url, ctrl.signal)
+      .then((data) => { if (!ctrl.signal.aborted) setState({ data, error: null, loading: false, updatedAt: Date.now() }); })
+      .catch((e) => { if (!ctrl.signal.aborted) setState((s) => ({ ...s, error: (e as Error).message, loading: false })); });
+    return () => ctrl.abort();
+  }, [url, tick]);
+  return { ...state, reload: () => setTick((t) => t + 1) };
+}
+
 export function useNow(intervalMs = 15000) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {

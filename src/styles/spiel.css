@@ -1,0 +1,180 @@
+/* Modul „Kesselcode“ (modules/spiel) und Einstieg auf der Startseite. */
+
+.spiel-module { --spiel-line: var(--line); }
+
+.spiel-hero {
+  margin-top: 6px;
+  padding: 18px 18px 16px;
+  border-radius: 22px 22px 22px 56px;
+  background: var(--ink);
+  color: var(--on-ink);
+}
+:root[data-theme='dark'] .spiel-hero { background: #0C0C0C; color: #ECEAE4; }
+.spiel-hero .eyebrow { display: inline-flex; align-items: center; gap: 6px; }
+.spiel-hero-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: .55; }
+.spiel-hero h3 { font-size: 21px; line-height: 1.2; font-weight: 800; margin: 4px 0 8px; }
+.spiel-hero-line { margin: 0; font-size: 13.5px; line-height: 1.45; opacity: .92; }
+.spiel-hero-meta { margin: 10px 0 0; font-size: 12px; font-weight: 700; letter-spacing: .02em; opacity: .75; }
+
+/* Routenkarten */
+.spiel-route-list { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.spiel-card {
+  border: 1.5px solid var(--spiel-line);
+  border-radius: 18px;
+  background: var(--card-2);
+  overflow: hidden;
+  transition: border-color .15s, background .15s;
+}
+.spiel-card:hover { border-color: var(--line-strong); }
+.spiel-card.is-open { background: var(--card); border-color: color-mix(in srgb, var(--spiel-color) 55%, var(--spiel-line)); }
+.spiel-card.is-done { background: color-mix(in srgb, var(--spiel-color) 5%, var(--card-2)); }
+.spiel-card-head {
+  width: 100%; display: flex; align-items: stretch; gap: 12px;
+  padding: 13px 13px 13px 10px; border: 0; background: transparent;
+  color: inherit; text-align: left; font: inherit; cursor: pointer;
+}
+.spiel-card-head:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.spiel-card-swatch { width: 5px; border-radius: 99px; background: var(--spiel-color); flex: none; }
+.spiel-card-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.spiel-kicker { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--muted); }
+.spiel-card-title { font-size: 17px; line-height: 1.2; font-weight: 800; }
+.spiel-card-sub { font-size: 12.5px; color: var(--ink-2); }
+.spiel-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.spiel-card-side { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 4px; flex: none; color: var(--muted); }
+.spiel-open-chip, .spiel-progress-chip, .spiel-done-chip { font-size: 10.5px; font-weight: 800; border-radius: 99px; padding: 2px 7px; white-space: nowrap; }
+.spiel-open-chip { border: 1px solid var(--line); color: var(--muted); }
+.spiel-progress-chip { background: var(--spiel-color); color: #fff; }
+.spiel-done-chip { display: inline-flex; align-items: center; gap: 3px; color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent); }
+.spiel-card-progress { height: 3px; background: var(--line); }
+.spiel-card-progress span { display: block; height: 100%; background: var(--spiel-color); transition: width .3s; }
+.spiel-card-body { padding: 0 14px 14px 27px; display: flex; flex-direction: column; gap: 10px; }
+.spiel-intro { margin: 0; font-size: 13.5px; line-height: 1.45; }
+.spiel-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 12px; margin: 0; font-size: 12.5px; }
+.spiel-facts div { display: contents; }
+.spiel-facts dt { color: var(--muted); }
+.spiel-facts dd { margin: 0; overflow-wrap: anywhere; }
+.spiel-details { font-size: 13px; }
+.spiel-details summary { cursor: pointer; font-weight: 700; padding: 3px 0; }
+.spiel-details ul { margin: 6px 0 0 18px; padding: 0; color: var(--ink-2); }
+.spiel-details li { margin: 3px 0; }
+.spiel-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.spiel-actions .link-btn { margin-top: 0; padding: 8px 12px; font-size: 12.5px; }
+.spiel-actions .link-btn.secondary { font-size: 12.5px; }
+
+.spiel-diff { display: inline-flex; gap: 3px; align-items: center; }
+.spiel-diff i { width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); display: block; }
+.spiel-diff i.on { background: var(--spiel-color, var(--ink)); }
+
+/* Aktive Route */
+.spiel-active-bar { display: flex; align-items: center; gap: 8px; margin: 4px 0 6px; }
+.spiel-back { display: inline-flex; align-items: center; gap: 3px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; padding: 4px 2px; cursor: pointer; }
+.spiel-back:hover { color: var(--accent-hover); }
+.spiel-active-time { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.spiel-pause { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--card-2); color: var(--ink); border-radius: 99px; padding: 4px 9px; font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; }
+.spiel-pause:hover { border-color: var(--ink); }
+.spiel-pause.is-paused { background: var(--accent); border-color: var(--accent); color: #26262C; }
+.spiel-active-head { padding: 15px 16px 14px; border-radius: 20px 20px 20px 40px; background: color-mix(in srgb, var(--spiel-color) 10%, var(--card-2)); border: 1px solid color-mix(in srgb, var(--spiel-color) 30%, var(--line)); }
+.spiel-active-head h3 { font-size: 20px; line-height: 1.2; font-weight: 800; margin: 3px 0 2px; }
+.spiel-active-head > p { margin: 0 0 10px; font-size: 13px; color: var(--ink-2); }
+.spiel-progress-line { display: flex; align-items: center; gap: 8px; }
+.spiel-progress-line > span { flex: 1; height: 6px; border-radius: 99px; background: color-mix(in srgb, var(--spiel-color) 18%, var(--line)); overflow: hidden; }
+.spiel-progress-line i { display: block; height: 100%; border-radius: inherit; background: var(--spiel-color); transition: width .35s; }
+.spiel-progress-line strong { font-size: 11.5px; color: var(--muted); }
+.spiel-active-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 7px; font-size: 11.5px; color: var(--muted); }
+.spiel-badge { border: 1px solid currentColor; border-radius: 99px; padding: 1px 8px; color: var(--ok); font-weight: 800; }
+
+/* Station */
+.spiel-station { margin-top: 10px; padding: 15px 15px 14px; border: 1.5px solid var(--line); border-radius: 20px; background: var(--card); display: flex; flex-direction: column; gap: 8px; }
+.spiel-station.is-current { border-color: color-mix(in srgb, var(--spiel-color) 55%, var(--line)); box-shadow: 0 8px 24px color-mix(in srgb, var(--spiel-color) 10%, transparent); }
+.spiel-station.is-bonus { background: var(--card-2); }
+.spiel-station-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.spiel-station-no { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; color: var(--spiel-color); }
+.spiel-station-state { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.spiel-ticket { margin-left: 5px; border: 1px solid var(--line); border-radius: 99px; padding: 0 5px; font-size: 9.5px; color: var(--warn); }
+.spiel-station-name { font-size: 19px; line-height: 1.25; font-weight: 800; margin: 0; }
+.spiel-prompt { font-size: 14.5px; line-height: 1.45; margin: 0; }
+.spiel-answer-label { font-size: 11.5px; font-weight: 700; color: var(--muted); margin-top: 2px; }
+.spiel-answer-row { display: flex; gap: 7px; align-items: stretch; }
+.spiel-answer { flex: 1; min-width: 0; border: 1.5px solid var(--line-strong); border-radius: 13px; background: var(--card-2); color: var(--ink); padding: 10px 12px; font: inherit; font-size: 16px; }
+.spiel-answer:focus { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); border-color: var(--ink); }
+.spiel-check { margin: 0; padding: 9px 14px; white-space: nowrap; }
+.spiel-check:disabled { opacity: .5; cursor: default; }
+.spiel-feedback { display: flex; align-items: flex-start; gap: 5px; margin: 0; font-size: 12.5px; line-height: 1.35; }
+.spiel-feedback.ok { color: var(--ok); }
+.spiel-feedback.err { color: var(--crit); }
+.spiel-location { margin: 0; font-size: 12px; color: var(--muted); }
+.spiel-hint-box { border: 1px dashed var(--line-strong); border-radius: 13px; background: var(--card-2); padding: 9px 11px; }
+.spiel-hint-box p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.4; }
+.spiel-hint-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; font-weight: 800; color: var(--muted); }
+.spiel-hint-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.spiel-hint-actions .link-btn { margin-top: 0; padding: 5px 9px; font-size: 11.5px; }
+.spiel-map-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.spiel-map-actions .link-btn { margin-top: 0; padding: 6px 10px; font-size: 11.5px; }
+
+.spiel-fact { display: flex; flex-direction: column; gap: 7px; padding: 11px 12px; border: 1px solid color-mix(in srgb, var(--spiel-color) 28%, var(--line)); border-radius: 14px; background: color-mix(in srgb, var(--spiel-color) 6%, var(--card-2)); }
+.spiel-fact-head { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--spiel-color); }
+.spiel-fact p { margin: 0; font-size: 13px; line-height: 1.45; }
+.spiel-fact .source { margin: 0; }
+.spiel-seal { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; border: 1.5px solid currentColor; }
+
+.spiel-station-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.spiel-station-row { width: 100%; display: flex; align-items: center; gap: 9px; padding: 8px 9px; border: 1px solid var(--line); border-radius: 12px; background: var(--card-2); color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.spiel-station-row:hover:not(:disabled) { border-color: var(--ink); background: var(--card); }
+.spiel-station-row:disabled { cursor: default; opacity: .55; }
+.spiel-station-row.is-current { border-color: color-mix(in srgb, var(--spiel-color) 55%, var(--line)); background: color-mix(in srgb, var(--spiel-color) 6%, var(--card)); opacity: 1; }
+.spiel-station-row.is-done { opacity: 1; }
+.spiel-station-row.is-bonus { background: transparent; }
+.spiel-row-no { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--card); border: 1.5px solid var(--line-strong); font-size: 11px; font-weight: 800; }
+.is-done .spiel-row-no { background: var(--ok); border-color: var(--ok); color: #fff; }
+.is-current .spiel-row-no { background: var(--spiel-color); border-color: var(--spiel-color); color: #fff; }
+.is-bonus .spiel-row-no { background: var(--accent); border-color: var(--accent); color: #26262C; }
+.spiel-row-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.spiel-row-name { font-size: 13px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.spiel-row-sub { font-size: 10.5px; color: var(--muted); }
+.spiel-row-state { flex: none; font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.spiel-row-state.done { color: var(--ok); }
+.spiel-row-state.current { color: var(--spiel-color); }
+.spiel-fact-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.spiel-fact-list details { border: 1px solid var(--line); border-radius: 12px; background: var(--card-2); padding: 8px 10px; }
+.spiel-fact-list summary { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; cursor: pointer; font-size: 12.5px; font-weight: 700; }
+.spiel-fact-list summary small { color: var(--muted); font-weight: 500; }
+.spiel-fact-list p { margin: 7px 0 0; font-size: 12.5px; line-height: 1.45; }
+.spiel-back-main { margin-top: 7px; }
+.spiel-finale-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; padding: 9px 11px; border-radius: 12px; background: var(--accent-soft); color: var(--ink); font-size: 12.5px; }
+.spiel-finale-hint .link-btn { margin: 0 0 0 auto; padding: 5px 9px; font-size: 11.5px; }
+
+/* Finale und Abschluss */
+.spiel-finale { margin-top: 10px; padding: 16px; border: 1.5px solid color-mix(in srgb, var(--spiel-color) 40%, var(--line)); border-radius: 20px; background: color-mix(in srgb, var(--spiel-color) 7%, var(--card)); display: flex; flex-direction: column; gap: 9px; }
+.spiel-finale-kicker { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; color: var(--spiel-color); }
+.spiel-finale h3 { font-size: 20px; line-height: 1.2; font-weight: 800; margin: 0; }
+.spiel-finale > p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+.spiel-codes { display: flex; flex-wrap: wrap; gap: 5px; margin: 2px 0; }
+.spiel-codes span { width: 30px; height: 36px; display: grid; place-items: center; border-radius: 8px; border: 1.5px dashed var(--line-strong); font-family: var(--font-head); font-weight: 800; font-size: 16px; color: var(--muted); background: var(--card-2); }
+.spiel-codes span.is-on { border-style: solid; border-color: var(--spiel-color); color: var(--spiel-color); background: var(--card); }
+.spiel-complete { margin-top: 10px; padding: 18px; border-radius: 20px; background: var(--card); border: 1.5px solid var(--line); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.spiel-complete-seal { width: 48px; height: 48px; border-radius: 50%; border: 3px double currentColor; display: grid; place-items: center; }
+.spiel-complete h3 { margin: 0; font-size: 20px; font-weight: 800; }
+.spiel-complete p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+
+/* Routenbuch */
+.spiel-book { padding: 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--card-2); }
+.spiel-book-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+.spiel-book-head strong { font-size: 13px; }
+.spiel-book-seals { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.spiel-book-seal { display: flex; flex-direction: column; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 9.5px; line-height: 1.2; text-align: center; cursor: pointer; padding: 3px 1px; border-radius: 10px; }
+.spiel-book-seal:hover { background: var(--card); }
+.spiel-seal-circle { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--line-strong); display: grid; place-items: center; font-family: var(--font-head); font-weight: 800; font-size: 14px; }
+.spiel-book-seal.is-done .spiel-seal-circle { background: var(--card); }
+.spiel-wappen { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px; border-radius: 12px; background: var(--accent-soft); color: #26262C; }
+.spiel-wappen-seal { width: 40px; height: 40px; border-radius: 50%; border: 3px double #26262C; display: grid; place-items: center; font-family: var(--font-head); font-weight: 800; font-size: 18px; flex: none; }
+.spiel-wappen strong { display: block; font-size: 13px; }
+.spiel-wappen p { margin: 2px 0 0; font-size: 11.5px; line-height: 1.35; }
+.spiel-book-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.spiel-small { padding: 5px 8px; font-size: 10.5px; margin-top: 0; }
+
+.spiel-howto { margin: 0; padding: 0 0 0 20px; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+.spiel-howto li { margin: 5px 0; }
+.spiel-howto strong { color: var(--ink); }
+
+/* Während einer Route keine Großveranstaltungs-Hinweise über dem Suchraum. */
+:root[data-spiel='active'] .big-event { display: none; }

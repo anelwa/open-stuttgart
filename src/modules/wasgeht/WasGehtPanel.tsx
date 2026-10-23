@@ -1,6 +1,6 @@
 // Modul „Was geht“: Szene-Termine (abgeglichen mit dem Kulturmodul), Neu in der Stadt (OpenStreetMap) und Meldungen.
 // Daten von /api/wasgeht, /api/openings und /api/news (server/sources/wasgeht.mjs). Spezifikation was-geht, Abschnitt 6.8.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ModuleProps } from '../types';
 import type { CultureEvent, Facility } from '../../lib/types';
 import { usePolling, useNow } from '../../lib/api';
@@ -104,7 +104,7 @@ function preis(e: WgEvent) {
 const hauptSzene = (e: WgEvent): Szene => (e.scene?.find((s) => s !== 'sonstiges') ?? 'sonstiges');
 const osmId = (osm: string | null | undefined) => (osm ? osm.replace(/^node\//, 'n').replace(/^way\//, 'w').replace(/^relation\//, 'r') : null);
 
-export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLayer, center }: ModuleProps) {
+export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLayer, center, botCommand }: ModuleProps) {
   const now = useNow(60_000);
   const today = berlinDate(now);
   const [ansicht, setAnsicht] = useState<Ansicht>({ kind: 'abend' });
@@ -122,6 +122,30 @@ export function WasGehtPanel({ visible, toggle, select, flyTo, setNearby, setLay
   const [sgTopic, setSgTopic] = useState<string>('alle');
   const [sgDistrict, setSgDistrict] = useState<string>('alle');
   const [sgCount, setSgCount] = useState(20);
+  const lastBotCommand = useRef('');
+
+  // Filter aus dem Bot: „nur heute“, „nur kostenlos“, „nur Partys“.
+  useEffect(() => {
+    if (!botCommand || botCommand.module !== 'wasgeht' || lastBotCommand.current === botCommand.id) return;
+    lastBotCommand.current = botCommand.id;
+    const value = String(botCommand.args?.value ?? '');
+    const on = value === 'true' || value === '1' || value === 'an';
+    if (botCommand.command === 'szene') {
+      setSzene((SZENE.some((s) => s.id === value) ? value : null) as Szene | null);
+    } else if (botCommand.command === 'frei') {
+      setFrei(on);
+    } else if (botCommand.command === 'jung') {
+      setJung(on);
+    } else if (botCommand.command === 'kollektive') {
+      setNurKollektive(on);
+    } else if (botCommand.command === 'abend') {
+      setAnsicht({ kind: 'abend' });
+    } else if (botCommand.command === 'wochenende') {
+      setAnsicht({ kind: 'wochenende' });
+    } else if (botCommand.command === 'tag' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      setAnsicht({ kind: 'tag', date: value });
+    }
+  }, [botCommand]);
 
   const url = ansicht.kind === 'abend' ? `/api/wasgeht?date=${today}&span=abend`
     : ansicht.kind === 'wochenende' ? `/api/wasgeht?date=${today}&span=wochenende`

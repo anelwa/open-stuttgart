@@ -142,7 +142,79 @@ export type Selection =
   | { type: 'place'; id: string }
   | { type: 'verwaltung_gebaeude'; id: string; lngLat?: [number, number] }
   | { type: 'verwaltung_leistung'; url: string; lat?: number; lon?: number }
-  | { type: 'wissen'; id: string; layer: string; layerTitle: string; name: string; lngLat: [number, number]; props: Record<string, unknown> };
+  | { type: 'wissen'; id: string; layer: string; layerTitle: string; name: string; lngLat: [number, number]; props: Record<string, unknown> }
+  | { type: 'bartour-stop'; tourId: string; stopIndex: number; lngLat: [number, number] };
+
+/** Eine kuratierte Bar- oder Drinking-Spot-Tour. */
+export interface BartourStop {
+  id: string;
+  venueId: string;
+  name: string;
+  category: string;
+  address: string;
+  lat: number;
+  lon: number;
+  role: 'ankommen' | 'vertiefen' | 'wechseln' | 'saettigen' | 'finale' | string;
+  stayMin: number;
+  orderIdea: string;
+  why: string;
+  openingHours: string;
+  wheelchair: 'yes' | 'limited' | 'no' | 'unknown' | string;
+  walkToNextM: number;
+  walkToNextMin: number;
+  note: string;
+  source: string;
+  checkedAt: string;
+  optional: boolean;
+  /** 1-basierte Position in der Tour */
+  index: number;
+  nearestStops: {
+    id: string; name: string; kind: string; lines: string[];
+    lat: number; lon: number; dist: number; walkMin: number;
+  }[];
+}
+
+export interface Bartour {
+  id: string;
+  title: string;
+  subtitle: string;
+  color: string;
+  themes: string[];
+  district: string;
+  audience: string;
+  durationMin: number;
+  distanceM: number;
+  priceLevel: string;
+  budget: string;
+  bestDays: string;
+  bestTime: string;
+  season: string;
+  reservation: string;
+  accessibility: string;
+  alcoholFree: string;
+  weather: string;
+  home: string;
+  intro: string;
+  dramaturgy: string;
+  stops: BartourStop[];
+  variants: string[];
+  notes: string[];
+  sources: string[];
+  checkedAt: string;
+  stopCount: number;
+  bbox: [number, number, number, number];
+  startStop: BartourStop['nearestStops'][number] | null;
+  endStop: BartourStop['nearestStops'][number] | null;
+}
+
+export interface BartourenResponse {
+  items: Bartour[];
+  updated: string | null;
+  stand: string | null;
+  source: string;
+  license: string | null;
+  hinweis: string;
+}
 
 export interface CultureEvent {
   id: string;
@@ -230,6 +302,10 @@ export interface Facility {
   wheelchair?: string | null;
   /** OpenStreetMap-Objekt, z. B. n29283708 */
   osm?: string | null;
+  /** Direkter OpenStreetMap-Link, wenn kein Objekttyp bekannt ist (z. B. POI-Bestand) */
+  osmUrl?: string | null;
+  /** Quellenangabe für die Detailansicht, wenn keine OSM-/Stadt-Zuordnung möglich ist */
+  source?: string | null;
   /** Erfasste Ernährungsangabe aus OpenStreetMap (diet:vegan / diet:vegetarian) */
   diet?: 'vegan-only' | 'vegan' | 'vegetarian-only' | 'vegetarian' | null;
 }

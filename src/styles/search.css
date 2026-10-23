@@ -139,6 +139,16 @@
   font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .search-hit-lines { display: flex; gap: 3px; flex: none; }
+.search-hit-call {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;
+  color: var(--ok); font-size: 11.5px; font-weight: 800; padding: 5px 6px; border-radius: 8px;
+  max-width: 140px;
+}
+.search-hit-call span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-hit-call:hover { background: var(--card-2); }
+@media (max-width: 640px) {
+  .search-hit-call span { display: none; }
+}
 
 .search-empty { padding: 22px 14px; color: var(--muted); font-size: 13px; text-align: center; }
 
@@ -206,6 +216,7 @@
 .quick-pill:hover { background: var(--card-2); }
 .quick-pill:active { transform: scale(.97); }
 .quick-pill svg { color: var(--muted); flex: none; }
+.quick-pill--contact svg { color: var(--crit); }
 .quick-pill.on {
   background: var(--ink); color: var(--on-ink); border-color: var(--ink);
 }
@@ -271,3 +282,11 @@
 :root[data-theme='dark'] .quick-actions::after {
   background: linear-gradient(to right, rgba(20, 20, 20, 0), rgba(20, 20, 20, .85));
 }
+
+.search-mic {
+  width: 38px; height: 38px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  background: var(--card-2); color: var(--ink); border: 1px solid var(--line); cursor: pointer;
+  transition: background .15s, border-color .15s, transform .12s;
+}
+.search-mic:hover { border-color: var(--accent); background: var(--accent-soft); }
+.search-mic:active { transform: scale(.94); }

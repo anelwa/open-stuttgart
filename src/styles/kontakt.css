@@ -1,0 +1,197 @@
+/* Kontaktregister und strukturierte Dienststellen-Seiten. */
+
+.kd-detail { display: flex; flex-direction: column; gap: 4px; }
+
+.kd-head { padding: 2px 0 14px; border-bottom: 1px solid var(--line); }
+.kd-head-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.kd-badge {
+  display: inline-flex; align-items: center; gap: 6px; width: fit-content;
+  padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 800;
+  letter-spacing: .04em; text-transform: uppercase;
+  background: var(--card-2); color: var(--muted); border: 1px solid var(--line);
+}
+.kd-badge.kind-notruf { background: var(--crit); border-color: var(--crit); color: #fff; }
+.kd-badge.kind-notdienst { background: var(--accent-soft); border-color: var(--accent); color: var(--warn); }
+.kd-badge.kind-beratung { background: var(--card-2); border-color: var(--line-strong); color: var(--ink-2); }
+.kd-head h2 { font: 800 23px/1.2 var(--font-head); margin: 0 0 4px; }
+.kd-org { margin: 0; font-size: 13.5px; color: var(--muted); }
+.kd-address-line { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); }
+
+.kd-status {
+  display: flex; align-items: center; gap: 8px; margin: 12px 0 2px;
+  font-size: 13.5px; font-weight: 700; color: var(--muted);
+}
+.kd-status.is-offen { color: var(--ok); }
+.kd-status.is-pause { color: var(--warn); }
+.kd-status.is-info { font-weight: 600; color: var(--ink-2); }
+.kd-status-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+
+.kd-actions {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0 4px;
+}
+.kd-action {
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 11px 12px; border-radius: 14px; text-decoration: none;
+  background: var(--card-2); color: var(--ink); border: 1px solid var(--line);
+  transition: background .15s, border-color .15s, transform .12s;
+}
+.kd-action:hover { background: var(--card); border-color: var(--line-strong); }
+.kd-action:active { transform: scale(.985); }
+.kd-action svg { flex: none; color: var(--muted); }
+.kd-action span { display: flex; flex-direction: column; min-width: 0; }
+.kd-action strong { font-size: 13.5px; line-height: 1.2; }
+.kd-action small { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kd-action--call {
+  grid-column: span 2; background: var(--accent); border-color: var(--accent); color: #26262C;
+}
+.kd-action--call:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+.kd-action--call svg, .kd-action--call small { color: #26262C; }
+.kd-action--call:hover svg, .kd-action--call:hover small { color: #fff; }
+.kd-action--call strong { font-size: 15px; }
+
+.kd-section { padding: 16px 0 2px; border-top: 1px solid var(--line); margin-top: 12px; }
+.kd-section h3 { font: 800 14.5px/1.3 var(--font-head); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+.kd-count { font: 600 11.5px/1 var(--font-body); color: var(--muted); background: var(--card-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 7px; }
+
+.kd-facts { margin: 0; display: flex; flex-direction: column; }
+.kd-facts > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); align-items: baseline; }
+.kd-facts > div:first-child { border-top: 0; padding-top: 0; }
+.kd-facts dt { color: var(--muted); font-size: 12.5px; }
+.kd-facts dd { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 600; min-width: 0; }
+.kd-facts dd a { color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.kd-facts dd a:hover { text-decoration: underline; }
+.kd-copy {
+  display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent;
+  color: var(--muted); font-size: 11.5px; padding: 2px 4px; border-radius: 6px;
+}
+.kd-copy:hover { color: var(--ink); background: var(--card-2); }
+
+.kd-hours { display: flex; flex-direction: column; gap: 12px; }
+.kd-hours-group h4 { margin: 0 0 4px; font: 700 12px/1.3 var(--font-body); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.kd-hours-group dl { margin: 0; }
+.kd-hours-group dl > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; padding: 5px 0; font-size: 13px; }
+.kd-hours-group dt { color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.kd-hours-group dd { margin: 0; font-weight: 600; }
+.kd-hours-group dl > div.is-today { background: var(--accent-soft); margin: 0 -8px; padding: 5px 8px; border-radius: 8px; }
+.kd-hours-group dl > div.is-today dt { color: var(--ink); }
+.kd-today { font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--warn); background: var(--card); border-radius: 4px; padding: 1px 4px; }
+.kd-note { display: block; font-weight: 500; font-size: 11.5px; color: var(--muted); }
+
+.kd-services { list-style: none; margin: 0; padding: 0; }
+.kd-services li + li { border-top: 1px solid var(--line); }
+.kd-services button, .kd-services a {
+  width: 100%; display: flex; align-items: center; gap: 8px; text-align: left;
+  border: 0; background: transparent; color: var(--ink); text-decoration: none;
+  padding: 9px 4px; font-size: 13px;
+}
+.kd-services button:hover, .kd-services a:hover { color: var(--accent-hover); }
+.kd-services span { flex: 1; min-width: 0; }
+.kd-services small { flex: none; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; color: var(--ok); background: var(--card-2); border: 1px solid var(--line); border-radius: 4px; padding: 2px 5px; }
+
+.kd-address { display: flex; gap: 9px; align-items: flex-start; margin: 0; font-size: 13px; }
+.kd-address svg { flex: none; margin-top: 1px; color: var(--warn); }
+.kd-address span { display: flex; flex-direction: column; gap: 2px; }
+.kd-address small { color: var(--muted); }
+.kd-text { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-2); white-space: pre-line; }
+
+.kd-source { display: flex; gap: 6px; align-items: flex-start; margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+.kd-source svg { flex: none; margin-top: 1px; }
+.kd-source a { color: inherit; }
+
+@media (max-width: 520px) {
+  .kd-head h2 { font-size: 20px; }
+  .kd-facts > div, .kd-hours-group dl > div { grid-template-columns: 96px minmax(0, 1fr); }
+}
+
+/* ── Kontaktregister als eigenes Blatt ────────────────────────────────── */
+.k-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 92; background: rgba(20, 20, 20, .38);
+  display: flex; justify-content: flex-end;
+}
+.k-sheet {
+  width: min(600px, 100%); height: 100%; background: var(--card); color: var(--ink);
+  display: flex; flex-direction: column; box-shadow: var(--shadow);
+  animation: k-sheet-in .2s ease-out;
+}
+@keyframes k-sheet-in { from { transform: translateX(20px); opacity: 0 } to { transform: none; opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .k-sheet { animation: none } }
+.k-sheet-head { padding: 14px 16px 12px; border-bottom: 1px solid var(--line); flex: none; }
+.k-sheet-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.k-sheet-title h2 { font: 800 21px/1.2 var(--font-head); }
+.k-sheet-head-actions { display: flex; align-items: center; gap: 6px; }
+.k-sheet-emergency {
+  display: inline-flex; align-items: center; gap: 5px; text-decoration: none;
+  padding: 6px 9px; border-radius: 999px; background: var(--crit); color: #fff;
+  font-size: 12px; font-weight: 800; letter-spacing: .02em;
+}
+.k-sheet-emergency:hover { filter: brightness(1.06); }
+:root[data-theme='dark'] .k-sheet-emergency { color: #26262C; }
+:root[data-theme='dark'] .kd-badge.kind-notruf { color: #26262C; }
+.k-sheet-sub { margin: 3px 0 10px; font-size: 12.5px; color: var(--muted); }
+.k-sheet-search {
+  display: flex; align-items: center; gap: 9px; border: 1.5px solid var(--line);
+  border-radius: 13px; padding: 8px 11px; background: var(--card-2);
+}
+.k-sheet-search:focus-within { border-color: var(--accent); background: var(--card); }
+.k-sheet-search svg { flex: none; color: var(--muted); }
+.k-sheet-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: 500 15px/1.3 var(--font-body); }
+.k-sheet-search input::placeholder { color: var(--muted); }
+
+.k-sheet-body { flex: 1; overflow-y: auto; padding: 14px 16px 30px; scrollbar-width: thin; }
+.k-sheet-body.is-detail { padding-top: 16px; }
+
+.k-emergency { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 16px; }
+.k-emergency a {
+  display: flex; flex-direction: column; gap: 2px; padding: 11px 12px; border-radius: 14px;
+  text-decoration: none; color: #fff; background: var(--crit); min-height: 82px;
+  justify-content: center;
+}
+.k-emergency a:nth-child(2) { background: #2B59C3; }
+.k-emergency a:nth-child(3) { background: var(--ok); }
+.k-emergency a:hover { filter: brightness(1.06); }
+:root[data-theme='dark'] .k-emergency a:first-child { color: #26262C; }
+.k-emergency small { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; opacity: .8; }
+.k-emergency strong { font: 800 16px/1.2 var(--font-head); }
+.k-emergency span { font-size: 12px; font-weight: 600; opacity: .95; }
+
+.k-gruppen { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 12px; scrollbar-width: none; }
+.k-gruppen::-webkit-scrollbar { display: none; }
+.k-gruppen .chip { flex: none; }
+.k-gruppen .chip small { color: var(--muted); }
+
+.k-list { list-style: none; margin: 0; padding: 0; }
+.k-list li { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--line); }
+.k-list li:first-child { border-top: 0; }
+.k-list-row {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 11px; text-align: left;
+  padding: 10px 4px; border: 0; background: transparent; color: var(--ink);
+}
+.k-list-row:hover { background: var(--card-2); border-radius: 10px; }
+.k-list-icon { width: 34px; height: 34px; border-radius: 10px; flex: none; display: grid; place-items: center; background: var(--card-2); color: var(--muted); }
+.k-list-icon.is-notruf { background: var(--crit); color: #fff; }
+.k-list-icon.is-notdienst { background: var(--accent-soft); color: var(--warn); }
+.k-list-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.k-list-name { font-size: 13.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-list-meta { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-list-call {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;
+  color: var(--ok); font-size: 12px; font-weight: 800; padding: 5px 7px; border-radius: 8px;
+  max-width: 150px;
+}
+.k-list-call span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-list-call:hover { background: var(--card-2); }
+.k-sheet-section-label { font: 800 10.5px/1 var(--font-head); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 14px 2px 6px; }
+.k-sheet-empty { padding: 22px 8px; color: var(--muted); font-size: 13px; text-align: center; }
+.k-sheet-foot { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.k-sheet-back { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--muted); font-size: 12.5px; font-weight: 700; padding: 4px 0; }
+.k-sheet-back:hover { color: var(--ink); }
+.k-sheet-back svg { transform: rotate(180deg); }
+
+@media (max-width: 640px) {
+  .k-sheet-backdrop { background: var(--canvas); }
+  .k-sheet { width: 100%; animation: none; }
+  .k-emergency { grid-template-columns: 1fr; }
+  .k-emergency a { min-height: 0; flex-direction: row; align-items: baseline; gap: 8px; }
+  .k-emergency small { order: 3; margin-left: auto; }
+  .k-list-call span { display: none; }
+}

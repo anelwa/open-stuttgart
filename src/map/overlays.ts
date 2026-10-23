@@ -10,7 +10,7 @@ export const aerialTiles = (year: string) =>
 
 export const BLANK_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
-export type OverlayKey = 'network' | 'stops' | 'parking' | 'sharing' | 'roadworks' | 'bike' | 'air' | 'water' | 'events' | 'places' | 'sun' | 'radar' | 'aerial' | 'nearby' | 'live' | 'route' | 'vehicles' | 'traffic' | 'warnung' | 'flug' | 'kaltluft' | 'unfall' | 'hike' | 'wissen';
+export type OverlayKey = 'network' | 'stops' | 'parking' | 'sharing' | 'roadworks' | 'bike' | 'air' | 'water' | 'events' | 'places' | 'sun' | 'radar' | 'aerial' | 'nearby' | 'live' | 'route' | 'vehicles' | 'traffic' | 'warnung' | 'flug' | 'kaltluft' | 'unfall' | 'hike' | 'wissen' | 'bartouren' | 'spiel';
 
 export const OVERLAY_LAYERS: Record<OverlayKey, string[]> = {
   bike: ['bike-routes'],
@@ -37,6 +37,8 @@ export const OVERLAY_LAYERS: Record<OverlayKey, string[]> = {
   unfall: ['unfall-dot'],
   hike: ['hike-line', 'hike-label'],
   wissen: ['wissen-fill', 'wissen-line', 'wissen-dot', 'wissen-label'],
+  spiel: ['spiel-route-casing', 'spiel-route', 'spiel-area', 'spiel-area-line', 'spiel-station', 'spiel-station-label'],
+  bartouren: ['bartour-casing', 'bartour-line', 'bartour-stop', 'bartour-stop-label'],
 };
 
 export const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -70,6 +72,7 @@ export function addOverlays(map: MlMap, theme: Theme, visible: Record<OverlayKey
   map.addSource('water', { type: 'geojson', data: EMPTY });
   map.addSource('places', { type: 'geojson', data: EMPTY });
   map.addSource('events', { type: 'geojson', data: EMPTY });
+  map.addSource('bartouren', { type: 'geojson', data: EMPTY });
   map.addSource('nearby', { type: 'geojson', data: EMPTY });
   map.addSource('live', { type: 'geojson', data: EMPTY });
   map.addSource('route', { type: 'geojson', data: EMPTY });
@@ -82,6 +85,7 @@ export function addOverlays(map: MlMap, theme: Theme, visible: Record<OverlayKey
   map.addSource('unfall', { type: 'geojson', data: EMPTY });
   map.addSource('hike', { type: 'geojson', data: EMPTY });
   map.addSource('wissen', { type: 'geojson', data: EMPTY });
+  map.addSource('spiel', { type: 'geojson', data: EMPTY });
   map.addSource('selected', { type: 'geojson', data: EMPTY });
 
   const vis = (k: OverlayKey) => ({ visibility: visible[k] ? 'visible' : 'none' }) as const;
@@ -460,6 +464,51 @@ export function addOverlays(map: MlMap, theme: Theme, visible: Record<OverlayKey
     paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 2 },
   });
 
+  // Bar-Touren: gestrichelter Verlauf und nummerierte Stationen. Die Linie verbindet
+  // die Stationen, sie ist keine Navigation; der echte Weg läuft über das Weg-Modul.
+  map.addLayer({
+    id: 'bartour-casing', type: 'line', source: 'bartouren',
+    filter: ['==', ['get', 'kind'], 'tour'],
+    layout: { ...vis('bartouren'), 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': card, 'line-width': zl([[10, 5], [14, 8]]), 'line-opacity': 0.8 },
+  }, before);
+  map.addLayer({
+    id: 'bartour-line', type: 'line', source: 'bartouren',
+    filter: ['==', ['get', 'kind'], 'tour'],
+    layout: { ...vis('bartouren'), 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': ['get', 'color'],
+      'line-width': zl([[10, 2.5], [14, 4]]),
+      'line-dasharray': [1.4, 1.2],
+      'line-opacity': 0.95,
+    },
+  }, before);
+  map.addLayer({
+    id: 'bartour-stop', type: 'circle', source: 'bartouren',
+    filter: ['==', ['get', 'kind'], 'stop'],
+    layout: vis('bartouren'),
+    paint: {
+      'circle-radius': zl([[10, 5], [14, 7], [17, 9]]),
+      'circle-color': card,
+      'circle-stroke-color': ['get', 'color'],
+      'circle-stroke-width': zl([[10, 2], [14, 3]]),
+    },
+  });
+  map.addLayer({
+    id: 'bartour-stop-label', type: 'symbol', source: 'bartouren',
+    filter: ['==', ['get', 'kind'], 'stop'],
+    minzoom: 11.5,
+    layout: {
+      ...vis('bartouren'),
+      'text-field': ['to-string', ['get', 'stopIndex']],
+      'text-font': ['Noto Sans Bold'],
+      'text-size': 11,
+      'text-allow-overlap': true,
+      'text-ignore-placement': true,
+    },
+    paint: { 'text-color': ink },
+  });
+
   // Amtliche Warnungen (BBK NINA / MoWaS): betroffenes Gebiet als Fläche mit Kennzeichnung
   const warnColor = ['match', ['get', 'severity'], 'Extreme', '#B71C1C', 'Severe', '#C62828', 'Moderate', '#E65100', '#C28800'] as ExpressionSpecification;
   map.addLayer({
@@ -576,6 +625,75 @@ export function addOverlays(map: MlMap, theme: Theme, visible: Record<OverlayKey
     paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 1.6 },
   });
 
+  // Stadtspiel: schematischer Verlauf, Suchraum und nummerierte Stationen.
+  map.addLayer({
+    id: 'spiel-route-casing', type: 'line', source: 'spiel',
+    filter: ['==', ['get', '_kind'], 'line'],
+    layout: { ...vis('spiel'), 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': card, 'line-width': zl([[10, 7], [14, 10]]), 'line-opacity': 0.9 },
+  }, before);
+  map.addLayer({
+    id: 'spiel-route', type: 'line', source: 'spiel',
+    filter: ['==', ['get', '_kind'], 'line'],
+    layout: { ...vis('spiel'), 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': ['get', 'color'],
+      'line-width': zl([[10, 3], [14, 4.5]]),
+      'line-dasharray': [1.6, 1.1],
+      'line-opacity': 0.95,
+    },
+  }, before);
+  map.addLayer({
+    id: 'spiel-area', type: 'fill', source: 'spiel',
+    filter: ['==', ['get', '_kind'], 'area'],
+    layout: vis('spiel'),
+    paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.12 },
+  }, before);
+  map.addLayer({
+    id: 'spiel-area-line', type: 'line', source: 'spiel',
+    filter: ['==', ['get', '_kind'], 'area'],
+    layout: { ...vis('spiel'), 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': ['get', 'color'], 'line-width': 1.5, 'line-dasharray': [2, 1.5], 'line-opacity': 0.7 },
+  }, before);
+  map.addLayer({
+    id: 'spiel-station', type: 'circle', source: 'spiel',
+    filter: ['==', ['get', '_kind'], 'station'],
+    layout: vis('spiel'),
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'],
+        10, ['case', ['==', ['get', 'status'], 'current'], 8, ['==', ['get', 'status'], 'solved'], 5, 4],
+        14, ['case', ['==', ['get', 'status'], 'current'], 13, ['==', ['get', 'status'], 'solved'], 8, 6],
+        17, ['case', ['==', ['get', 'status'], 'current'], 16, ['==', ['get', 'status'], 'solved'], 10, 8]],
+      'circle-color': ['case',
+        ['==', ['get', 'status'], 'solved'], '#1B7F3B',
+        ['==', ['get', 'status'], 'current'], ['get', 'color'],
+        ['==', ['get', 'status'], 'bonus'], '#FFB300', card],
+      'circle-stroke-color': ['case',
+        ['==', ['get', 'status'], 'solved'], '#FFFFFF',
+        ['==', ['get', 'status'], 'current'], '#FFFFFF',
+        ['get', 'color']],
+      'circle-stroke-width': ['case', ['==', ['get', 'status'], 'current'], 3, 2],
+      'circle-opacity': ['case', ['==', ['get', 'status'], 'open'], 0.7, 1],
+    },
+  });
+  map.addLayer({
+    id: 'spiel-station-label', type: 'symbol', source: 'spiel',
+    filter: ['==', ['get', '_kind'], 'station'],
+    layout: {
+      ...vis('spiel'),
+      'text-field': ['case', ['==', ['get', 'kind'], 'bonus'], '+', ['to-string', ['get', 'no']]],
+      'text-font': ['Noto Sans Bold'],
+      'text-size': zl([[10, 8], [14, 10.5], [17, 12]]),
+      'text-allow-overlap': true,
+      'text-ignore-placement': true,
+    },
+    paint: {
+      'text-color': ['case', ['==', ['get', 'status'], 'current'], '#FFFFFF', ['==', ['get', 'status'], 'solved'], '#FFFFFF', ink],
+      'text-halo-color': ['case', ['==', ['get', 'status'], 'current'], ['get', 'color'], '#FFFFFF00'],
+      'text-halo-width': 0,
+    },
+  });
+
   // Auswahl
   map.addLayer({
     id: 'selected-halo', type: 'circle', source: 'selected',
@@ -589,4 +707,4 @@ export function setOverlayVisibility(map: MlMap, key: OverlayKey, on: boolean) {
   }
 }
 
-export const INTERACTIVE_LAYERS = ['stops-rail', 'stops-bus', 'parking-icon', 'parking-dot', 'roadworks', 'share-point', 'share-cluster', 'air-circle', 'water-gauge', 'events-pin', 'places-icon', 'nearby-dot', 'live-dot', 'vehicles-dot', 'traffic-dot', 'traffic-line', 'flug-dot', 'warnung-label', 'kaltluft-line', 'unfall-dot', 'hike-line', 'wissen-dot', 'wissen-line', 'wissen-fill'];
+export const INTERACTIVE_LAYERS = ['stops-rail', 'stops-bus', 'parking-icon', 'parking-dot', 'roadworks', 'share-point', 'share-cluster', 'air-circle', 'water-gauge', 'events-pin', 'bartour-stop', 'places-icon', 'nearby-dot', 'live-dot', 'vehicles-dot', 'traffic-dot', 'traffic-line', 'flug-dot', 'warnung-label', 'kaltluft-line', 'unfall-dot', 'hike-line', 'wissen-dot', 'wissen-line', 'wissen-fill'];

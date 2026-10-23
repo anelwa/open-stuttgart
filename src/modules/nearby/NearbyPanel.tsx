@@ -11,6 +11,7 @@ import { fmtTime } from '../../lib/format';
 import { CAT_COLOR, CAT_GROUPS, type FacilitiesResponse } from './cats';
 import { MyAddress, type BbItem } from './MyAddress';
 import { VerwaltungSection } from './VerwaltungSection';
+import { TankenSection } from './TankenSection';
 import { Explain } from '../../lib/info';
 import { icsFile } from './ics';
 import { openState } from '../../lib/openingHours';
@@ -47,6 +48,10 @@ const dayLabel = (iso: string) => {
 };
 
 const STUFE = (s: number) => (s >= 11 ? 'alle Wartemarken vergeben' : s >= 10 ? '150 Minuten oder mehr' : `etwa ${Math.round(s) * 15} Minuten`);
+/** Kategorien mit Öffnungszeiten und Rollstuhl-Angabe (OpenStreetMap-Bestand). */
+const EINKAUFEN = new Set(['supermarkt', 'baeckerei', 'kiosk', 'metzgerei', 'obst_gemuese', 'tabak', 'hofladen_osm', 'geschaeft', 'bank', 'geldautomat', 'zigarettenautomat']);
+/** Ergänzende OSM-Kategorien für den Alltag. */
+const ALLTAG = new Set(['paketstation', 'briefkasten', 'buecherschrank', 'waschsalon', 'hundepark', 'wickeltisch', 'soziales']);
 /** Vergleich mit dem eigenen Verlauf: gleicher Wochentag, gleiche Viertelstunde */
 function usualBb(b: Bb) {
   if (!b.usual) return 'Üblich um diese Zeit: noch zu wenige Messungen';
@@ -105,12 +110,13 @@ function GeocacheSection({ lngLat }: { lngLat: [number, number] }) {
   );
 }
 
-export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visible, toggle }: ModuleProps) {
+export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visible, toggle, botCommand }: ModuleProps) {
   const [origin, setOrigin] = useState<Origin>(() => readAddr() ?? { lngLat: center, label: 'Kartenmitte', kind: 'karte' });
   const [cat, setCat] = useState<string>(() => { try { return localStorage.getItem('os-kategorie') ?? 'spielplatz'; } catch { return 'spielplatz'; } });
   const [diet, setDiet] = useState<'vegan' | 'vegetarian' | null>(null);
   const [onlyDiet, setOnlyDiet] = useState(false);
   const [verwOnMap, setVerwOnMap] = useState(false);
+  const [tankOnMap, setTankOnMap] = useState(false);
   const [q, setQ] = useState('');
   const [addrOpen, setAddrOpen] = useState(false);
   const [addrActive, setAddrActive] = useState(0);
@@ -118,10 +124,31 @@ export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visibl
   const addrId = useId();
   const addrInput = useRef<HTMLInputElement>(null);
   const addrBlur = useRef<number | null>(null);
+  const lastBotCommand = useRef('');
+
+  // Filter aus dem Bot: „nur Toiletten“, „nur vegan“, „nur Essen“.
+  useEffect(() => {
+    if (!botCommand || botCommand.module !== 'nearby' || lastBotCommand.current === botCommand.id) return;
+    lastBotCommand.current = botCommand.id;
+    const value = String(botCommand.args?.value ?? '');
+    if (botCommand.command === 'category' && value) {
+      setCat(value);
+    } else if (botCommand.command === 'diet') {
+      if (value === 'vegan' || value === 'vegetarian') {
+        setDiet(value); setOnlyDiet(false);
+        setCat((c) => (c.startsWith('essen_') ? c : 'essen_restaurant'));
+      } else if (value === 'vegan-only' || value === 'vegetarian-only') {
+        setDiet(value.replace('-only', '') as 'vegan' | 'vegetarian'); setOnlyDiet(true);
+        setCat((c) => (c.startsWith('essen_') ? c : 'essen_restaurant'));
+      } else { setDiet(null); setOnlyDiet(false); }
+    }
+  }, [botCommand]);
 
   // Kartenmitte folgt der Karte, solange kein fester Standort gewählt ist
   useEffect(() => { if (origin.kind === 'karte') setOrigin((o) => ({ ...o, lngLat: center })); }, [center, origin.kind]);
   useEffect(() => { try { localStorage.setItem('os-kategorie', cat); } catch { /* egal */ } }, [cat]);
+  useEffect(() => { setTankOnMap(false); }, [cat]);
+  useEffect(() => { if (verwOnMap) setTankOnMap(false); }, [verwOnMap]);
   useEffect(() => { setLayer('nearby', true); return () => setNearby(null); }, [setLayer, setNearby]);
 
   const addrQuery = q.trim();
@@ -169,16 +196,19 @@ export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visibl
 
   useLang();
   const essen = cat.startsWith('essen_');
+  const einkaufen = EINKAUFEN.has(cat);
+  const alltag = ALLTAG.has(cat);
+  const mitOeffnung = essen || einkaufen;
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [onlyStep, setOnlyStep] = useState(false);
   const sorted = useMemo(() => (fac.data?.items ?? [])
-    .filter((f) => !essen || ((!onlyOpen || openState(f.hours)?.open) && (!onlyStep || f.wheelchair === 'yes')))
+    .filter((f) => !mitOeffnung || ((!onlyOpen || openState(f.hours)?.open) && (!onlyStep || f.wheelchair === 'yes')))
     .map((f) => ({ f, d: distM([lon, lat], [f.lon, f.lat]) }))
-    .sort((a, b) => a.d - b.d), [fac.data, lon, lat, essen, onlyOpen, onlyStep]);
+    .sort((a, b) => a.d - b.d), [fac.data, lon, lat, mitOeffnung, onlyOpen, onlyStep]);
   useEffect(() => {
-    if (verwOnMap || !fac.data) return;
+    if (verwOnMap || tankOnMap || !fac.data) return;
     setNearby({ items: sorted.map((x) => x.f), color: CAT_COLOR });
-  }, [verwOnMap, sorted, fac.data, setNearby]);
+  }, [verwOnMap, tankOnMap, sorted, fac.data, setNearby]);
 
   const bbNear = useMemo(() => (bb.data?.items ?? []).filter((b) => b.lat != null)
     .map((b) => ({ b, d: distM([lon, lat], [b.lon!, b.lat!]) })).sort((a, b) => a.d - b.d).slice(0, 3), [bb.data, lon, lat]);
@@ -275,6 +305,8 @@ export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visibl
           meta={fac.data ? `${fac.data.label}, nächste zuerst` : 'wird geladen'} />
       </Section>
 
+      <TankenSection select={select} flyTo={flyTo} setNearby={setNearby} setLayer={setLayer} onMap={() => setTankOnMap(true)} origin={origin.lngLat} />
+
       <Section title="Bürgerbüros, aktuelle Wartezeit" aside={<Explain id="buergerbuero" />}>
         {bb.error && !bb.data && <ErrorNote text="Wartezeitanzeige derzeit nicht erreichbar." onRetry={bb.reload} />}
         {!bb.data && !bb.error && <span className="skeleton block" style={{ height: 120 }} />}
@@ -330,7 +362,7 @@ export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visibl
         <p className="muted small">Quelle: Abfallwirtschaft Stuttgart. Sperrmüll und Grüngut über die <a href="https://www.stuttgart.de/aws" target="_blank" rel="noreferrer">AWS</a> anmelden.</p>
       </Section>
 
-      <Section title="Einrichtungen in der Nähe" aside={<>{fac.data ? `${fac.data.items.length} im Stadtgebiet` : null}<Explain id={essen ? "gastro" : "einrichtungen"} /></>}>
+      <Section title="Einrichtungen in der Nähe" aside={<>{fac.data ? `${fac.data.items.length} im Stadtgebiet` : null}<Explain id={essen ? "gastro" : einkaufen ? "einkaufen" : "einrichtungen"} /></>}>
         {CAT_GROUPS.map((g) => (
           <div key={g.label} className="cat-group">
             <span className="cat-group-label">{tr(g.label)}</span>
@@ -343,20 +375,24 @@ export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visibl
             </div>
           </div>
         ))}
-        {essen && (
+        {mitOeffnung && (
           <>
             <div className="chips filter-chips essen-filter">
               <button type="button" className={`chip ${onlyOpen ? 'on' : ''}`} aria-pressed={onlyOpen} onClick={() => setOnlyOpen((v) => !v)}>{tr('Jetzt geöffnet')}</button>
               <button type="button" className={`chip ${onlyStep ? 'on' : ''}`} aria-pressed={onlyStep} onClick={() => setOnlyStep((v) => !v)}>{tr('Stufenlos zugänglich')}</button>
-              <button type="button" className={`chip ${diet === 'vegan' ? 'on' : ''}`} aria-pressed={diet === 'vegan'} onClick={() => { setDiet(diet === 'vegan' ? null : 'vegan'); setOnlyDiet(false); }}>Vegan</button>
-              <button type="button" className={`chip ${diet === 'vegetarian' ? 'on' : ''}`} aria-pressed={diet === 'vegetarian'} onClick={() => { setDiet(diet === 'vegetarian' ? null : 'vegetarian'); setOnlyDiet(false); }}>Vegetarisch</button>
-              {diet && (
-                <button type="button" className={`chip ${onlyDiet ? 'on' : ''}`} aria-pressed={onlyDiet} onClick={() => setOnlyDiet((v) => !v)}>
-                  Nur komplett {diet === 'vegan' ? 'vegan' : 'vegetarisch'}
-                </button>
+              {essen && (
+                <>
+                  <button type="button" className={`chip ${diet === 'vegan' ? 'on' : ''}`} aria-pressed={diet === 'vegan'} onClick={() => { setDiet(diet === 'vegan' ? null : 'vegan'); setOnlyDiet(false); }}>Vegan</button>
+                  <button type="button" className={`chip ${diet === 'vegetarian' ? 'on' : ''}`} aria-pressed={diet === 'vegetarian'} onClick={() => { setDiet(diet === 'vegetarian' ? null : 'vegetarian'); setOnlyDiet(false); }}>Vegetarisch</button>
+                  {diet && (
+                    <button type="button" className={`chip ${onlyDiet ? 'on' : ''}`} aria-pressed={onlyDiet} onClick={() => setOnlyDiet((v) => !v)}>
+                      Nur komplett {diet === 'vegan' ? 'vegan' : 'vegetarisch'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
-            {diet && (
+            {essen && diet && (
               <p className="muted small diet-note">
                 {onlyDiet
                   ? `Nur Betriebe, die laut OpenStreetMap ausschließlich ${diet === 'vegan' ? 'vegan' : 'vegetarisch'} sind.`
@@ -375,7 +411,7 @@ export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visibl
                 <span className="walk"><Icon name="walk" size={16} /><strong>{walkMin(d)}</strong><small>min</small></span>
                 <span className="near-main">
                   <span className="near-name">{f.name}{f.diet && <span className={`diet-tag diet-${f.diet}`}>{f.diet === 'vegan-only' ? 'nur vegan' : f.diet === 'vegan' ? 'vegan' : f.diet === 'vegetarian-only' ? 'nur vegetarisch' : 'vegetarisch'}</span>}</span>
-                  <span className="near-sub">{[fmtDist(d), essen ? openState(f.hours)?.text ?? (f.hours ? 'Öffnungszeiten siehe Eintrag' : 'Öffnungszeiten nicht erfasst') : f.address, ...(f.info ?? []).slice(0, essen ? 1 : 2)].filter(Boolean).join(' · ')}</span>
+                  <span className="near-sub">{[fmtDist(d), f.live, essen ? openState(f.hours)?.text ?? (f.hours ? 'Öffnungszeiten siehe Eintrag' : 'Öffnungszeiten nicht erfasst') : f.address, einkaufen ? openState(f.hours)?.text ?? (f.hours ? 'Öffnungszeiten siehe Eintrag' : 'Öffnungszeiten nicht erfasst') : null, ...(f.info ?? []).slice(0, essen ? 1 : 2)].filter(Boolean).join(' · ')}</span>
                 </span>
                 <Icon name="chevron" size={16} className="muted" />
               </button>
@@ -396,6 +432,27 @@ export function NearbyPanel({ center, flyTo, select, setNearby, setLayer, visibl
         <p className="muted small nearby-hint">
           Essen und Trinken: Angaben aus OpenStreetMap ohne Bewertung und ohne bezahlte Reihenfolge, nächste zuerst. Ergebnisse amtlicher
           Lebensmittelkontrollen veröffentlicht das Land auf <a href="https://www.verbraucherinfo-bw.de/" target="_blank" rel="noreferrer">verbraucherinfo-bw.de</a>.
+        </p>
+      )}
+
+      {einkaufen && (
+        <p className="muted small nearby-hint">
+          Einkaufen und Geld: Angaben aus OpenStreetMap (ODbL), nächste zuerst. Öffnungszeiten und Standorte können veraltet sein.
+          Zigarettenautomaten werden nicht amtlich erfasst und sind deshalb unvollständig. <Explain id="einkaufen" />
+        </p>
+      )}
+
+      {cat === 'defibrillator' && (
+        <p className="muted small nearby-hint">
+          Defibrillatoren aus OpenStreetMap, kein amtliches Register. Standort und Zugang können veraltet sein.
+          Im Notfall immer <strong>112</strong> rufen und den Anweisungen der Leitstelle folgen. <Explain id="defibrillator" />
+        </p>
+      )}
+
+      {alltag && (
+        <p className="muted small nearby-hint">
+          Ergänzende Angaben aus OpenStreetMap (ODbL), kein amtliches Register. Leerungszeiten, Zugang und Ausstattung
+          nur, wenn dort erfasst; für verbindliche Angaben gilt die Seite des Betreibers. <Explain id="alltag" />
         </p>
       )}
 

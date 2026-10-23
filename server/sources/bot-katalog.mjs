@@ -48,6 +48,10 @@ export function norm(text) {
     .replace(/ö/g, 'oe')
     .replace(/ü/g, 'ue')
     .replace(/ß/g, 'ss')
+    // Akzente aus französischen Lehnwörtern (Café, Crêpe, ...) vereinheitlichen,
+    // damit „Cafe“, „Café“ und „CAFÉ“ dieselbe Kategorie treffen.
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();

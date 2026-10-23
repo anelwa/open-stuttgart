@@ -2,9 +2,16 @@
 // Die Datenbank (server/data/suche.sqlite) wird mit scripts/build-search-db.mjs aus
 // server/data/verwaltung.sqlite erzeugt: Dokumentenregister, FTS5, Backlinks, Leistungsabläufe
 // und Bezugsquellen. Keine externen Anfragen, keine Personenprofile.
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
+import { kontaktDetail } from './kontakte.mjs';
+
+const SYNONYME_FILE = fileURLToPath(new URL('../../src/data/kontakte-synonyme.json', import.meta.url));
+let SYNONYME = [];
+try {
+  SYNONYME = JSON.parse(readFileSync(SYNONYME_FILE, 'utf8'));
+} catch { /* wörtliche Suche */ }
 
 const FILE = process.env.OS_SEARCH_DB ?? fileURLToPath(new URL('../data/suche.sqlite', import.meta.url));
 let db = null;
@@ -35,19 +42,44 @@ const safeType = (t) => (/^[a-z_]{2,40}$/.test(String(t ?? '')) ? String(t) : nu
 function ftsQuery(q) {
   const tokens = (String(q ?? '').toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) ?? []).slice(0, 12);
   if (!tokens.length) return null;
-  return tokens.map((t) => `"${t.replace(/"/g, '')}"*`).join(' OR ');
+  const expanded = new Set();
+  for (const token of tokens) {
+    const rules = SYNONYME.filter((rule) => (rule.begriffe ?? []).includes(token));
+    if (rules.length) {
+      for (const rule of rules) for (const treffer of rule.treffer ?? []) expanded.add(treffer);
+    } else {
+      expanded.add(token);
+    }
+  }
+  return [...expanded].slice(0, 24).map((t) => `"${t.replace(/"/g, '')}"*`).join(' OR ');
 }
 
 const TYPE_LABEL = {
   leistung: 'Leistung',
   dienststelle: 'Dienststelle',
+  kontakt: 'Kontakt',
   seite: 'Seite',
   pressemitteilung: 'Pressemitteilung',
   online_angebot: 'Online-Dienst',
   dokument: 'Dokument',
 };
 
+/** Telefonnummer für die schnelle Aktion direkt in der Trefferliste. */
+function firstPhone(json) {
+  try {
+    const rows = JSON.parse(json ?? '[]');
+    if (!Array.isArray(rows) || !rows.length) return null;
+    const first = rows.find((p) => p?.number) ?? rows[0];
+    return first?.number ? { label: first.label ?? 'Telefon', number: String(first.number), tel: String(first.number).replace(/[^\d+]/g, '') } : null;
+  } catch { return null; }
+}
+
 function mapResult(r) {
+  const contactAddress = [r.contact_street, [r.contact_postal, r.contact_city].filter(Boolean).join(' ')]
+    .filter(Boolean).join(', ');
+  const contactSnippet = r.contact_id
+    ? [r.contact_description, r.contact_category, contactAddress].filter(Boolean).join(' · ')
+    : null;
   return {
     id: Number(r.id),
     title: r.title,
@@ -57,8 +89,10 @@ function mapResult(r) {
     source: r.source,
     district: r.district ?? null,
     modified: r.modified_at ?? null,
-    snippet: r.snippet ?? r.summary ?? null,
-    rank: r.rank != null ? Number(r.rank) : null,
+    snippet: contactSnippet || r.snippet || r.summary || null,
+    rank: r.fts_rank != null ? Number(r.fts_rank) : r.rank != null ? Number(r.rank) : null,
+    contactId: r.contact_id ?? null,
+    phone: firstPhone(r.phones_json),
   };
 }
 
@@ -75,11 +109,15 @@ export function search({ q = '', type = null, limit = 20, offset = 0 } = {}) {
   const match = ftsQuery(query);
 
   if (!match) {
-    const rows = d.prepare(`SELECT id,title,url,doc_type,source,district,modified_at,summary AS snippet,NULL AS rank
-      FROM documents ${typ ? 'WHERE doc_type = ?' : ''}
-      ORDER BY COALESCE(modified_at, fetched_at, '') DESC, id DESC LIMIT ? OFFSET ?`)
+    const rows = d.prepare(`SELECT d.id,d.title,d.url,d.doc_type,d.source,d.district,d.modified_at,
+        d.summary AS snippet,NULL AS rank,c.id AS contact_id,c.phones_json,
+        c.description AS contact_description,c.category AS contact_category,
+        c.street AS contact_street,c.postal_code AS contact_postal,c.city AS contact_city
+      FROM documents d LEFT JOIN contacts c ON c.document_id = d.id
+      ${typ ? 'WHERE d.doc_type = ?' : ''}
+      ORDER BY COALESCE(d.modified_at, d.fetched_at, '') DESC, d.id DESC LIMIT ? OFFSET ?`)
       .all(...(typ ? [typ, lim + 1, off] : [lim + 1, off]));
-    const total = d.prepare(`SELECT count(*) AS n FROM documents ${typ ? 'WHERE doc_type = ?' : ''}`).get(...(typ ? [typ] : [])).n;
+    const total = d.prepare(`SELECT count(*) AS n FROM documents d ${typ ? 'WHERE d.doc_type = ?' : ''}`).get(...(typ ? [typ] : [])).n;
     return {
       q: '', type: typ, total: Number(total), limit: lim, offset: off,
       items: rows.slice(0, lim).map(mapResult),
@@ -89,15 +127,24 @@ export function search({ q = '', type = null, limit = 20, offset = 0 } = {}) {
   }
 
   const rows = d.prepare(`SELECT d.id,d.title,d.url,d.doc_type,d.source,d.district,d.modified_at,
-      bm25(documents_fts,10,5,1) AS rank,
-      snippet(documents_fts,-1,'[[',']]',' … ',22) AS snippet
+      bm25(documents_fts,10,5,1) AS fts_rank,
+      snippet(documents_fts,-1,'[[',']]',' … ',22) AS snippet,
+      c.id AS contact_id,c.phones_json,
+      c.description AS contact_description,c.category AS contact_category,
+      c.street AS contact_street,c.postal_code AS contact_postal,c.city AS contact_city
     FROM documents_fts JOIN documents d ON d.id = documents_fts.rowid
+    LEFT JOIN contacts c ON c.document_id = d.id
     WHERE documents_fts MATCH ? ${typ ? 'AND d.doc_type = ?' : ''}
-    ORDER BY (rank
-      - CASE d.doc_type WHEN 'leistung' THEN 3.0 WHEN 'dienststelle' THEN 1.5 WHEN 'seite' THEN 0.3 ELSE 0 END
+    ORDER BY (fts_rank
+      - CASE WHEN lower(d.title) = lower(?) THEN 6.0
+             WHEN lower(d.title) LIKE lower(?) || '%' THEN 2.5
+             ELSE 0 END
+      - CASE c.kind WHEN 'notruf' THEN 3.5 WHEN 'notdienst' THEN 1.0 ELSE 0 END
+      - CASE WHEN c.emergency = 1 THEN 2.0 ELSE 0 END
+      - CASE d.doc_type WHEN 'leistung' THEN 3.0 WHEN 'dienststelle' THEN 2.0 WHEN 'kontakt' THEN 4.0 WHEN 'seite' THEN 0.3 ELSE 0 END
       + CASE d.doc_type WHEN 'dokument' THEN 2.0 WHEN 'online_angebot' THEN 0.8 ELSE 0 END), d.title
     LIMIT ? OFFSET ?`)
-    .all(...(typ ? [match, typ, lim + 1, off] : [match, lim + 1, off]));
+    .all(...(typ ? [match, query, query, typ, lim + 1, off] : [match, query, query, lim + 1, off]));
   const total = d.prepare(`SELECT count(*) AS n FROM documents_fts JOIN documents d ON d.id = documents_fts.rowid
     WHERE documents_fts MATCH ? ${typ ? 'AND d.doc_type = ?' : ''}`)
     .get(...(typ ? [match, typ] : [match])).n;
@@ -129,8 +176,11 @@ export function suggest(q = '') {
     FROM documents_fts JOIN documents d ON d.id=documents_fts.rowid
     WHERE documents_fts MATCH ?
     ORDER BY (bm25(documents_fts,10,5,1)
-      - CASE d.doc_type WHEN 'leistung' THEN 3.0 WHEN 'dienststelle' THEN 1.5 ELSE 0 END
-      + CASE d.doc_type WHEN 'dokument' THEN 2.0 WHEN 'online_angebot' THEN 0.8 ELSE 0 END), d.title LIMIT 8`).all(match);
+      - CASE WHEN lower(d.title) = lower(?) THEN 6.0
+             WHEN lower(d.title) LIKE lower(?) || '%' THEN 2.5
+             ELSE 0 END
+      - CASE d.doc_type WHEN 'leistung' THEN 3.0 WHEN 'dienststelle' THEN 2.0 WHEN 'kontakt' THEN 4.0 ELSE 0 END
+      + CASE d.doc_type WHEN 'dokument' THEN 2.0 WHEN 'online_angebot' THEN 0.8 ELSE 0 END), d.title LIMIT 8`).all(match, query, query);
   return { items: rows.map((r) => ({ id: Number(r.id), title: r.title, type: r.doc_type, typeLabel: TYPE_LABEL[r.doc_type] ?? r.doc_type, url: r.url })) };
 }
 
@@ -152,12 +202,41 @@ export function documentDetail(id) {
   const outlinks = d.prepare(`SELECT d.id,d.title,d.url,d.doc_type,l.to_url,l.anchor,l.kind
     FROM document_links l LEFT JOIN documents d ON d.id=l.to_id
     WHERE l.from_id=? ORDER BY l.kind, d.title LIMIT 60`).all(Number(id));
-  const related = d.prepare(`SELECT d.id,d.title,d.url,d.doc_type,count(*) AS shared
-    FROM document_links a
-    JOIN document_links b ON b.to_url=a.to_url AND b.from_id != a.from_id
-    JOIN documents d ON d.id=b.from_id
-    WHERE a.from_id=? AND d.id != ?
-    GROUP BY d.id ORDER BY shared DESC, d.title LIMIT 8`).all(Number(id), Number(id));
+  /**
+   * Verwandte Dokumente über gemeinsame Ziele, aber ohne die globale Navigation:
+   * Ziele, auf die sehr viele Seiten verweisen (Kontakt, Impressum, Startseite),
+   * tragen nichts zur inhaltlichen Verwandtschaft bei und fliegen raus.
+   * Das Gewicht bevorzugt seltene, also spezifische gemeinsame Links.
+   */
+  const relatedSql = `WITH target_pop AS (
+      SELECT to_url, count(DISTINCT from_id) AS n FROM document_links GROUP BY to_url
+    ), shared AS (
+      SELECT b.from_id, a.to_url, 1.0 / tp.n AS w
+      FROM document_links a
+      JOIN document_links b ON b.to_url=a.to_url AND b.from_id != a.from_id
+      JOIN target_pop tp ON tp.to_url=a.to_url
+      WHERE a.from_id=? AND tp.n <= 40
+      GROUP BY b.from_id, a.to_url
+    )
+    SELECT d.id,d.title,d.url,d.doc_type,count(*) AS shared,sum(w) AS weight
+    FROM shared s JOIN documents d ON d.id=s.from_id
+    WHERE d.id != ?
+    GROUP BY d.id
+    HAVING count(*) >= 2
+    ORDER BY weight DESC, shared DESC, d.title LIMIT 8`;
+  let related = d.prepare(relatedSql).all(Number(id), Number(id));
+  if (!related.length) {
+    related = d.prepare(`WITH target_pop AS (
+        SELECT to_url, count(DISTINCT from_id) AS n FROM document_links GROUP BY to_url
+      )
+      SELECT d.id,d.title,d.url,d.doc_type,count(*) AS shared,sum(1.0 / tp.n) AS weight
+      FROM document_links a
+      JOIN document_links b ON b.to_url=a.to_url AND b.from_id != a.from_id
+      JOIN target_pop tp ON tp.to_url=a.to_url
+      JOIN documents d ON d.id=b.from_id
+      WHERE a.from_id=? AND d.id != ? AND tp.n <= 40
+      GROUP BY d.id ORDER BY weight DESC, d.title LIMIT 4`).all(Number(id), Number(id));
+  }
   const chunks = d.prepare('SELECT ord,text FROM document_chunks WHERE document_id=? ORDER BY ord LIMIT 12').all(Number(id));
   return {
     ...doc,
@@ -167,8 +246,10 @@ export function documentDetail(id) {
     sources: sources.map((s) => ({ ...s, role: s.role ?? 'quelle' })),
     backlinks: backlinks.map((b) => ({ ...b, id: Number(b.id) })),
     outlinks: outlinks.map((o) => ({ ...o, id: o.id != null ? Number(o.id) : null })),
-    related: related.map((r) => ({ ...r, id: Number(r.id), shared: Number(r.shared) })),
+    related: related.map((r) => ({ ...r, id: Number(r.id), shared: Number(r.shared), weight: Number(r.weight) })),
     chunks,
+    // Ältere Datenbanken ohne Kontaktregister dürfen den Dokumentenleser nicht blockieren.
+    contact: (() => { try { return kontaktDetail(Number(id)); } catch { return null; } })(),
     source: 'Landeshauptstadt Stuttgart, stuttgart.de (Struktur- und Seitendaten); abgeleitete Suche',
     lizenz: 'Angaben der Landeshauptstadt Stuttgart; Quellen und Links an jedem Dokument. Keine Volltexte von Presseartikeln.',
   };
@@ -176,13 +257,17 @@ export function documentDetail(id) {
 
 export function related(id) {
   const d = open();
-  const rows = d.prepare(`SELECT d.id,d.title,d.url,d.doc_type,count(*) AS shared
+  const rows = d.prepare(`WITH target_pop AS (
+      SELECT to_url, count(DISTINCT from_id) AS n FROM document_links GROUP BY to_url
+    )
+    SELECT d.id,d.title,d.url,d.doc_type,count(*) AS shared,sum(1.0 / tp.n) AS weight
     FROM document_links a
     JOIN document_links b ON b.to_url=a.to_url AND b.from_id != a.from_id
+    JOIN target_pop tp ON tp.to_url=a.to_url
     JOIN documents d ON d.id=b.from_id
-    WHERE a.from_id=? AND d.id != ?
-    GROUP BY d.id ORDER BY shared DESC, d.title LIMIT 12`).all(Number(id), Number(id));
-  return { items: rows.map((r) => ({ ...r, id: Number(r.id), shared: Number(r.shared), typeLabel: TYPE_LABEL[r.doc_type] ?? r.doc_type })) };
+    WHERE a.from_id=? AND d.id != ? AND tp.n <= 40
+    GROUP BY d.id ORDER BY weight DESC, shared DESC, d.title LIMIT 12`).all(Number(id), Number(id));
+  return { items: rows.map((r) => ({ ...r, id: Number(r.id), shared: Number(r.shared), weight: Number(r.weight), typeLabel: TYPE_LABEL[r.doc_type] ?? r.doc_type })) };
 }
 
 export function searchStats() {
@@ -198,7 +283,9 @@ export function searchStats() {
     (SELECT count(*) FROM service_sources) AS service_sources,
     (SELECT count(*) FROM document_links) AS links,
     (SELECT count(*) FROM document_links WHERE to_id IS NOT NULL) AS resolved_links,
-    (SELECT count(*) FROM document_chunks) AS chunks`).get();
+    (SELECT count(*) FROM document_chunks) AS chunks,
+    (SELECT count(*) FROM contacts) AS contacts,
+    (SELECT count(*) FROM contacts WHERE phones_json != '[]') AS contacts_with_phone`).get();
   return {
     ...counts,
     types,

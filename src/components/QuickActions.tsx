@@ -1,17 +1,18 @@
 import { ANLIEGEN, type Anliegen } from '../lib/anliegen';
 import { Icon } from './Icon';
-import { StuttBotMark } from './StuttBotMark';
+import { StuggiMark } from './StuggiMark';
 import { tr, useLang } from '../lib/i18n';
 
 /**
  * Schnellaktionen oben über der Karte — das Muster von Google Maps: eine horizontale
  * Reihe von Pillen mit Icon und Kurzlabel, scrollbar, ohne die Karte zu verdecken.
- * Ganz links steht StuttBot mit eigenem Maskottchen; danach folgen die Anliegen.
+ * Ganz links steht StuggiAI mit eigenem Zeichen; danach folgen die Anliegen.
  */
-export function QuickActions({ active, onPick, onBot }: {
+export function QuickActions({ active, onPick, onBot, onContacts }: {
   active: string | null;
   onPick: (a: Anliegen) => void;
   onBot: () => void;
+  onContacts: () => void;
 }) {
   useLang();
   return (
@@ -21,11 +22,22 @@ export function QuickActions({ active, onPick, onBot }: {
           <button
             type="button"
             className="quick-pill quick-pill--bot"
-            title="StuttBot: Amt, Termin und Weg"
+            title="StuggiAI: Amt, Termin und Weg"
             onClick={onBot}
           >
-            <StuttBotMark size={20} />
-            <span>StuttBot</span>
+            <StuggiMark size={20} />
+            <span>StuggiAI</span>
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
+            className="quick-pill quick-pill--contact"
+            title="Notrufe, Ämter und alle wichtigen Kontakte"
+            onClick={onContacts}
+          >
+            <Icon name="phone" size={17} />
+            <span>Kontakt & Notfall</span>
           </button>
         </li>
         {ANLIEGEN.map((a) => (

@@ -6,7 +6,7 @@ import { MODULES } from './modules';
 import { DataProvider, useData } from './lib/data';
 import type { Facility, Selection } from './lib/types';
 import { Icon, weatherIconName } from './components/Icon';
-import { Search } from './components/Search';
+import { Search, type SearchHandle } from './components/Search';
 import { DocumentReader } from './components/DocumentReader';
 import { DetailSheet } from './components/Details';
 import { BigEventBanner } from './components/BigEvent';
@@ -15,7 +15,7 @@ import { loadStops } from './lib/stops';
 import { nowFrame, radarCoords, radarImage } from './lib/rain';
 import { InfoProvider, type InfoPage } from './lib/info';
 import { useLive } from './lib/live';
-import { RouteProvider, type Place as RoutePlace } from './lib/routeCtx';
+import { RouteProvider, type RouteRequest } from './lib/routeCtx';
 import { LANGS, setLang, tr, useLang } from './lib/i18n';
 import { InfoPages } from './components/InfoPages';
 import { LayerSheet } from './components/LayerSheet';
@@ -25,10 +25,15 @@ import { ANLIEGEN, type Anliegen } from './lib/anliegen';
 import { Disclosure } from './components/ui';
 import { StuttBot } from './components/StuttBot';
 import { Kiosk } from './components/Kiosk';
+import { KontaktSheet } from './components/KontaktSheet';
+import type { Kontakt } from './lib/kontakt';
 import { objectUrl } from './components/WissenDetail';
+import type { BotContext, BotReceipt, BotUiAction } from './lib/bot/types';
+import { actionLabel, validateBotAction } from './lib/bot/actions';
+import type { ModuleCommand } from './modules/types';
 
 const DEFAULT_VISIBLE: Record<OverlayKey, boolean> = {
-  network: true, stops: true, parking: true, sharing: false, roadworks: true, bike: false, air: true, water: true, events: true, places: true, sun: false, radar: true, aerial: false, nearby: true, live: true, route: true, vehicles: true, traffic: false, warnung: true, flug: false, kaltluft: false, unfall: false, hike: false, wissen: false,
+  network: true, stops: true, parking: true, sharing: false, roadworks: true, bike: false, air: true, water: true, events: true, places: true, sun: false, radar: true, aerial: false, nearby: true, live: true, route: true, vehicles: true, traffic: false, warnung: true, flug: false, kaltluft: false, unfall: false, hike: false, wissen: false, bartouren: false, spiel: false,
 };
 
 function readPref<T>(key: string, fallback: T): T {
@@ -39,6 +44,36 @@ function readPref<T>(key: string, fallback: T): T {
 }
 function writePref(key: string, v: unknown) {
   try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* privat */ }
+}
+
+function newBotActionId() {
+  try { return crypto.randomUUID(); } catch { return `bot-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
+}
+
+function readBotLocation(): BotContext['location'] {
+  try {
+    const saved = JSON.parse(localStorage.getItem('os-adresse') ?? 'null');
+    const [lon, lat] = saved?.lngLat ?? [];
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      return { lat: Number(lat), lon: Number(lon), label: saved.label ?? saved.address ?? 'Meine Adresse' };
+    }
+  } catch { /* egal */ }
+  return null;
+}
+
+interface BotSnapshot {
+  moduleId: string | null;
+  focus: string | null;
+  anliegenId: string | null;
+  visible: Record<OverlayKey, boolean>;
+  selection: Selection | null;
+  theme: Theme;
+  terrain: boolean;
+  aerial: { year: string; opacity: number };
+  routeTarget: RouteRequest | null;
+  routeGeo: GeoJSON.FeatureCollection | null;
+  sheet: 'mini' | 'peek' | 'open';
+  center: [number, number];
 }
 
 function useMedia(q: string) {
@@ -55,9 +90,13 @@ function useMedia(q: string) {
 function Shell() {
   const data = useData();
   const mapRef = useRef<MapHandle>(null);
+  const searchRef = useRef<SearchHandle>(null);
+  const botUndo = useRef(new Map<string, BotSnapshot>());
+  const botActionLog = useRef<string[]>([]);
   const panelScrollRef = useRef<HTMLDivElement>(null);
   const mobile = useMedia('(max-width: 900px)');
   const compact = useMedia('(max-width: 1180px)');
+  const lang = useLang();
   const [theme, setTheme] = useState<Theme>(() => readPref('theme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
   // null = Einstieg ohne vorgewähltes Thema. Der Startzustand fragt nach dem Anliegen,
   // statt den Datenbestand eines Themas sofort zu zeigen.
@@ -70,6 +109,7 @@ function Shell() {
   const [sheet, setSheet] = useState<'mini' | 'peek' | 'open'>('peek');
   const [ready, setReady] = useState(false);
   const [center, setCenter] = useState<[number, number]>([9.18, 48.779]);
+  const [spielGeo, setSpielGeo] = useState<GeoJSON.FeatureCollection | null>(null);
   const [sunImage, setSunImage] = useState<string | null>(null);
   const [radarFrame, setRadarFrame] = useState<number | null>(null);
   const [nearby, setNearby] = useState<MapData['nearby']>(null);
@@ -78,6 +118,9 @@ function Shell() {
   const [docId, setDocId] = useState<number | null>(null);
   const [layersOpen, setLayersOpen] = useState(false);
   const [botOpen, setBotOpen] = useState(false);
+  const [botVoiceRequest, setBotVoiceRequest] = useState(0);
+  const [kontaktOpen, setKontaktOpen] = useState(false);
+  const [moduleCommand, setModuleCommand] = useState<ModuleCommand | null>(null);
   const [locateMsg, setLocateMsg] = useState<string | null>(null);
   const openInfo = useCallback((page: InfoPage, anchor?: string) => setInfo({ page, anchor }), []);
   const [aerial, setAerial] = useState({ year: AERIAL_YEARS[AERIAL_YEARS.length - 1], opacity: 1 });
@@ -116,6 +159,7 @@ function Shell() {
       case 'verwaltung_gebaeude': return selection.lngLat ?? null;
       case 'verwaltung_leistung': return selection.lon != null && selection.lat != null ? [selection.lon, selection.lat] : null;
       case 'wissen': return selection.lngLat;
+      case 'bartour-stop': return selection.lngLat;
     }
   }, [selection, data]);
 
@@ -138,7 +182,9 @@ function Shell() {
     setAnliegenId(null);
     setSelection(null);
     setWissen(null);
-    setVisible((v) => (v.wissen ? { ...v, wissen: false } : v));
+    setSpielGeo(null);
+    setModuleCommand(null);
+    setVisible((v) => ({ ...v, ...(v.wissen ? { wissen: false } : {}), ...(v.spiel ? { spiel: false } : {}) }));
     setSheet('peek');
   }, []);
 
@@ -209,6 +255,14 @@ function Shell() {
 
   const flyTo = useCallback((c: [number, number], z?: number) => mapRef.current?.flyTo(c, z), []);
   const fitBounds = useCallback((bounds: [[number, number], [number, number]], opts?: { maxZoom?: number }) => mapRef.current?.fitBounds(bounds, opts), []);
+  /** Kontakt auf der Karte zeigen; bei bekannten Gebäuden die Verwaltungsdetails öffnen. */
+  const showKontaktOnMap = useCallback((k: Kontakt) => {
+    if (k.lat == null || k.lon == null) return;
+    setKontaktOpen(false);
+    setDocId(null);
+    flyTo([k.lon, k.lat], 16);
+    if (k.buildingId) select({ type: 'verwaltung_gebaeude', id: k.buildingId, lngLat: [k.lon, k.lat] });
+  }, [flyTo, select]);
 
   // Permanente Links (?o=…): Objekt nach dem Laden der Daten auswählen.
   useEffect(() => {
@@ -285,6 +339,17 @@ function Shell() {
     }
   }, [data.parking.data, data.roadworks.data, data.places.data, data.air.data, data.sharing.data, data.water.data, data.events.data, select, flyTo]);
 
+  // Tiefe Links: ?spiel=kessel-code öffnet das Stadtspiel.
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('spiel');
+    if (!id) return;
+    setModuleId('spiel');
+    setFocus('routen');
+    setAnliegenId('spiel');
+    setSelection(null);
+    if (mobile) setSheet('open');
+  }, [mobile]);
+
   // Tiefe Links: ?stop=de:08111:6115
   useEffect(() => {
     const id = new URLSearchParams(location.search).get('stop');
@@ -319,12 +384,12 @@ function Shell() {
 
   const live = useLive(visible.live);
   const [routeGeo, setRouteGeo] = useState<GeoJSON.FeatureCollection | null>(null);
-  const [routeTarget, setRouteTarget] = useState<RoutePlace | null>(null);
+  const [routeTarget, setRouteTarget] = useState<RouteRequest | null>(null);
   const activeAnliegen = useMemo(() => ANLIEGEN.find((a) => a.id === anliegenId) ?? null, [anliegenId]);
 
-  const planRoute = useCallback((p: RoutePlace) => {
+  const planRoute = useCallback((p: RouteRequest) => {
     setRouteTarget(p); setModuleId('route'); setFocus('route'); setAnliegenId('anreise');
-    setSelection(null); if (mobile) setSheet('peek');
+    setSelection(null); setModuleCommand(null); if (mobile) setSheet('peek');
   }, [mobile]);
 
   /** Ein Anliegen öffnet das zuständige Panel, schaltet die passenden Ebenen zu und setzt den Fokus. */
@@ -333,6 +398,11 @@ function Shell() {
     setFocus(a.focus);
     setAnliegenId(a.id);
     setSelection(null);
+    setModuleCommand(null);
+    if (a.module !== 'spiel') {
+      setSpielGeo(null);
+      setVisible((v) => (v.spiel ? { ...v, spiel: false } : v));
+    }
     setVisible((v) => {
       const next = { ...v };
       for (const k of a.layers) next[k] = true;
@@ -352,9 +422,326 @@ function Shell() {
     setFocus(f ?? null);
     setAnliegenId(aId);
     setSelection(null);
+    setModuleCommand(null);
+    if (id !== 'spiel') {
+      setSpielGeo(null);
+      setVisible((v) => (v.spiel ? { ...v, spiel: false } : v));
+    }
     // Beim Weg bleibt mehr Karte sichtbar: Die Route soll beim Öffnen direkt erkennbar sein.
     if (mobile) setSheet(id === 'route' ? 'peek' : 'open');
   }, [mobile]);
+
+  /** Snapshot für „Rückgängig“: nur UI-Zustand, keine Daten und keine Chattexte. */
+  const takeBotSnapshot = (): BotSnapshot => ({
+    moduleId, focus, anliegenId,
+    visible: { ...visible },
+    selection,
+    theme, terrain,
+    aerial: { ...aerial },
+    routeTarget,
+    routeGeo,
+    sheet,
+    center,
+  });
+
+  const restoreBotSnapshot = (s: BotSnapshot) => {
+    setModuleId(s.moduleId);
+    setFocus(s.focus);
+    setAnliegenId(s.anliegenId);
+    setVisible({ ...s.visible });
+    setSelection(s.selection);
+    setTheme(s.theme);
+    setTerrain(s.terrain);
+    setAerial({ ...s.aerial });
+    setRouteTarget(s.routeTarget);
+    setRouteGeo(s.routeGeo);
+    setSheet(s.sheet);
+    setModuleCommand(null);
+    mapRef.current?.flyTo(s.center);
+  };
+
+  const rememberUndo = (id: string, snap: BotSnapshot) => {
+    botUndo.current.set(id, snap);
+    if (botUndo.current.size > 12) {
+      const first = botUndo.current.keys().next().value;
+      if (first) botUndo.current.delete(first);
+    }
+  };
+
+  const undoBotAction = (actionId: string) => {
+    const snap = botUndo.current.get(actionId);
+    if (!snap) return;
+    restoreBotSnapshot(snap);
+    botUndo.current.delete(actionId);
+    setLocateMsg('Rückgängig gemacht.');
+  };
+
+  /** Eine Existenzprüfung, damit eine Bot-Auswahl nie ins Leere zeigt. */
+  const selectionExists = (s: Selection): boolean => {
+    switch (s.type) {
+      case 'parking': {
+        const list = data.parking.data?.sites;
+        return !list || list.some((x) => String(x.id) === String(s.id));
+      }
+      case 'roadwork': {
+        const list = data.roadworks.data?.items;
+        return !list || list.some((x) => x.id === s.id);
+      }
+      case 'air': {
+        const list = data.air.data?.stations;
+        return !list || list.some((x) => x.id === s.id);
+      }
+      case 'sharing': {
+        const list = data.sharing.data?.items;
+        return !list || list.some((x) => x.id === s.id);
+      }
+      case 'event': {
+        const list = data.events.data?.events;
+        return !list || list.some((x) => x.id === s.id);
+      }
+      case 'place': {
+        const list = data.places.data?.places;
+        return !list || list.some((x) => x.id === s.id);
+      }
+      case 'bartour-stop': {
+        const list = data.bartouren.data?.items;
+        return !list || list.some((t) => t.id === s.tourId && t.stops.some((x) => x.index === s.stopIndex));
+      }
+      default:
+        return true;
+    }
+  };
+
+  const highlightPoint = (layer: OverlayKey, ids: string[]): [number, number] | null => {
+    const has = (id: unknown) => ids.some((x) => String(x) === String(id));
+    if (layer === 'parking') {
+      const hit = data.parking.data?.sites.find((x) => has(x.id));
+      return hit ? [hit.lon, hit.lat] : null;
+    }
+    if (layer === 'roadworks') {
+      const hit = data.roadworks.data?.items.find((x) => has(x.id));
+      return hit ? [hit.lon, hit.lat] : null;
+    }
+    if (layer === 'events') {
+      const hit = data.events.data?.events.find((x) => has(x.id));
+      return hit?.lon != null && hit.lat != null ? [hit.lon, hit.lat] : null;
+    }
+    if (layer === 'places') {
+      const hit = data.places.data?.places.find((x) => has(x.id));
+      return hit ? [hit.lon, hit.lat] : null;
+    }
+    if (layer === 'air') {
+      const hit = data.air.data?.stations.find((x) => has(x.id));
+      return hit ? [hit.lon, hit.lat] : null;
+    }
+    if (layer === 'sharing') {
+      const hit = data.sharing.data?.items.find((x) => has(x.id));
+      return hit ? [hit.lon, hit.lat] : null;
+    }
+    if (layer === 'nearby') {
+      const hit = nearby?.items.find((x) => has(x.id));
+      return hit ? [hit.lon, hit.lat] : null;
+    }
+    if (layer === 'unfall') {
+      const hit = data.unfaelle.data?.items.find((x) => has(x.id));
+      return hit ? [hit.lon, hit.lat] : null;
+    }
+    if (layer === 'live') {
+      const hit = live?.find((x) => has(x.id));
+      return hit ? [hit.lon, hit.lat] : null;
+    }
+    return null;
+  };
+
+  /**
+   * Der Action Bus. Das Modell sendet Absichten, hier werden sie validiert und ausgeführt.
+   * Jede Aktion bekommt eine Quittung; der Snapshot davor macht sie rückgängig.
+   */
+  const handleBotAction = (incoming: BotUiAction): BotReceipt => {
+    const action = validateBotAction(incoming);
+    if (!action) {
+      return { actionId: newBotActionId(), status: 'error', label: 'Aktion nicht möglich', message: 'Ungültige Kartenaktion.', undoable: false };
+    }
+    const id = newBotActionId();
+    const snap = takeBotSnapshot();
+    try {
+      switch (action.type) {
+        case 'open_module': {
+          setModuleId(action.module);
+          setFocus(action.focus ?? null);
+          setAnliegenId(action.anliegen ?? null);
+          setSelection(null);
+          if (mobile) setSheet(action.module === 'route' ? 'peek' : 'open');
+          break;
+        }
+        case 'close_module':
+          backToStart();
+          break;
+        case 'set_layer':
+          setVisible((v) => ({ ...v, [action.key]: action.on }));
+          break;
+        case 'set_layers':
+          setVisible((v) => {
+            const next = { ...v };
+            if (action.only) {
+              for (const k of Object.keys(next) as OverlayKey[]) next[k] = false;
+            }
+            for (const k of action.on) next[k] = true;
+            for (const k of action.off ?? []) next[k] = false;
+            return next;
+          });
+          break;
+        case 'show_nearby': {
+          setVisible((v) => ({ ...v, nearby: true }));
+          setNearby({ items: action.items as Facility[], color: action.color ?? {} });
+          if (action.items.length === 1 || action.fit === false) {
+            const first = action.items[0];
+            mapRef.current?.flyTo([first.lon, first.lat], 15.5);
+          } else {
+            const lons = action.items.map((x) => x.lon);
+            const lats = action.items.map((x) => x.lat);
+            mapRef.current?.fitBounds(
+              [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
+              { maxZoom: 15.5 },
+            );
+          }
+          break;
+        }
+        case 'clear_nearby':
+          setNearby(null);
+          break;
+        case 'fly_to':
+          if (!mapRef.current) throw new Error('Karte ist noch nicht bereit.');
+          mapRef.current.flyTo([action.lon, action.lat], action.zoom ?? 15);
+          break;
+        case 'fit_bounds':
+          if (!mapRef.current) throw new Error('Karte ist noch nicht bereit.');
+          mapRef.current.fitBounds(
+            [[action.bbox[0], action.bbox[1]], [action.bbox[2], action.bbox[3]]],
+            { maxZoom: action.maxZoom ?? 16 },
+          );
+          break;
+        case 'select':
+          if (!selectionExists(action.selection)) throw new Error('Das Objekt ist nicht mehr in den Daten.');
+          select(action.selection);
+          break;
+        case 'clear_selection':
+          setSelection(null);
+          break;
+        case 'show_route':
+          planRoute({
+            ...action.to,
+            ...(action.from ? { from: action.from } : {}),
+            ...(action.mode ? { mode: action.mode } : {}),
+            ...(action.profile ? { profile: action.profile } : {}),
+          });
+          break;
+        case 'clear_route':
+          setRouteTarget(null);
+          setRouteGeo(null);
+          break;
+        case 'search':
+          searchRef.current?.open(action.query);
+          break;
+        case 'open_document':
+          setDocId(action.id);
+          break;
+        case 'open_info':
+          setInfo({ page: action.page as InfoPage, anchor: action.anchor });
+          break;
+        case 'module_command':
+          setModuleCommand({ id, module: action.module, command: action.command, args: action.args });
+          if (moduleId !== action.module) {
+            setModuleId(action.module);
+            setSelection(null);
+          }
+          break;
+        case 'set_theme':
+          setTheme(action.theme);
+          break;
+        case 'set_terrain':
+          setTerrain(action.on);
+          break;
+        case 'set_aerial':
+          setVisible((v) => ({ ...v, aerial: action.on }));
+          if (action.year && AERIAL_YEARS.includes(action.year)) {
+            setAerial((a) => ({ ...a, year: action.year! }));
+          }
+          break;
+        case 'play_radar':
+          setVisible((v) => ({ ...v, radar: action.play !== false }));
+          if (action.play !== false) {
+            setRadarFrame(action.frame === 'now' || action.frame == null ? null : Math.max(0, Math.min(200, Math.round(action.frame))));
+          }
+          break;
+        case 'set_sheet':
+          setSheet(action.level);
+          break;
+        case 'highlight': {
+          setVisible((v) => ({ ...v, [action.layer]: true }));
+          const point = highlightPoint(action.layer, action.ids);
+          if (point && mapRef.current) {
+            mapRef.current.flyTo(point, 15.5);
+            setLocateMsg(`Hervorgehoben: ${action.ids.length} Objekt${action.ids.length === 1 ? '' : 'e'}.`);
+          } else {
+            setLocateMsg('Zum Hervorheben ist kein Objekt in den geladenen Daten.');
+          }
+          break;
+        }
+        case 'toast':
+          setLocateMsg(action.text);
+          break;
+      }
+      rememberUndo(id, snap);
+      botActionLog.current = [...botActionLog.current, action.type].slice(-12);
+      const label = action.type === 'open_module'
+        ? `${MODULES.find((m) => m.id === action.module)?.label ?? 'Bereich'} geöffnet`
+        : actionLabel(action);
+      return { actionId: id, status: 'ok', label, undoable: action.type !== 'toast' };
+    } catch (err) {
+      return {
+        actionId: id,
+        status: 'error',
+        label: 'Aktion fehlgeschlagen',
+        message: (err as Error).message,
+        undoable: false,
+      };
+    }
+  };
+
+  const getBotContext = (): BotContext => {
+    const view = mapRef.current?.getView();
+    const mapCenter = view?.center ?? center;
+    const bbox = view?.bbox ?? [mapCenter[0] - 0.02, mapCenter[1] - 0.02, mapCenter[0] + 0.02, mapCenter[1] + 0.02];
+    const selectionName = selection && 'name' in selection && typeof selection.name === 'string'
+      ? selection.name
+      : selection?.type === 'facility' ? selection.item.name : undefined;
+    return {
+      module: moduleId,
+      focus,
+      anliegen: anliegenId,
+      selection: selection ? {
+        type: selection.type,
+        ...('id' in selection ? { id: String(selection.id) } : {}),
+        ...(selectionName ? { name: selectionName } : {}),
+      } : null,
+      center: [mapCenter[0], mapCenter[1]],
+      zoom: view?.zoom ?? 14,
+      bbox: [bbox[0], bbox[1], bbox[2], bbox[3]],
+      layers: (Object.keys(visible) as OverlayKey[]).filter((k) => visible[k]),
+      route: routeTarget ? {
+        ...(routeTarget.from ? { from: routeTarget.from } : {}),
+        to: { lat: routeTarget.lat, lon: routeTarget.lon, label: routeTarget.label },
+        ...(routeTarget.mode ? { mode: routeTarget.mode } : {}),
+        active: !!routeGeo,
+      } : null,
+      theme,
+      locale: lang === 'en' ? 'en' : 'de',
+      localTime: new Date().toISOString(),
+      location: readBotLocation(),
+      lastActions: [...botActionLog.current],
+    };
+  };
 
   // Beim Wechsel des Themas beginnt das Panel wieder oben. Sonst landet man nach
   // einem Modulwechsel mitten im vorherigen Inhalt.
@@ -363,7 +750,6 @@ function Shell() {
   }, [moduleId, focus, anliegenId]);
 
   // Auf kleinen Desktops weicht das Panel dem Detail (siehe design-pass.css).
-  const lang = useLang();
   const mapData = useMemo(() => ({
     parking: data.parking.data?.sites ?? null,
     sharing: data.sharing.data?.items ?? null,
@@ -372,6 +758,7 @@ function Shell() {
     water: data.water.data ?? null,
     bike: data.bike.data ?? null,
     events: data.events.data?.events ?? null,
+    bartouren: data.bartouren.data?.items ?? null,
     places: data.places.data?.places ?? null,
     sunImage,
     radarImage: radarImg,
@@ -385,7 +772,8 @@ function Shell() {
     unfall: data.unfaelle.data?.items ?? null,
     wanderwege: data.wanderwege.data?.items ?? null,
     wissen,
-  }), [data.traffic.data, sunImage, radarImg, nearby, live, routeGeo, data.parking.data, data.sharing.data, data.roadworks.data, data.air.data, data.water.data, data.bike.data, data.events.data, data.places.data, data.warnungen.data, data.flug.data, data.kaltluft.data, data.unfaelle.data, data.wanderwege.data, wissen]);
+    spiel: spielGeo,
+  }), [data.traffic.data, sunImage, radarImg, nearby, live, routeGeo, spielGeo, data.parking.data, data.sharing.data, data.roadworks.data, data.air.data, data.water.data, data.bike.data, data.events.data, data.bartouren.data, data.places.data, data.warnungen.data, data.flug.data, data.kaltluft.data, data.unfaelle.data, data.wanderwege.data, wissen]);
 
   const showDetail = !!selection;
   const kiosk = new URLSearchParams(location.search).get('display') === 'kiosk';
@@ -422,6 +810,7 @@ function Shell() {
         active={anliegenId}
         onPick={(a) => { setAnliegenId(a.id); openAnliegen(a); }}
         onBot={() => { setBotOpen(true); setSelection(null); }}
+        onContacts={() => { setKontaktOpen(true); setSelection(null); }}
       />
 
       <aside className={`panel ${mod ? 'has-module' : ''}`} aria-label="Themen und Ebenen">
@@ -504,7 +893,7 @@ function Shell() {
                   {activeAnliegen && activeAnliegen.module !== mod.id && <span className="crumb-context">{tr(mod.label)}</span>}
                 </div>
               </div>
-              <mod.Panel focus={focus ?? undefined} visible={visible} toggle={toggle} select={select} flyTo={flyTo} fitBounds={fitBounds} setLayer={setLayer} center={center} setSunImage={setSunImage} radarFrame={radarFrame} setRadarFrame={setRadarFrame} setNearby={setNearby} setWissen={setWissen} setRoute={setRouteGeo} routeTarget={routeTarget} />
+              <mod.Panel focus={focus ?? undefined} visible={visible} toggle={toggle} select={select} flyTo={flyTo} fitBounds={fitBounds} setLayer={setLayer} center={center} setSunImage={setSunImage} radarFrame={radarFrame} setRadarFrame={setRadarFrame} setNearby={setNearby} setWissen={setWissen} setSpiel={setSpielGeo} setRoute={setRouteGeo} routeTarget={routeTarget} botCommand={moduleCommand} />
             </>
           ) : (
             <StartPanel onModule={(id) => openModule(id)} />
@@ -612,8 +1001,15 @@ function Shell() {
         </aside>
       )}
       {info && <InfoPages page={info.page} anchor={info.anchor} onPage={(page) => setInfo({ page })} onClose={() => setInfo(null)} />}
-      <DocumentReader id={docId} onClose={() => setDocId(null)} />
+      <DocumentReader id={docId} onClose={() => setDocId(null)} onShowOnMap={showKontaktOnMap} />
+      <KontaktSheet
+        open={kontaktOpen}
+        onClose={() => setKontaktOpen(false)}
+        onOpenDocument={(id) => { setKontaktOpen(false); setDocId(id); }}
+        onShowOnMap={showKontaktOnMap}
+      />
       <Search
+        ref={searchRef}
         onPickStop={(s) => {
           const c = s.geometry.coordinates as [number, number];
           select({ type: 'stop', id: s.properties.id, name: s.properties.name, lngLat: c, lines: s.properties.lines });
@@ -621,6 +1017,7 @@ function Shell() {
         }}
         onOpenDocument={(id) => setDocId(id)}
         onRoute={() => { setAnliegenId('anreise'); openModule('route', 'route', 'anreise'); }}
+        onVoice={() => { setBotOpen(true); setBotVoiceRequest((n) => n + 1); }}
       />
       <LayerSheet open={layersOpen} onClose={() => setLayersOpen(false)} visible={visible} toggle={toggle} theme={theme} onTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} terrain={terrain} onTerrain={() => setTerrain((t) => !t)} onResetNorth={() => mapRef.current?.resetNorth()} />
       <StuttBot
@@ -631,6 +1028,11 @@ function Shell() {
           flyTo(lngLat, 16);
           if (id) select({ type: 'verwaltung_gebaeude', id, lngLat });
         }}
+        onAction={handleBotAction}
+        onUndo={undoBotAction}
+        getContext={getBotContext}
+        voiceRequest={botVoiceRequest}
+        locale={lang === 'en' ? 'en' : 'de'}
       />
       {locateMsg && (
         <div className="app-toast" role="status">

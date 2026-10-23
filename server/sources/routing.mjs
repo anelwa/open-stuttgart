@@ -340,7 +340,15 @@ async function oepnv(a, b, t, ankunft, profil) {
   // Aufzugsstatus ändert sich schneller als die Verbindung: nach dem Zwischenspeicher ergänzen
   const varianten = structuredClone(value.varianten);
   await Promise.all(varianten.map((v) => aufzugStatus(v, profil)));
-  if (profil !== 'standard') varianten.sort((x, y) => (x.nutzbar === false) - (y.nutzbar === false));
+  // EFA liefert die Verbindungen nach Abfahrtszeit. Für Karte und Bot-Karte ist
+  // die schnellste Verbindung die Empfehlung; bei Barriereprofilen zuerst die
+  // nutzbaren Varianten, innerhalb dieser nach Dauer.
+  varianten.sort((x, y) => {
+    if (profil !== 'standard' && (x.nutzbar === false) !== (y.nutzbar === false)) {
+      return x.nutzbar === false ? 1 : -1;
+    }
+    return (Number(x.dauerMin) || 1e9) - (Number(y.dauerMin) || 1e9);
+  });
   const hinweise = [];
   if (!varianten.length) hinweise.push('Keine Verbindung gefunden.');
   if (profil !== 'standard') {

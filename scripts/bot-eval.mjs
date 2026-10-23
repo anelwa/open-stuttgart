@@ -2,7 +2,7 @@
 // Aufruf: node scripts/bot-eval.mjs
 // Die Fälle brauchen Netz für Wartezeit und Route; ohne Netz greift die Schätzung.
 
-import { botReply } from '../server/sources/bot.mjs';
+import { botReply, runBotTool } from '../server/sources/bot.mjs';
 
 const ort = (lat, lon, label) => ({ lat, lon, label });
 
@@ -71,5 +71,34 @@ for (const [i, c] of CASES.entries()) {
   }
 }
 
-console.log(`\n${CASES.length - failed}/${CASES.length} Fälle bestanden.`);
+// Werkzeug-Regressionen: Diese Fehler waren in der Oberfläche sichtbar und
+// sollen nicht wieder unbemerkt zurückkommen.
+const checks = [];
+{
+  const cafe = await runBotTool('naehe', { kategorie: 'Cafe' });
+  checks.push({
+    name: 'Café-Suche bleibt bei Cafés (nicht Restaurants)',
+    ok: cafe.facts?.kategorie === 'Cafés' && (cafe.facts?.anzahl ?? 0) > 0,
+    got: `${cafe.facts?.kategorie ?? '—'} (${cafe.facts?.anzahl ?? 0})`,
+  });
+}
+{
+  const migration = await runBotTool('suche_leistung', { query: 'Aufschiebung der Abschiebung' });
+  const names = [
+    ...(migration.facts?.treffer ?? []).map((x) => x.name),
+    ...(migration.facts?.stellen ?? []).map((x) => x.name),
+  ].join(' ');
+  checks.push({
+    name: 'Aufenthaltsrecht liefert Duldung/Ausländerbehörde statt Füllwort-Treffer',
+    ok: /Chancen-Aufenthaltsrecht|Aufenthaltstitel|Ausländerrecht/i.test(names),
+    got: names.slice(0, 120) || 'keine Treffer',
+  });
+}
+for (const c of checks) {
+  if (!c.ok) failed += 1;
+  console.log(`${c.ok ? 'OK  ' : 'FAIL'} ${c.name}`);
+  if (!c.ok) console.log(`      bekommen: ${c.got}`);
+}
+
+console.log(`\n${CASES.length + checks.length - failed}/${CASES.length + checks.length} Fälle bestanden.`);
 process.exitCode = failed ? 1 : 0;

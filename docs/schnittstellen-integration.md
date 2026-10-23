@@ -7,7 +7,9 @@ Anwendung tatsächlich läuft.
 
 Leitsatz: **Alles ist auffindbar und bewertet; live angebunden wird nur, was ohne Key,
 ohne Login und ohne Rechtsverstoß funktioniert.** Wo eine Quelle eine Freigabe, einen Key
-oder einen offiziellen Endpunkt braucht, steht das hier und in der App.
+oder einen offiziellen Endpunkt braucht, steht das hier und in der App. Ausnahme sind die
+Tankpreise: Sie laufen ohne Key über einen keylosen Fallback und mit einem kostenlosen
+Tankerkönig-Key stadtweit.
 
 ## Wo das in der App steckt
 
@@ -16,6 +18,7 @@ oder einen offiziellen Endpunkt braucht, steht das hier und in der App.
 | **Stadtwissen** (Schnellaktion und „Alle Themen“) | Fünf Reiter: Karte, Zahlen, Transparenz, Fundstücke, Ausgabe |
 | **Karte → Stadt-Layer** | Katalog aller 458 WFS-Layer, Suche, Workspace-Filter, Freigabestatus; 77 Layer direkt ladbar |
 | **Karte → Adresse finden** | amtlicher gis6-Geocoder; zugleich Rückgrat der Adresssuche in „In der Nähe“ und „Meine Adresse“ |
+| **Nähe → Tanken** | Tankpreise E5/E10/Diesel (Tankerkönig/MTS-K, keyloser InfraNode-Fallback), Preisvergleich und günstigste Tankstelle auf der Auto-Route |
 | **Zahlen → Kiez in Zahlen** | KOMUNIS-Navigation, Tabellen, direkte XLSX-Anhänge |
 | **Transparenz → IFG-Anfragen** | FragDenStaat, 285 Anfragen, Status und Link; dazu Haushalt/OParl/Gelbe Karte |
 | **Fundstücke** | Fairteiler (foodsharing), Artenfunde (GBIF), OSM-Hinweise, Wikidata-Lücken, K10plus-Bibliothek |
@@ -43,7 +46,7 @@ oder einen offiziellen Endpunkt braucht, steht das hier und in der App.
 
 | Fund | Status | Umsetzung / Grund |
 | --- | --- | --- |
-| TTS / Vorlesen | **live** | `SpeakButton` über die Web Speech API: in StuttBot-Antworten, in Stadt-Layer-Details und in „Ausgabe“. Keine Cloud, kein Server. |
+| TTS / Vorlesen | **live** | `SpeakButton` über die Web Speech API: in StuggiAI-Antworten, in Stadt-Layer-Details und in „Ausgabe“. Keine Cloud, kein Server. |
 | Leichte Sprache | **vorhanden** | Eigene Seite in der App („Über diese Anwendung → Leichte Sprache“); keine neue API nötig. |
 | IVR / Sprachassistent | **offen** | Eigene Infrastruktur; die JSON-Endpunkte sind dafür vorbereitet. |
 
@@ -95,6 +98,7 @@ oder einen offiziellen Endpunkt braucht, steht das hier und in der App.
 * **WFS-Layer ohne Freigabe:** im Katalog sichtbar, aber nicht ladbar. Die App zeigt „Freigabe nötig“ statt einer Grauzone.
 * **Foodsharing-Körbe/-Status:** 401 ohne Login, daher nicht verwendet.
 * **Beteiligungs-API:** robots.txt sperrt `/api/`; daher nur Verweis.
+* **Blitzerwarnungen:** keine offenen amtlichen Daten für Baden-Württemberg; für Fahrende nach § 23 StVO unzulässig. Die App zeigt stattdessen Unfallschwerpunkte aus dem Unfallatlas.
 * **Scraping hinter Logins/ToS:** nicht Teil des Projekts.
 
 ## 10. Technische Bausteine
@@ -102,6 +106,7 @@ oder einen offiziellen Endpunkt braucht, steht das hier und in der App.
 | Datei | Aufgabe |
 | --- | --- |
 | `server/sources/schnittstellen.mjs` | WFS-Katalog und -Proxy, gis6, KOMUNIS, FragDenStaat, Foodsharing, GBIF, OSM Notes, Wikidata, K10plus, GovData |
+| `server/sources/tanken.mjs` | Tankpreise über Tankerkönig/MTS-K, keyloser InfraNode-Fallback, 60-Sekunden-Cache |
 | `server/index.mjs` | Routen `/api/stadt/*`, RSS-Ausgaben |
 | `src/modules/schnittstellen/SchnittstellenPanel.tsx` | fünf Reiter der Oberfläche |
 | `src/components/WissenDetail.tsx` | Detailansicht für WFS-/GBIF-/Fairteiler-Objekte, permanenter Link |

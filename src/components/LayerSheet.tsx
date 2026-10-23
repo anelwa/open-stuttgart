@@ -24,6 +24,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
     label: 'Orte und Termine',
     items: [
       { key: 'nearby', label: 'Einrichtungen der Nähe', icon: 'pin', meta: 'Kategorie im Panel wählen' },
+      { key: 'bartouren', label: 'Bar-Touren', icon: 'cocktail', meta: '7 Touren, nummerierte Stopps' },
       { key: 'events', label: 'Termine', icon: 'ticket', meta: 'Kultur und Szene' },
       { key: 'places', label: 'Sehenswürdigkeiten', icon: 'culture', meta: 'Museen, Parks, Denkmäler' },
       { key: 'parking', label: 'Parkhäuser', icon: 'parking', meta: 'freie Plätze' },
@@ -47,6 +48,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
     items: [
       { key: 'aerial', label: 'Luftbilder 2006–2025', icon: 'image', meta: 'Stadtmessungsamt' },
       { key: 'route', label: 'Gewählte Route', icon: 'route', meta: 'aus dem Modul Weg' },
+      { key: 'spiel', label: 'Spielroute', icon: 'compass', meta: 'Kesselcode' },
       { key: 'live', label: 'Live-Zustände', icon: 'clock', meta: 'Wartezeiten, Bäder' },
     ],
   },
