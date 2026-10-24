@@ -7,7 +7,10 @@ import { cached, fetchJson } from '../cache.mjs';
 import { facilities } from './nearby.mjs';
 
 const WFS = (layer) => `https://geoserver.stuttgart.de/geoserver/GEOLINE_FLEX/ows?service=WFS&version=2.0.0&request=GetFeature&typeName=GEOLINE_FLEX:${layer}_EPSG25832&outputFormat=application/json&srsName=EPSG:4326&count=5000`;
-const STOPS = fileURLToPath(new URL('../../public/data/stops.geojson', import.meta.url));
+const STOP_FILES = [
+  fileURLToPath(new URL('../../public/data/stops.geojson', import.meta.url)),
+  fileURLToPath(new URL('../../dist/data/stops.geojson', import.meta.url)),
+];
 const OSM_FILE = fileURLToPath(new URL('../data/wanderwege-osm.json', import.meta.url));
 const R = 6371000;
 const rad = (d) => (d * Math.PI) / 180;
@@ -43,13 +46,23 @@ const distToGeom = (p, g) => Math.min(...linesOf(g).map((l) => distToLine(p, l))
 
 let stopCache = null;
 function stops() {
-  if (!stopCache) {
-    const fc = JSON.parse(readFileSync(STOPS, 'utf8'));
-    stopCache = fc.features.map((f) => ({
-      id: f.properties.id, name: f.properties.name, lines: f.properties.lines, kind: f.properties.kind,
-      lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1],
-    }));
+  if (stopCache) return stopCache;
+  // Im Container liegt public/ nicht zwingend im Image; dist/data/ ist immer da.
+  for (const file of STOP_FILES) {
+    try {
+      const fc = JSON.parse(readFileSync(file, 'utf8'));
+      stopCache = (fc.features ?? []).map((f) => ({
+        id: f.properties.id,
+        name: f.properties.name,
+        lines: f.properties.lines ?? [],
+        kind: f.properties.kind,
+        lon: f.geometry.coordinates[0],
+        lat: f.geometry.coordinates[1],
+      }));
+      return stopCache;
+    } catch { /* nächster Pfad */ }
   }
+  stopCache = [];
   return stopCache;
 }
 function nearestStop(p) {

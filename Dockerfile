@@ -16,6 +16,9 @@ ENV NODE_ENV=production
 ENV PORT=8787
 WORKDIR /app
 COPY server ./server
+# Die Quellen lesen Stammdaten aus public/data (Stops, Gastro, Netz); im Image liegt
+# parallel auch dist/data. Beides ist klein und vermeidet Pfadfehler im Container.
+COPY public ./public
 # Kontakt-Synonyme werden zur Laufzeit aus src/data gelesen (server/sources/kontakte.mjs).
 COPY src/data ./src/data
 COPY --from=build /app/dist ./dist
