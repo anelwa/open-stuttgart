@@ -20,11 +20,13 @@ stehen bewusst nicht im Git und werden direkt auf den Server gespielt.
 |---|---|---|
 | `dist/` (gebaute Oberfläche) | `/app/dist` | wird im Docker-Build erzeugt |
 | `server/` (API-Server, Node ≥ 22.5) | `/app/server` | aus dem Git |
+| `public/` (Stammdaten: Haltestellen, Netz, Gastro) | `/app/public` | aus dem Git, wird ins Laufzeit-Image kopiert |
 | `server/data/` (Verwaltung, Suche, GeoJSON) | `/app/server/data` | **Volume**, per rsync vom Entwicklungsrechner |
 | `server/.cache/` (Tagesarchive, Snapshots) | `/app/server/.cache` | **Volume**, schreibt der Server selbst |
 
 Der Server braucht zur Laufzeit keine `node_modules` (nur Node-Builtins). `sqlite-vec` wird ausschließlich lokal für
-`npm run data:search` gebraucht.
+`npm run data:search` gebraucht. Die GeoJSON-Stammdaten unter `public/data/` liegen zusätzlich im gebauten `dist/`;
+das Image kopiert `public/` mit, damit Wanderwege und Bar-Touren auch ohne Volume darauf zugreifen können.
 
 ## Schritt 1: Ordner und Daten auf den VPS
 
