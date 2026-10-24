@@ -15,6 +15,9 @@ FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production
 ENV PORT=8787
 WORKDIR /app
+# Laufzeitabhängigkeiten für QR-Code und Satellitenberechnung (keine Build-Tools nötig).
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 COPY server ./server
 # Die Quellen lesen Stammdaten aus public/data (Stops, Gastro, Netz); im Image liegt
 # parallel auch dist/data. Beides ist klein und vermeidet Pfadfehler im Container.

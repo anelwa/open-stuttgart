@@ -1,0 +1,204 @@
+/* Modul „Stadtlabor“: über 100 Quellen und 100 Werkzeuge. Ruhige Liste, klare Formulare,
+   Tabellen nur dort, wo Zahlen wirklich gebraucht werden. */
+.labor { gap: 0; }
+.labor-toolbar { display: flex; flex-direction: column; gap: 8px; padding: 4px 4px 8px; }
+.labor-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.labor-mini { padding: 4px 9px; font-size: 12px; }
+.labor-mini small { opacity: .7; margin-left: 2px; }
+.labor-pane { padding: 2px 4px 20px; }
+.labor-feature-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.labor-feature {
+  width: 100%; display: flex; align-items: flex-start; gap: 10px; text-align: left;
+  border: 1.5px solid var(--line); border-radius: 16px; background: var(--card-2);
+  padding: 10px; color: inherit; transition: border-color .15s, background .15s, transform .1s;
+}
+.labor-feature:hover:not(:disabled) { border-color: var(--line-strong); background: var(--card); }
+.labor-feature:active:not(:disabled) { transform: scale(.995); }
+.labor-feature:disabled { opacity: .62; cursor: default; }
+.labor-feature .labor-number { flex: none; }
+.labor-feature-main { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.labor-feature-main strong { font-size: 14.5px; line-height: 1.25; }
+.labor-feature-main small { color: var(--ink-2); font-size: 12.5px; line-height: 1.35; }
+.labor-feature-main em { color: var(--muted); font-style: normal; font-size: 11px; margin-top: 2px; }
+.labor-feature > svg { flex: none; margin-top: 2px; color: var(--muted); }
+.labor-number {
+  display: inline-grid; place-items: center; min-width: 34px; height: 24px; border-radius: 7px;
+  background: var(--ink); color: var(--on-ink); font-size: 10.5px; font-weight: 800;
+  font-variant-numeric: tabular-nums; letter-spacing: .03em; flex: none;
+}
+.labor-feature.is-planned .labor-number { background: var(--line-strong); color: var(--muted); }
+.labor-source-dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 7px; flex: none; background: var(--ok); }
+.labor-source-dot.is-key { background: var(--warn); }
+.labor-source-dot.is-geplant { background: var(--line-strong); }
+.labor-count { color: var(--muted); font-size: 11.5px; margin: 8px 0 0; }
+.labor-form { display: flex; flex-direction: column; gap: 10px; padding: 2px 2px 4px; }
+.labor-back {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 3px;
+  border: 0; background: none; padding: 4px 0; font-size: 12.5px; color: var(--muted);
+}
+.labor-back:hover { color: var(--ink); }
+.labor-form-head { display: flex; gap: 10px; align-items: flex-start; }
+.labor-form-head h3 { font-size: 17px; line-height: 1.2; }
+.labor-form-head p { margin: 3px 0 0; }
+.labor-field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 600; }
+.labor-field input, .labor-field select {
+  height: 38px; border: 1.5px solid var(--line); border-radius: 11px; background: var(--card);
+  color: var(--ink); font: inherit; font-size: 13.5px; padding: 0 10px;
+}
+.labor-field input:focus, .labor-field select:focus { border-color: var(--ink); outline: none; }
+.labor-run {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  height: 44px; border: 0; border-radius: 99px; background: var(--accent); color: #26262C;
+  font-weight: 800; padding: 0 16px; margin-top: 2px;
+}
+.labor-run:hover:not(:disabled) { background: var(--accent-hover); }
+.labor-run:disabled { opacity: .65; cursor: wait; }
+.labor-note { color: var(--muted); font-size: 11.5px; line-height: 1.4; margin: 2px 0 0; }
+.labor-result { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+.labor-result-head h3 { font-size: 19px; line-height: 1.2; }
+.labor-kicker { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; font-weight: 800; color: var(--muted); }
+.labor-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.labor-summary { margin: 6px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--ink-2); }
+.labor-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.labor-fact {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--card-2);
+  padding: 8px 9px; display: flex; flex-direction: column; gap: 1px; min-width: 0;
+}
+.labor-fact span { font-size: 10.5px; color: var(--muted); }
+.labor-fact strong { font-size: 15px; line-height: 1.2; font-family: var(--font-head); overflow-wrap: anywhere; }
+.labor-fact small { color: var(--muted); font-size: 10.5px; }
+.labor-text, .labor-facts-block, .labor-list, .labor-links, .labor-table-wrap, .labor-chart { border-top: 1px solid var(--line); padding-top: 10px; }
+.labor-text h4, .labor-facts-block h4, .labor-list h4, .labor-links h4, .labor-table-wrap h4, .labor-chart h4 { margin: 0 0 6px; font-size: 13.5px; font-weight: 800; }
+.labor-text p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.labor-text.is-warn { background: var(--accent-soft); border-radius: 12px; padding: 10px; border-top: 0; }
+.labor-list ul, .labor-links ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.labor-list li, .labor-links li { font-size: 12.5px; line-height: 1.35; }
+.labor-list li a, .labor-list li > div, .labor-links li a { display: flex; flex-direction: column; gap: 1px; text-decoration: none; color: inherit; padding: 6px 8px; border-radius: 10px; background: var(--card-2); border: 1px solid transparent; }
+.labor-list li a:hover, .labor-links li a:hover { border-color: var(--line-strong); background: var(--card); }
+.labor-list li small, .labor-links li small { color: var(--muted); font-size: 11px; line-height: 1.35; }
+.labor-links li a strong { text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--line-strong); }
+.labor-table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; max-height: 340px; overflow-y: auto; }
+.labor-table { border-collapse: collapse; width: 100%; font-size: 11.5px; }
+.labor-table th { position: sticky; top: 0; background: var(--card-2); text-align: left; font-weight: 800; padding: 6px 7px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.labor-table td { padding: 5px 7px; border-bottom: 1px solid var(--line); vertical-align: top; max-width: 220px; overflow-wrap: anywhere; }
+.labor-table tr:last-child td { border-bottom: 0; }
+.labor-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.labor-chart-head strong { font-size: 13.5px; }
+.labor-chart-head span { font-size: 15px; font-family: var(--font-head); font-weight: 800; }
+.labor-chart .spark { width: 100%; height: 58px; color: var(--ink); margin: 4px 0 0; }
+.labor-chart-single { font-size: 22px; font-family: var(--font-head); font-weight: 800; }
+.labor-chart-legend { display: flex; justify-content: space-between; color: var(--muted); font-size: 10.5px; }
+.labor-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.labor-limits { border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: 10px; padding: 8px 10px; background: var(--card-2); }
+.labor-limits strong { font-size: 12px; }
+.labor-limits ul { margin: 4px 0 0; padding-left: 16px; font-size: 11.5px; line-height: 1.4; color: var(--ink-2); }
+.labor-meta { color: var(--muted); font-size: 10.5px; margin: 0; }
+.labor-source-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.labor-source-items li { font-size: 12.5px; }
+.labor-source-items li a, .labor-source-items li > * { display: flex; flex-direction: column; text-decoration: none; color: inherit; padding: 5px 7px; border: 1px solid var(--line); border-radius: 9px; }
+.labor-source-items li small { color: var(--muted); font-size: 11px; }
+.labor-json { border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; font-size: 11px; overflow: auto; max-height: 260px; background: var(--card-2); }
+.labor-json summary { cursor: pointer; font-weight: 700; font-size: 12px; }
+.labor-json pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; }
+.labor-progress { height: 7px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.labor-progress span { display: block; height: 100%; border-radius: 99px; background: var(--accent-hover); transition: width .3s; }
+.labor-progress.small { height: 5px; }
+.labor-cat-progress { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.labor-cat-row { display: grid; grid-template-columns: 1fr 110px 38px; gap: 8px; align-items: center; font-size: 11.5px; }
+.labor-cat-row strong { text-align: right; font-variant-numeric: tabular-nums; }
+.labor-principles { margin: 0; padding-left: 17px; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); }
+.labor-principles li { margin: 4px 0; }
+@media (max-width: 520px) {
+  .labor-facts { grid-template-columns: 1fr; }
+  .labor-cat-row { grid-template-columns: 1fr 70px 34px; }
+}
+
+.labor-figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.labor-image { width: min(100%, 260px); height: auto; border-radius: 14px; border: 1px solid var(--line); background: #fff; }
+.labor-figure figcaption { font-size: 11.5px; color: var(--muted); }
+.labor-speak { margin-top: 8px; }
+
+.labor-table caption {
+  caption-side: top;
+  text-align: left;
+  padding: 6px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.labor-mini,
+.labor-run,
+.labor-feature,
+.labor-back,
+.labor-tabs button {
+  min-height: 44px;
+}
+.labor-mini { min-height: 32px; }
+@media (prefers-reduced-motion: reduce) {
+  .labor-progress span,
+  .labor-feature,
+  .labor-run {
+    transition: none;
+  }
+}
+
+/* Vier Reiter im Stadtlabor: gleichmäßig statt der Fünf-Reiter-Regel aus Stadtwissen. */
+.labor .wiss-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.labor .wiss-tabs button:nth-child(n) { grid-column: span 1; }
+@media (max-width: 430px) {
+  .labor .wiss-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .labor .wiss-tabs button { white-space: normal; }
+}
+
+/* Dunkles Thema: Datentabellen und Fakten bleiben auch bei wenig Licht lesbar. */
+:root[data-theme='dark'] .labor-fact,
+:root[data-theme='dark'] .labor-feature,
+:root[data-theme='dark'] .labor-table-scroll,
+:root[data-theme='dark'] .labor-json {
+  background: #1B1A1A;
+  border-color: #3B3836;
+}
+:root[data-theme='dark'] .labor-table th { background: #2A2828; }
+:root[data-theme='dark'] .labor-image { background: #fff; }
+
+/* Hoher Kontrast: Linien und Sekundärtext deutlicher. */
+@media (prefers-contrast: more) {
+  .labor-feature, .labor-fact, .labor-table-scroll, .labor-limits { border-color: var(--ink); }
+  .labor-feature-main small, .labor-count, .labor-note, .labor-meta { color: var(--ink-2); }
+  .labor-progress { outline: 1px solid var(--ink); }
+}
+
+/* Druck: nur der Bericht, keine Bedienelemente. */
+@media print {
+  .labor-toolbar, .labor .wiss-tabs, .labor-actions, .labor-back, .labor-form,
+  .labor-feature-list, .labor-progress, .labor-speak, .offline-banner { display: none !important; }
+  .labor-pane, .labor-result { padding: 0; }
+  .labor-table-scroll { max-height: none; overflow: visible; border-color: #999; }
+  .labor-table th { background: #eee; color: #000; }
+  .labor-fact, .labor-feature, .labor-limits { break-inside: avoid; background: #fff; color: #000; border-color: #999; }
+  a[href]::after { content: " (" attr(href) ")"; font-size: 9px; color: #555; }
+}
+
+/* Fokus und Typografie: sichtbar, ruhig, mitwachsend. */
+.labor button:focus-visible,
+.labor a:focus-visible,
+.labor-table-scroll:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.labor-result-head h3 { font-size: clamp(17px, 2.2vw, 21px); }
+.labor-feature-main strong { font-size: clamp(13.5px, 1.5vw, 15px); }
+.labor-field-error { color: var(--crit); font-size: 10.5px; font-weight: 600; }
+
+/* Klebende Abschnittsüberschriften in langen Werkzeuglisten. */
+.labor .section-head {
+  position: sticky;
+  top: 44px;
+  z-index: 2;
+  background: var(--card);
+  padding: 6px 0 5px;
+}
+.labor-empty { display: flex; align-items: center; gap: 6px; padding: 12px 4px; }
+
+/* Lange Listen: nur sichtbare Einträge layouten (content-visibility). */
+.labor-feature-list li { content-visibility: auto; contain-intrinsic-size: 78px; }

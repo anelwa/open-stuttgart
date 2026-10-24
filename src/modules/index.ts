@@ -1,3 +1,4 @@
+import { lazy } from 'react';
 import type { ModuleDef } from './types';
 import { MobilityPanel } from './mobility/MobilityPanel';
 import { EnvironmentPanel } from './environment/EnvironmentPanel';
@@ -11,6 +12,7 @@ import { BartourenPanel } from './bartouren/BartourenPanel';
 import { SchnittstellenPanel } from './schnittstellen/SchnittstellenPanel';
 import { SpielPanel } from './spiel/SpielPanel';
 import { UmlandPanel } from './umland/UmlandPanel';
+const LaborPanel = lazy(() => import('./labor/LaborPanel').then((m) => ({ default: m.LaborPanel })));
 
 export const MODULES: ModuleDef[] = [
   { id: 'nearby', label: 'Nähe', icon: 'pin', status: 'live', overlays: ['nearby'], Panel: NearbyPanel },
@@ -25,4 +27,5 @@ export const MODULES: ModuleDef[] = [
   { id: 'sun', label: 'Sonne', icon: 'sunset', status: 'live', overlays: ['sun'], Panel: SunPanel },
   { id: 'wissen', label: 'Stadtwissen', icon: 'layers', status: 'live', overlays: ['wissen'], Panel: SchnittstellenPanel },
   { id: 'umland', label: 'Umland', icon: 'tree', status: 'live', overlays: ['umland'], Panel: UmlandPanel },
+  { id: 'labor', label: 'Stadtlabor', icon: 'flask', status: 'live', overlays: ['wissen'], Panel: LaborPanel },
 ];

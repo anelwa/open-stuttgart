@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, LazyExoticComponent } from 'react';
 import type { OverlayKey } from '../map/overlays';
 import type { Facility, Selection } from '../lib/types';
 import type { RouteRequest } from '../lib/routeCtx';
@@ -56,5 +56,5 @@ export interface ModuleDef {
   icon: string;
   status: 'live' | 'soon';
   overlays: OverlayKey[];
-  Panel: ComponentType<ModuleProps>;
+  Panel: ComponentType<ModuleProps> | LazyExoticComponent<ComponentType<ModuleProps>>;
 }

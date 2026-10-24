@@ -309,6 +309,16 @@ function LeichteSprache() {
       <h3>Wie komme ich mit Bus und Bahn hin?</h3>
       <p>Tippen Sie auf einen Ort. Dann tippen Sie auf „Verbindung suchen“.</p>
       <p>Wenn Sie keine Treppen nehmen können: Wählen Sie „stufenlos“.</p>
+      <h3>Was ist das Stadtlabor?</h3>
+      <p>Das Stadtlabor ist ein neuer Bereich.</p>
+      <p>Dort gibt es viele kleine Werkzeuge.</p>
+      <p>Zum Beispiel: Wie ist mein Kiez? Wann kommt der Regen? Wo ist der nächste Defibrillator?</p>
+      <p>Jedes Werkzeug sagt, woher die Daten kommen. Und was es nicht kann.</p>
+      <h3>Was kann StuggiAI?</h3>
+      <p>StuggiAI ist ein Assistent.</p>
+      <p>Sie können in normaler Sprache fragen.</p>
+      <p>StuggiAI findet Ämter, Wege und Termine.</p>
+      <p>StuggiAI gibt keine Rechts-Beratung.</p>
       <h3>Woher kommen die Informationen?</h3>
       <p>Die Informationen kommen von der Stadt Stuttgart und von anderen Stellen.</p>
       <p>Unter jeder Information steht, woher sie kommt.</p>

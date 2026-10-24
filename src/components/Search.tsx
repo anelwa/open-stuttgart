@@ -73,11 +73,12 @@ export const Search = forwardRef<SearchHandle, {
   onVoice?: () => void;
 }>(function Search({ onPickStop, onOpenDocument, onRoute, onVoice }, ref) {
   const stops = useStops();
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(() => { try { return new URLSearchParams(location.search).get('q') ?? ''; } catch { return ''; } });
   const [type, setType] = useState<string | null>(null);
   const [limit, setLimit] = useState(12);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const [recent, setRecent] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('os-recent-searches') ?? '[]'); } catch { return []; } });
   const listId = useId();
   const box = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -109,6 +110,12 @@ export const Search = forwardRef<SearchHandle, {
   }, [stopHits, contactDocs, otherDocs]);
 
   useEffect(() => { setActive(0); setLimit(12); }, [q, type]);
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    const t = q.trim();
+    if (t.length >= 2) u.searchParams.set('q', t); else u.searchParams.delete('q');
+    window.history.replaceState(null, '', u);
+  }, [q]);
 
   // Cmd/Ctrl+K setzt den Fokus in dieses eine Suchfeld.
   useEffect(() => {
@@ -131,6 +138,7 @@ export const Search = forwardRef<SearchHandle, {
   }, []);
 
   const choose = (h: Hit) => {
+    remember(q);
     if (h.kind === 'stop') { onPickStop(h.stop); setOpen(false); setQ(''); }
     else if (h.kind === 'doc') { onOpenDocument(h.doc.id); setOpen(false); }
     setActive(0);
@@ -141,9 +149,17 @@ export const Search = forwardRef<SearchHandle, {
     setType(null);
     inputRef.current?.focus();
   };
+  const remember = (term: string) => {
+    const t = term.trim();
+    if (t.length < 2) return;
+    const next = [t, ...recent.filter((x) => x !== t)].slice(0, 6);
+    setRecent(next);
+    try { localStorage.setItem('os-recent-searches', JSON.stringify(next)); } catch { /* egal */ }
+  };
 
   const facets = data?.facets ?? [];
-  const showPanel = open && q.trim().length >= 2;
+  const showPanel = open;
+  const searching = q.trim().length >= 2;
 
   return (
     <div className="search-dock" ref={box}>
@@ -204,6 +220,22 @@ export const Search = forwardRef<SearchHandle, {
               <Icon name="close" size={18} />
             </button>
           </div>
+          {!searching ? (
+            <div className="search-recent">
+              {recent.length > 0 ? (
+                <>
+                  <p className="search-recent-title">Letzte Suchen</p>
+                  <div className="search-recent-chips">
+                    {recent.map((r) => <button key={r} type="button" className="chip" onClick={() => { setQ(r); setOpen(true); }}>{r}</button>)}
+                    <button type="button" className="chip" onClick={() => { setRecent([]); try { localStorage.removeItem('os-recent-searches'); } catch { /* egal */ } }}>Verlauf löschen</button>
+                  </div>
+                </>
+              ) : (
+                <p className="search-empty">Tippe mindestens zwei Zeichen – zum Beispiel „Personalausweis“, „Charlottenplatz“ oder „Müll“.</p>
+              )}
+            </div>
+          ) : (
+          <>
           {facets.length > 0 && (
             <div className="search-facets" role="group" aria-label="Dokumenttyp filtern">
               <button type="button" className={`chip ${!type ? 'on' : ''}`} aria-pressed={!type} onClick={() => setType(null)}>
@@ -221,7 +253,15 @@ export const Search = forwardRef<SearchHandle, {
           <ul className="search-list" id={listId} role="listbox" aria-label="Suchergebnisse">
             {hits.length === 0 && (
               <li className="search-empty">
-                {loading ? 'Suche läuft …' : error ? friendlyError(`Suche nicht verfügbar: ${error}`) : `Keine Treffer für „${q.trim()}“.`}
+                {loading ? 'Suche läuft …' : error ? friendlyError(`Suche nicht verfügbar: ${error}`) : (
+                  <>
+                    <Icon name="info" size={22} />
+                    <span>Keine Treffer für „{q.trim()}“.</span>
+                    <span className="search-empty-actions">
+                      {['Personalausweis', 'Charlottenplatz', 'Müll'].filter((x) => x.toLowerCase() !== q.trim().toLowerCase()).map((x) => <button key={x} type="button" className="chip" onClick={() => setQ(x)}>{x}</button>)}
+                    </span>
+                  </>
+                )}
               </li>
             )}
 
@@ -324,6 +364,8 @@ export const Search = forwardRef<SearchHandle, {
             </span>
             <span className="search-keys"><kbd>↑</kbd><kbd>↓</kbd> wählen <kbd>↵</kbd> öffnen</span>
           </footer>
+          </>
+          )}
         </div>
       )}
     </div>

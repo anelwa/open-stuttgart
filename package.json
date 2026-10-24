@@ -26,7 +26,10 @@
     "check:wasgeht": "node scripts/check-wasgeht-quellen.mjs",
     "check:bot": "node scripts/bot-eval.mjs",
     "check:umland": "node scripts/check-umland.mjs",
-    "data:spiel": "node scripts/build-spiel-data.mjs"
+    "data:spiel": "node scripts/build-spiel-data.mjs",
+    "check:extras": "node scripts/check-extras.mjs",
+    "docs:extras": "node scripts/render-extras.mjs",
+    "docs:improvements": "node scripts/render-improvements.mjs"
   },
   "engines": {
     "node": ">=22.5"
@@ -38,6 +41,7 @@
     "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "satellite.js": "^6.0.2",
     "sqlite-vec": "^0.1.9"
   },
   "devDependencies": {

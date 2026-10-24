@@ -904,3 +904,57 @@ a.chip { text-decoration: none; color: inherit; display: inline-flex; align-item
   .anliegen-icon { width: 40px; height: 40px; border-radius: 12px; }
   .anliegen-chip { padding: 10px; border-radius: 16px; }
 }
+
+.offline-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  max-width: min(90vw, 560px);
+  border-radius: 99px;
+  padding: 7px 14px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 12.5px;
+  font-weight: 650;
+  box-shadow: var(--shadow-soft);
+  text-align: center;
+}
+@media print { .offline-banner { display: none; } }
+
+/* Globale Bewegungsbremse: dekorative Animationen aus, Scrollen ohne Gleiten. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.sheet-head-actions { display: flex; align-items: center; gap: 4px; }
+.sheet-share-note {
+  display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 99px;
+  background: var(--accent-soft); color: var(--ink); font-size: 11px; font-weight: 650;
+}
+
+.whats-new {
+  position: absolute; top: 78px; right: 16px; z-index: 12; width: min(300px, calc(100vw - 32px));
+  display: flex; flex-direction: column; gap: 4px; padding: 11px 12px;
+  border-radius: 16px; background: var(--card); box-shadow: var(--shadow);
+  border: 1px solid var(--line);
+}
+.whats-new strong { font-size: 13.5px; }
+.whats-new span { color: var(--ink-2); font-size: 12px; line-height: 1.35; }
+.whats-new > div { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 3px; }
+@media (max-width: 900px) {
+  .whats-new { top: auto; bottom: 92px; right: 12px; left: 12px; width: auto; }
+}
+@media print { .whats-new { display: none; } }
+
+/* Wichtige Touchziele: mindestens 44 × 44 Pixel, ohne die Optik zu sprengen. */
+.quick-pill, .search-clear, .labor-run, .labor-back, .sb-close, .sb-voice-toggle, .sb-stop {
+  min-height: 44px;
+}
+.search-clear, .sb-close, .sb-voice-toggle { min-width: 44px; }

@@ -290,3 +290,9 @@
 }
 .search-mic:hover { border-color: var(--accent); background: var(--accent-soft); }
 .search-mic:active { transform: scale(.94); }
+
+.search-recent { padding: 10px 12px 14px; }
+.search-recent-title { margin: 0 0 6px; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.search-recent-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.search-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.search-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }

@@ -5,6 +5,7 @@ import { adminTools } from './tools/admin.mjs';
 import { cultureTools } from './tools/culture.mjs';
 import { environmentTools } from './tools/environment.mjs';
 import { openDataTools } from './tools/opendata.mjs';
+import { laborTools } from './tools/labor.mjs';
 import { createAboutTool } from './tools/meta.mjs';
 import { createResources } from './resources.mjs';
 import { prompts } from './prompts.mjs';
@@ -16,6 +17,7 @@ const baseTools = [
   ...cultureTools,
   ...environmentTools,
   ...openDataTools,
+  ...laborTools,
 ];
 
 const tools = [...baseTools];

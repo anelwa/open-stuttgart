@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { MapView, type MapData, type MapHandle } from './map/MapView';
 import type { Theme } from './map/mapStyle';
 import { AERIAL_YEARS, type OverlayKey } from './map/overlays';
@@ -18,11 +18,12 @@ import { useLive } from './lib/live';
 import { RouteProvider, type RouteRequest } from './lib/routeCtx';
 import { LANGS, setLang, tr, useLang } from './lib/i18n';
 import { InfoPages } from './components/InfoPages';
+import './styles/shortcuts.css';
 import { LayerSheet } from './components/LayerSheet';
 import { StartPanel } from './components/StartPanel';
 import { QuickActions } from './components/QuickActions';
 import { ANLIEGEN, type Anliegen } from './lib/anliegen';
-import { Disclosure } from './components/ui';
+import { Disclosure, SkeletonRows } from './components/ui';
 import { StuttBot } from './components/StuttBot';
 import { Kiosk } from './components/Kiosk';
 import { KontaktSheet } from './components/KontaktSheet';
@@ -94,6 +95,8 @@ function Shell() {
   const botUndo = useRef(new Map<string, BotSnapshot>());
   const botActionLog = useRef<string[]>([]);
   const panelScrollRef = useRef<HTMLDivElement>(null);
+  const scrollPositions = useRef(new Map<string, number>());
+  const selectionPushed = useRef(false);
   const mobile = useMedia('(max-width: 900px)');
   const compact = useMedia('(max-width: 1180px)');
   const lang = useLang();
@@ -101,6 +104,7 @@ function Shell() {
   // null = Einstieg ohne vorgewähltes Thema. Der Startzustand fragt nach dem Anliegen,
   // statt den Datenbestand eines Themas sofort zu zeigen.
   const [moduleId, setModuleId] = useState<string | null>(() => readPref('module-v2', null));
+  const scrollKey = moduleId ?? 'start';
   const [focus, setFocus] = useState<string | null>(() => readPref('focus-v2', null));
   const [anliegenId, setAnliegenId] = useState<string | null>(() => readPref('anliegen-v2', null));
   const [visible, setVisible] = useState<Record<OverlayKey, boolean>>(() => ({ ...DEFAULT_VISIBLE, ...readPref('layers', {}) }));
@@ -118,6 +122,9 @@ function Shell() {
   const [docId, setDocId] = useState<number | null>(null);
   const [layersOpen, setLayersOpen] = useState(false);
   const [botOpen, setBotOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
+  const [whatsNew, setWhatsNew] = useState(() => { try { return localStorage.getItem('os-whats-new-2026-10') !== '1'; } catch { return true; } });
   const [botVoiceRequest, setBotVoiceRequest] = useState(0);
   const [kontaktOpen, setKontaktOpen] = useState(false);
   const [moduleCommand, setModuleCommand] = useState<ModuleCommand | null>(null);
@@ -132,6 +139,13 @@ function Shell() {
   }, [data.radar.data, visible.radar, radarFrame]);
 
   useEffect(() => {
+    const on = () => setOnline(navigator.onLine);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', on);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', on); };
+  }, []);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.querySelector('meta[name=theme-color]')?.setAttribute('content', theme === 'dark' ? '#141414' : '#26262C');
     writePref('theme', theme);
@@ -139,6 +153,12 @@ function Shell() {
   useEffect(() => {
     writePref('module-v2', moduleId); writePref('focus-v2', focus); writePref('anliegen-v2', anliegenId);
   }, [moduleId, focus, anliegenId]);
+  useEffect(() => {
+    const el = panelScrollRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() => { el.scrollTop = scrollPositions.current.get(scrollKey) ?? 0; });
+    return () => cancelAnimationFrame(id);
+  }, [scrollKey]);
   useEffect(() => writePref('layers', visible), [visible]);
 
   const toggle = useCallback((k: OverlayKey) => setVisible((v) => ({ ...v, [k]: !v[k] })), []);
@@ -362,6 +382,18 @@ function Shell() {
     if (mobile) setSheet('open');
   }, [mobile]);
 
+  // Tiefe Links: #labor=<werkzeug> und #modul=<modul> öffnen das passende Panel.
+  useEffect(() => {
+    const hp = new URLSearchParams(location.hash.startsWith('#') ? location.hash.slice(1) : '');
+    const target = hp.get('modul') ?? (hp.has('labor') ? 'labor' : null);
+    if (!target || !MODULES.some((m) => m.id === target)) return;
+    setModuleId(target);
+    setFocus(hp.get('focus'));
+    setAnliegenId(target === 'labor' ? 'labor' : null);
+    setSelection(null);
+    if (mobile) setSheet('open');
+  }, [mobile]);
+
   // Tiefe Links: ?stop=de:08111:6115
   useEffect(() => {
     const id = new URLSearchParams(location.search).get('stop');
@@ -383,8 +415,38 @@ function Shell() {
   }, [selection]);
 
   useEffect(() => {
+    if (selection && !selectionPushed.current) {
+      try { history.pushState({ ...(history.state ?? {}), osDetail: true }, ''); } catch { /* egal */ }
+      selectionPushed.current = true;
+    }
+    if (!selection) selectionPushed.current = false;
+  }, [selection]);
+
+  useEffect(() => {
+    const onPop = () => {
+      if (selectionPushed.current) {
+        selectionPushed.current = false;
+        setSelection(null);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setSelection(null); setDocId(null); setLayersOpen(false); }
+      if (e.key === 'Escape') { setSelection(null); setDocId(null); setLayersOpen(false); setShortcutsOpen(false); }
+      const target = e.target as HTMLElement | null;
+      const typing = !!target?.closest('input, textarea, select, [contenteditable="true"]');
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        setBotOpen((v) => !v);
+        setSelection(null);
+      }
+      if (!typing && e.key === '?') {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -826,6 +888,18 @@ function Shell() {
         </div>
       )}
       <a className="skip-link" href="#panel-content">{tr('Zum Inhalt springen')}</a>
+      {!online && <div className="offline-banner" role="status">Offline – gespeicherte Ansichten bleiben sichtbar, Live-Daten pausieren.</div>}
+
+      {whatsNew && (
+        <aside className="whats-new" role="status">
+          <strong>Neu: Stadtlabor</strong>
+          <span>100 Werkzeuge, über 100 Quellen – Kiez, Umwelt, Wissen und Alltag.</span>
+          <div>
+            <button type="button" className="chip" onClick={() => { setWhatsNew(false); try { localStorage.setItem('os-whats-new-2026-10', '1'); } catch { /* egal */ } openModule('labor', 'werkzeuge', 'labor'); }}>Öffnen</button>
+            <button type="button" className="icon-btn ghost" aria-label="Hinweis schließen" onClick={() => { setWhatsNew(false); try { localStorage.setItem('os-whats-new-2026-10', '1'); } catch { /* egal */ } }}><Icon name="close" size={15} /></button>
+          </div>
+        </aside>
+      )}
 
       <QuickActions
         active={anliegenId}
@@ -895,7 +969,7 @@ function Shell() {
           </div>
         </header>
 
-        <div className="panel-scroll" id="panel-content" tabIndex={-1} ref={panelScrollRef}>
+        <div className="panel-scroll" id="panel-content" tabIndex={-1} ref={panelScrollRef} role="main" aria-label="Inhalte und Werkzeuge" onScroll={(e) => scrollPositions.current.set(scrollKey, e.currentTarget.scrollTop)}>
           {mod ? (
             <>
               <div
@@ -914,7 +988,7 @@ function Shell() {
                   {activeAnliegen && activeAnliegen.module !== mod.id && <span className="crumb-context">{tr(mod.label)}</span>}
                 </div>
               </div>
-              <mod.Panel focus={focus ?? undefined} visible={visible} toggle={toggle} select={select} flyTo={flyTo} fitBounds={fitBounds} setLayer={setLayer} center={center} setSunImage={setSunImage} radarFrame={radarFrame} setRadarFrame={setRadarFrame} setNearby={setNearby} setWissen={setWissen} setSpiel={setSpielGeo} setRoute={setRouteGeo} routeTarget={routeTarget} botCommand={moduleCommand} />
+              <Suspense fallback={<SkeletonRows rows={5} />}><mod.Panel focus={focus ?? undefined} visible={visible} toggle={toggle} select={select} flyTo={flyTo} fitBounds={fitBounds} setLayer={setLayer} center={center} setSunImage={setSunImage} radarFrame={radarFrame} setRadarFrame={setRadarFrame} setNearby={setNearby} setWissen={setWissen} setSpiel={setSpielGeo} setRoute={setRouteGeo} routeTarget={routeTarget} botCommand={moduleCommand} /></Suspense>
             </>
           ) : (
             <StartPanel onModule={(id) => openModule(id)} />
@@ -1021,6 +1095,24 @@ function Shell() {
           <DetailSheet sel={selection!} onClose={() => setSelection(null)} select={select} flyTo={flyTo} />
         </aside>
       )}
+      {shortcutsOpen && (
+        <div className="shortcut-backdrop" role="presentation" onClick={() => setShortcutsOpen(false)}>
+          <section className="shortcut-card" role="dialog" aria-modal="true" aria-labelledby="shortcut-title" onClick={(e) => e.stopPropagation()}>
+            <header>
+              <h2 id="shortcut-title">Tastenkürzel</h2>
+              <button type="button" className="icon-btn ghost" onClick={() => setShortcutsOpen(false)} aria-label="Schließen"><Icon name="close" size={19} /></button>
+            </header>
+            <dl>
+              <div><dt><kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>K</kbd></dt><dd>Suche öffnen</dd></div>
+              <div><dt><kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>J</kbd></dt><dd>StuggiAI öffnen oder schließen</dd></div>
+              <div><dt><kbd>?</kbd></dt><dd>Diese Hilfe anzeigen</dd></div>
+              <div><dt><kbd>Esc</kbd></dt><dd>Detail, Dialog oder Hilfe schließen</dd></div>
+            </dl>
+            <p>Die Kürzel gelten außerhalb von Eingabefeldern. Auf Tablets und Smartphones sind alle Funktionen auch über die sichtbaren Knöpfe erreichbar.</p>
+          </section>
+        </div>
+      )}
+
       {info && <InfoPages page={info.page} anchor={info.anchor} onPage={(page) => setInfo({ page })} onClose={() => setInfo(null)} />}
       <DocumentReader id={docId} onClose={() => setDocId(null)} onShowOnMap={showKontaktOnMap} />
       <KontaktSheet

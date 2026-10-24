@@ -7,5 +7,8 @@ export default defineConfig({
     port: 5173,
     proxy: { '/api': 'http://localhost:8787' },
   },
-  build: { chunkSizeWarningLimit: 1500 },
+  build: {
+    chunkSizeWarningLimit: 1500,
+    rolldownOptions: { output: { advancedChunks: { groups: [{ name: 'maplibre', test: /maplibre-gl/ }] } } },
+  },
 });

@@ -11,7 +11,7 @@ Antwort Quelle und Lizenz und kann sowohl lokal über **stdio** als auch öffent
 - **Health:** `GET /healthz` beim eigenen Prozess, `GET /api/health` bei der App
 - **Protokoll:** MCP `2026-07-28` (modern, zustandslos) und abwärtskompatibel
   `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05` (initialize + Sitzung)
-- **Werkzeuge:** 35 · **Ressourcen:** 4 + 6 Vorlagen · **Prompts:** 6
+- **Werkzeuge:** 37 · **Ressourcen:** 4 + 6 Vorlagen · **Prompts:** 6
 - **Lizenz:** EUPL-1.2; die Daten selbst stehen unter den Lizenzen der jeweiligen Quellen.
 
 ## Start
@@ -215,6 +215,8 @@ Ergebnis mit `"isError": true` und einer erklärenden Textantwort.
 
 ## Werkzeuge
 
+Neu sind die beiden Stadtlabor-Werkzeuge `labor_werkzeug` (100 Werkzeuge) und `labor_quelle` (über 100 Quellen).
+
 Alle Werkzeuge sind `readOnlyHint: true`, `destructiveHint: false`. `cost` steuert das Rate-Limit:
 1 = normal, 3 = teuer, 6 = sehr teuer. Eine ausführliche Beschreibung, Beispiele und die
 JSON-Schemata stehen im laufenden Server unter `tools/list` und in `stuttgart://catalog`.
@@ -228,6 +230,13 @@ JSON-Schemata stehen im laufenden Server unter `tools/list` und in `stuttgart://
 | `contacts` | Kontaktregister (ca. 5.400 Stellen, Notdienste, Beratung) mit Telefon, E-Mail, Zeiten; `id` für Details |
 | `datasets` | GovData, OpenData@Stuttgart (CKAN), KOMUNIS, Wikidata-Lücken, K10plus, FragDenStaat |
 | `participation` | Bebauungspläne und Planauslegung am Ort, Wahlergebnisse je Bezirk, Beteiligungsangebote |
+
+### Stadtlabor: über 100 Quellen und 100 Werkzeuge
+
+| Werkzeug | Zweck |
+|---|---|
+| `labor_werkzeug` | Eines der 100 Stadtlabor-Werkzeuge ausführen (Kiez, Adress-Zeugnis, Familien-Check, Erdbeben, Luft, Pollen, Bibliothek, Quellen-Check, Lizenz-Finder, Export u. a.) oder den Katalog durchsuchen. Ohne `werkzeug` kommt der Katalog. |
+| `labor_quelle` | Eine der über 100 neuen Quellen abrufen (CKAN-Tabelle, WFS-/LUBW-/LGL-GeoJSON, REST-Liste) oder den Quellenkatalog durchsuchen. Jede Antwort nennt Lizenz, Quellenangabe, Abrufzeit und Grenzen. |
 
 ### Weg und Verkehr
 
@@ -372,7 +381,7 @@ npm run check:mcp
 
 Der Rauchtest prüft:
 
-- Katalog (35 Werkzeuge, eindeutige Namen, read-only, Schemata),
+- Katalog (37 Werkzeuge, eindeutige Namen, read-only, Schemata),
 - Legacy: `initialize`, `tools/list`, `tools/call`, Ressourcen, Prompts, Completion, Fehler,
 - modern: `server/discover`, `tools/list`, `tools/call`, Cache-Felder,
 - HTTP: CORS, Session, SSE, DELETE, Header-Pflicht, Versionsfehler,
@@ -398,7 +407,7 @@ server/mcp/
   sources.mjs     Quellen- und Lizenzregister
   coverage.mjs     Abdeckung und Grenzen
   util.mjs         Validierung, Fristen, Ergebnisse, Rate-Limit
-  tools/           35 Werkzeuge nach Domäne
+  tools/           37 Werkzeuge nach Domäne
 ```
 
 ## Bekannte Grenzen

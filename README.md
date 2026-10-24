@@ -74,6 +74,7 @@ optionaler Gancio-Anbindung — steht in [`docs/deploy-dokploy.md`](docs/deploy-
 | Stadtgedächtnis | Archiv der öffentlichen Veränderungen: Meldungen, amtliche Bekanntmachungen, neu erfasste OpenStreetMap-Orte und Änderungen an Verwaltungsseiten, mit Datum, Quelle, Lizenz und Bezirksfilter; als RSS abonnierbar | Stadt, Feuerwehr, Polizei, SWR, Kessel.TV, Amtliche Bekanntmachungen, OpenStreetMap (ODbL), Verwaltungsseiten |
 | Alles durchsuchen | Cmd/Ctrl+K-Palette über 10.300 Seiten, Leistungen, Dienststellen, Kontakte, Online-Dienste und Dokumente; FTS5-Volltextsuche, Facetten, Dokumentenleser mit Ablauf, Bezugsquellen, Backlinks und verwandten Dokumenten; Kontakte mit direktem Anruf und strukturierten Öffnungszeiten | Lokale SQLite-/FTS5-Datenbank aus stuttgart.de (Verwaltungs- und Seitendaten) und redaktionell geprüften Notdiensten; `sqlite-vec` für Vektoren vorbereitet |
 | Kontakt & Notfall | Sofort erreichbare Notrufe (112, 110, 116117, Giftnotruf) und ein durchsuchbares Register mit 5.400 Dienststellen, Beratungs- und Notdiensten; Anrufen, Mailen, Öffnungszeiten und Leistungen | `src/data/kontakte-wichtig.json` (geprüft), stuttgart.de-Organigramm; Details in `docs/kontaktregister.md` |
+| Stadtlabor | 101 neue öffentliche Schnittstellen, APIs und Datensätze – amtliche CKAN-Statistik, Stuttgarter WFS-Layer, LUBW-/LGL-BW-Daten, Erdbeben, Wetter, Satelliten, Kultur- und Wissens-APIs – und 100 Werkzeuge, die daraus konkrete Antworten machen. Quellen durchsuchen, als Tabelle oder Karte ansehen, Werkzeuge wie Kiez-Steckbrief, Familien-Check, Adress-Zeugnis, Familien- und Senioren-Check, Auto-Check, Quellen-Check, Lizenz-Finder oder Datenexport ausführen; jedes Ergebnis nennt Quelle, Lizenz und Grenzen. Fortschritt: 101/101 Quellen, 100/100 Werkzeuge, 100/100 Verbesserungen (Stand 24.10.2026) | OpenData@Stuttgart (CKAN, CC BY 4.0), Geoserver Stuttgart, LUBW, LGL-BW, EMSC, USGS, Open-Meteo, MET Norway, NASA GIBS/EONET, GDACS, Transitous, CelesTrak, Wikimedia, Wikidata, Open Library, Internet Archive, Tagesschau, u. a. |
 | Stadtwissen | Fünf Reiter: Karte mit allen 458 WFS-Layern (77 freigegeben und direkt ladbar), amtlicher gis6-Geocoder, KOMUNIS-Statistik mit XLSX-Anhängen, FragDenStaat-Transparenz, Fairteiler, GBIF-Arten, OSM-Hinweise, Wikidata-Lücken, K10plus-Bibliothek, GovData-Änderungsfeed; Ausgabe als GeoJSON/RSS/iCal/CSV, permanenter Link, QR-Schild, Kiosk und Vorlesen | Geoserver der Stadt (WFS 2.0.0, CC BY 4.0 bzw. Nutzungsbedingungen), gis6, KOMUNIS, FragDenStaat, foodsharing, GBIF, OSM Notes, Wikidata, K10plus, GovData |
 | Live-Zustände | Wartezeit der Bürgerbüros und Besucherzahl der Bäder als Kartenebene, mit „üblich um diese Zeit“, bester Zeit und Trefferquote aus eigener Aufzeichnung | Wartezeitanzeige der Stadt, Stuttgarter Bäder |
 | Weg | Bus und Bahn von Tür zu Tür mit Echtzeit, Profile „stufenlos“ und „mit Kinderwagen“, Aufzugsstatus der DB-Stationen; Fahrrad mit Steigung, Pedelec, zu Fuß mit Höhenprofil, Auto mit freien Parkhäusern am Ziel; ausgeschilderte Wander-, Weinwander- und Downhillwege (Blaustrümpflerweg, Rößleweg, 4-Burgen-Weg, Georg-Fahrbach-Weg, HW 5, Stuttgarter Weinwanderwege) mit Länge, Auf-/Abstieg, Start/Ziel, Haltestellen und Unfällen im 30-Meter-Korridor; Übergabe an Google Maps, Apple Karten, OpenStreetMap | EFA-BW, BFRK (NVBW), DB SIRI-FM, Valhalla und OSRM (FOSSGIS), BRouter, Geoserver der Stadt (CC BY 4.0), OpenStreetMap-Routenrelationen (ODbL), Unfallatlas (dl-de/by-2-0) |
@@ -181,6 +182,21 @@ optionaler Gancio-Anbindung — steht in [`docs/deploy-dokploy.md`](docs/deploy-
 Teilbare Links: Der Kartenausschnitt steht in der Adresse (`#karte=zoom/lat/lon`), eine gewählte Haltestelle als
 `?stop=de:08111:6115`.
 
+
+### Stadtlabor und Erweiterungsprogramm
+
+Das Modul **Stadtlabor** bündelt den Ausbau um über 100 zusätzliche öffentliche Schnittstellen, APIs und Datensätze, 100 neue Werkzeuge sowie 100 Verbesserungen für StuggiAI, Bedienung, Design, Zuverlässigkeit und Inhalt. Die Register sind maschinenlesbar und werden automatisch dokumentiert:
+
+- **Quellen:** `/api/labor/quellen` listet alle Quellen mit Typ, Lizenz, Quellenangabe, Status und Aktualisierung. `/api/labor/quelle?id=…` ruft eine Quelle ab (Tabelle, GeoJSON oder Liste) – serverseitig, zwischengespeichert und mit Quellenangabe.
+- **Werkzeuge:** `/api/labor/werkzeuge` listet alle 100 Werkzeuge mit Eingaben und Status; alle sind live. `/api/labor/werkzeug?id=…` führt eines aus und liefert Blöcke, Kartenpunkte, Quellen und Grenzen.
+- **Oberfläche:** Das Modul „Stadtlabor“ hat drei Reiter: Werkzeuge (Suche, Kategorie, Formular, Ergebnis), Quellen (durchsuchen, Tabelle/Karte/JSON) und Fortschritt (Umsetzungsstand, Grundsätze, Prüfung).
+- **MCP:** `labor_werkzeug` und `labor_quelle` machen dieselben Funktionen für andere Agenten verfügbar (siehe [`docs/mcp.md`](docs/mcp.md)).
+- **Prüfung:** `npm run check:extras` prüft 100 + 100 Einträge, IDs, Lizenzen und Handler; `npm run check:extras -- --live` ruft alle Quellen auf, `-- --live-features` alle Werkzeuge.
+- **Verbesserungen:** `/api/labor/verbesserungen` liefert die 100 Verbesserungen mit Status; im Stadtlabor gibt es dafür einen eigenen Reiter. Register: `server/extras/improvements.mjs`.
+- **Dokumentation:** [`docs/erweiterungsprogramm.md`](docs/erweiterungsprogramm.md) und [`docs/verbesserungen.md`](docs/verbesserungen.md) werden mit `npm run docs:extras` bzw. `npm run docs:improvements` erzeugt und nennen jeden Eintrag mit Status.
+
+Leitsatz bleibt: Jede Quelle nennt Lizenz und Quellenangabe; jede Antwort sagt, was sie nicht kann. Neue Quellen werden nur aufgenommen, wenn sie ohne Key, Login oder Rechtsverstoß nutzbar sind – oder ausdrücklich als „Key nötig“ markiert werden.
+
 ## MCP-Server für andere Agenten
 
 Open Stuttgart ist zugleich ein vollständiger, **read-only MCP-Server**. Andere Agenten und
@@ -192,7 +208,7 @@ Zeitstand an jeder Antwort.
 - **Eigener Prozess:** `npm run mcp:http` → `http://127.0.0.1:8788/mcp`.
 - **stdio:** `node server/mcp/stdio.mjs` für Claude Desktop, Cursor und andere lokale Clients
   (direkt starten, nicht über `npm run`, damit nur JSON-RPC auf stdout landet).
-- **Umfang:** 35 Werkzeuge (Suche, Verwaltung, Adressprofil, Weg/Abfahrten, Verkehr, Parken,
+- **Umfang:** 37 Werkzeuge (Suche, Verwaltung, Adressprofil, Weg/Abfahrten, Verkehr, Parken,
   Termine, Kultur, Umwelt, Umland, Gesundheit, WFS/Open Data), 4 Ressourcen, 6 Vorlagen und 6 Prompts.
 - **Grenzen:** keine Buchungen, Anträge oder Schreibzugriffe; jede Quelle mit Lizenz; Rate-Limit
   pro IP und Werkzeug; keine Standortabfrage ohne übergebene Koordinaten.
@@ -205,17 +221,18 @@ Zeitstand an jeder Antwort.
 server/            Node-Server ohne Abhängigkeiten
   index.mjs        API-Routen /api/* und Auslieferung von dist/
   cache.mjs        Zwischenspeicher mit Ablaufzeit, höflicher Abruf je Host, letzter guter Wert bei Ausfall
-  sources/         eine Datei je Quelle (efa, parking, sharing, roadworks, environment, culture, events-extra, radar, kessel,
+  sources/         eine Datei je Altquelle (efa, parking, sharing, roadworks, environment, culture, events-extra, radar, kessel,
                    nearby, adresse, verwaltung, verlauf, routing, aufzuege, hitze, beteiligung, partner, bot, bot-katalog, umland)
-  mcp/             MCP-Server: Streamable HTTP (/mcp), stdio, 35 Werkzeuge, Ressourcen und Prompts (siehe docs/mcp.md)
+  mcp/             MCP-Server: Streamable HTTP (/mcp), stdio, 37 Werkzeuge, Ressourcen und Prompts (siehe docs/mcp.md)
+  extras/          101 Quellen, 100 Werkzeuge und 100 Verbesserungen mit Adaptern und Registern
   .cache/          dauerhafter Zwischenspeicher (iCal-Details, Verortungen), nicht im Git
 src/
   map/             Kartenstil (mapStyle.ts), Fachebenen (overlays.ts), Symbole (icons.ts), MapView.tsx
-  modules/         Themenmodule: nearby, route, mobility, environment, culture, sun, umland
+  modules/         Themenmodule: nearby, route, mobility, environment, culture, sun, umland, labor
   components/      Suche, Detailansichten, Bedienelemente, StuggiAI mit Büsten-Zeichen
   lib/             Datenabruf, Formatierung, Typen, Geometrie, Sonnenstand, sunWorker.ts (Schattenrechnung im Web Worker)
 public/data/       aufbereitete Fahrplandaten (network.geojson, stops.geojson)
-scripts/           build_gtfs.py (Fahrplan aufbereiten), dev.mjs, bot-eval.mjs (StuggiAI-Rauchtest)
+scripts/           build_gtfs.py (Fahrplan aufbereiten), dev.mjs, bot-eval.mjs (StuggiAI-Rauchtest), check-extras.mjs, render-extras.mjs, render-improvements.mjs
 ```
 
 ### Neues Modul ergänzen

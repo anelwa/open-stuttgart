@@ -64,6 +64,9 @@ export const ICON_PATHS: Record<string, string> = {
   volumeOff: 'M4 10v4h4l5 4V6L8 10H4zM16 9l5 6M21 9l-5 6',
   check: 'M4 12l5 5L20 6',
   undo: 'M9 7H5v4M5.5 11a7 7 0 1 0 2-5',
+  flask: 'M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3M7.5 14h9',
+  trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+  help: 'M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.8.3-1.2 1-1.2 1.8M12 17h.01',
 };
 const P = ICON_PATHS;
 

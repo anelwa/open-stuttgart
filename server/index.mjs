@@ -1,6 +1,7 @@
 // API-Proxy und Auslieferung der gebauten Oberfläche. Keine Abhängigkeiten außer Node ≥ 20.
 import './env.mjs';
 import http from 'node:http';
+import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -43,6 +44,7 @@ import { verwaltungGebaeude, verwaltungLeistung, verwaltungSuche, verwaltungWerk
 import { botCoverage, botReply, botStatus, botToolCatalog } from './sources/bot.mjs';
 import { handleMcpHttp } from './mcp/index.mjs';
 import { stadtpalais } from './sources/stadtpalais.mjs';
+import { featureCatalog, improvementCatalog, laborOverview, runFeature, runSource, sourceCatalog } from './extras/index.mjs';
 import {
   addressSearch, bibliothek, dcatKatalog, foodsharing, fragdenstaat, fragdenstaatRss, gbif,
   geocode, komunis, komunisDoc, osmNotes, stadtKatalog, wfsFeatures, wfsKatalog, wfsRss, wikidataGaps,
@@ -146,7 +148,14 @@ const routes = {
   '/api/natur': (q) => beobachtungen(+q.get('lat'), +q.get('lon'), q.get('r')),
   '/api/geocaches': (q) => geocaches({ lat: q.get('lat'), lon: q.get('lon'), r: q.get('r'), limit: q.get('limit') }),
   '/api/mensa': (q) => mensen(q.get('date')),
-  '/api/health': async () => ({ ok: true, time: new Date().toISOString() }),
+  '/api/health': async () => {
+    const l = laborOverview();
+    return {
+      ok: true, time: new Date().toISOString(), uptimeS: Math.round(process.uptime()), node: process.version,
+      labor: { sources: l.sources.live, features: l.features.live, improvements: l.improvements.done },
+      optional: { dbApi: Boolean(process.env.OS_DB_CLIENT_ID), ticketmaster: Boolean(process.env.OS_TICKETMASTER_KEY), gancio: Boolean(process.env.OS_GANCIO_URL), llm: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) },
+    };
+  },
   '/api/bot/health': async () => botStatus(),
   '/api/bot/tools': async () => botToolCatalog(),
   '/api/bot/coverage': async () => botCoverage(),
@@ -166,6 +175,13 @@ const routes = {
   '/api/stadt/katalog': () => dcatKatalog(),
   '/api/stadt/ckan': () => stadtKatalog(),
   '/api/stadt/stadtpalais': () => stadtpalais(),
+  // Erweiterungsprogramm: 100 neue Quellen und 100 Werkzeuge
+  '/api/labor': () => laborOverview(),
+  '/api/labor/quellen': () => sourceCatalog(),
+  '/api/labor/quelle': (q) => runSource(q.get('id'), Object.fromEntries(q)),
+  '/api/labor/werkzeuge': () => featureCatalog(),
+  '/api/labor/werkzeug': (q) => runFeature(q.get('id'), Object.fromEntries(q)),
+  '/api/labor/verbesserungen': () => improvementCatalog(),
 };
 
 const MIME = {
@@ -239,7 +255,7 @@ const server = http.createServer(async (req, res) => {
     };
     try {
       const body = await readJsonBody(req);
-      send('status', { text: 'Ich schaue nach …' });
+      send('status', { text: 'Ich prüfe Ämter, Karte und Quellen …' });
       const data = await botReply({
         sessionId: body.sessionId,
         message: body.message,
@@ -249,6 +265,7 @@ const server = http.createServer(async (req, res) => {
       });
       for (const action of data.ui ?? []) send('action', action);
       for (const card of data.cards ?? []) send('card', card);
+      send('status', { text: 'Ich formuliere die Antwort …' });
       const text = String(data.reply ?? '');
       for (let i = 0; i < text.length; i += 60) send('token', { text: text.slice(i, i + 60) });
       send('done', data);
@@ -338,9 +355,29 @@ const server = http.createServer(async (req, res) => {
     const t0 = Date.now();
     try {
       const data = await handler(url.searchParams);
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-      res.end(JSON.stringify(data));
-      if (process.env.LOG) console.log(`${url.pathname} ${Date.now() - t0} ms`);
+      const body = JSON.stringify(data);
+      const cacheable = ['/api/labor/quellen', '/api/labor/werkzeuge', '/api/labor/verbesserungen'].includes(url.pathname);
+      if (cacheable) {
+        const etag = `"${createHash('sha1').update(body).digest('hex')}"`;
+        if (req.headers['if-none-match'] === etag) {
+          res.writeHead(304, { ETag: etag, 'Cache-Control': 'public, max-age=300' });
+          res.end();
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600',
+          ETag: etag,
+          Vary: 'Accept-Encoding',
+        });
+        res.end(body);
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(body);
+      }
+      const ms = Date.now() - t0;
+      if (process.env.LOG) console.log(`${url.pathname} ${ms} ms`);
+      if (ms > 2000) console.warn(`[langsam] ${url.pathname} ${ms} ms`);
     } catch (err) {
       const status = err.status ?? 502;
       console.warn(`${url.pathname}: ${err.message}`);

@@ -22,12 +22,24 @@ type Close = { onClose: () => void };
 type Nav = { select: (s: Selection) => void; flyTo: (c: [number, number], z?: number) => void };
 
 export function SheetHead({ eyebrow, title, onClose, children, tone = 'ink' }: Close & { eyebrow: string; title: string; children?: React.ReactNode; tone?: string }) {
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  const share = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) await navigator.share({ title: `${title} · Open Stuttgart`, url });
+      else { await navigator.clipboard.writeText(url); setShareNote('Link kopiert'); window.setTimeout(() => setShareNote(null), 1800); }
+    } catch { /* Nutzer hat abgebrochen */ }
+  };
   return (
     <header className={`sheet-head tone-${tone}`}>
       <div className="sheet-head-top">
         <span className="eyebrow">{eyebrow}</span>
-        <button type="button" className="icon-btn ghost" onClick={onClose} aria-label="Schließen"><Icon name="close" size={20} /></button>
+        <div className="sheet-head-actions">
+          <button type="button" className="icon-btn ghost" onClick={() => void share()} aria-label="Diese Ansicht teilen" title="Teilen"><Icon name="share" size={18} /></button>
+          <button type="button" className="icon-btn ghost" onClick={onClose} aria-label="Schließen"><Icon name="close" size={20} /></button>
+        </div>
       </div>
+      {shareNote && <span className="sheet-share-note" role="status">{shareNote}</span>}
       <h2 id="detail-title">{title}</h2>
       {children}
     </header>

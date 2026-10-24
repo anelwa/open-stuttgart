@@ -1,0 +1,21 @@
+# Glossar
+
+- **API** – Programmierschnittstelle; maschinenlesbarer Zugang zu Daten oder Funktionen.
+- **AQI** – Air Quality Index; Luftqualitätsindex, hier meist der EU-Index von 1 (gut) bis 5 (sehr schlecht).
+- **CKAN** – Open-Source-Datenportalsoftware; OpenData@Stuttgart und GovData nutzen sie.
+- **DATEX II** – europäischer Standard für Verkehrsmeldungen.
+- **DCAT-AP** – Metadatenstandard für offene Datenkataloge.
+- **DWD** – Deutscher Wetterdienst.
+- **GBFS** – General Bikeshare Feed Specification; Standard für Sharing-Angebote.
+- **GeoJSON** – offenes Format für Vektor-Geodaten.
+- **GTFS / GTFS-RT** – Standard für Fahrpläne bzw. Echtzeitdaten im ÖPNV.
+- **HQ100** – Hochwasser, das statistisch einmal in 100 Jahren auftritt; keine jährliche Garantie.
+- **KOMUNIS** – Statistikdatenbank der Landeshauptstadt Stuttgart.
+- **LUBW** – Landesanstalt für Umwelt Baden-Württemberg.
+- **LGL** – Landesamt für Geoinformation und Landentwicklung Baden-Württemberg.
+- **MCP** – Model Context Protocol; Schnittstelle für KI-Agenten.
+- **ODbL** – Open Database License; Namensnennung und Share-alike für Datenbanken.
+- **OSM** – OpenStreetMap; freie Weltkarte der Community.
+- **Pollenflug** – DWD-Vorhersage für allergene Pollen.
+- **WFS** – Web Feature Service; OGC-Standard für Vektordaten.
+- **WMS** – Web Map Service; OGC-Standard für Rasterkarten.

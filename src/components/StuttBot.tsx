@@ -28,6 +28,7 @@ interface ChatMessage {
   fallback?: boolean;
   error?: boolean;
   fromVoice?: boolean;
+  at?: string;
 }
 
 const START_SUGGESTIONS = [
@@ -104,6 +105,14 @@ export function StuttBot({
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [speakReplies, setSpeakReplies] = useState(false);
   const [handsFree, setHandsFree] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+  const [feedback, setFeedback] = useState<Record<string, 'up' | 'down'>>(() => { try { return JSON.parse(localStorage.getItem('os-bot-feedback') ?? '{}'); } catch { return {}; } });
+  const [chatQuery, setChatQuery] = useState('');
+  const [progress, setProgress] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState('');
+  const [locVersion, setLocVersion] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const locationSent = useRef(false);
@@ -158,7 +167,7 @@ export function StuttBot({
   }, []);
 
   const addMessage = useCallback((m: Omit<ChatMessage, 'id'>) => {
-    setMessages((prev) => [...prev, { ...m, id: newId() }]);
+    setMessages((prev) => [...prev, { ...m, id: newId(), at: m.at ?? new Date().toISOString() }]);
   }, []);
 
   const stopListening = useCallback(() => {
@@ -262,18 +271,23 @@ export function StuttBot({
     return out;
   }, [onAction]);
 
-  const send = useCallback(async (raw?: string, locOverride?: BotLocation, opts?: { voice?: boolean }) => {
+  const send = useCallback(async (raw?: string, locOverride?: BotLocation, opts?: { voice?: boolean; silentUser?: boolean }) => {
     const text = (raw ?? input).trim();
     if (busy || (!text && !locOverride)) return;
     setBusy(true);
     setInput('');
     setInterim('');
-    if (text) addMessage({ role: 'user', text, fromVoice: opts?.voice });
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setProgress('Ich schaue nach …');
+    setStreaming('');
+    if (text && !opts?.silentUser) addMessage({ role: 'user', text, fromVoice: opts?.voice });
     else if (locOverride) addMessage({ role: 'user', text: '📍 Mein Standort' });
 
     const firstLocation = !locationSent.current ? readSavedLocation() : null;
     try {
-      const res = await fetch('/api/bot', {
+      const res = await fetch('/api/bot/stream', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -282,10 +296,36 @@ export function StuttBot({
           location: locOverride ?? firstLocation,
           context: getContext(),
         }),
+        signal: controller.signal,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((data as { error?: string }).error ?? `Fehler ${res.status}`);
-      const bot = data as BotResponse;
+      if (res.status === 429) throw new Error('Zu viele Anfragen. Bitte in einer Minute erneut versuchen.');
+      if (!res.ok) throw new Error(`Fehler ${res.status}`);
+      let bot: BotResponse | null = null;
+      let streamed = '';
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('Keine Antwort erhalten');
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() ?? '';
+        for (const part of parts) {
+          const ev = /^event: (.+)$/m.exec(part)?.[1];
+          const raw = /^data: (.+)$/m.exec(part)?.[1];
+          if (!ev || !raw) continue;
+          let payload: unknown = null;
+          try { payload = JSON.parse(raw); } catch { continue; }
+          if (ev === 'status') setProgress((payload as { text?: string }).text ?? 'Ich schaue nach …');
+          else if (ev === 'token') { streamed += (payload as { text?: string }).text ?? ''; setStreaming(streamed); setProgress(null); }
+          else if (ev === 'done') { bot = payload as BotResponse; }
+          else if (ev === 'error') throw new Error((payload as { message?: string }).message ?? 'StuttBot nicht erreichbar');
+        }
+      }
+      if (!bot) throw new Error('Antwort unvollständig');
+      setProgress(null); setStreaming('');
       if (bot.sessionId) setSessionId(bot.sessionId);
       locationSent.current = true;
       const receipts = runUiActions(bot.ui);
@@ -321,13 +361,20 @@ export function StuttBot({
         window.setTimeout(() => startListening(true), 350);
       }
     } catch (err) {
-      addMessage({
-        role: 'assistant',
-        text: `Ich konnte gerade nicht antworten: ${(err as Error).message}. Versuch es bitte noch einmal.`,
-        error: true,
-      });
+      if ((err as Error).name === 'AbortError') {
+        addMessage({ role: 'assistant', text: 'Abgebrochen. Du kannst die Frage erneut senden.', at: new Date().toISOString() });
+      } else {
+        addMessage({
+          role: 'assistant',
+          text: `Ich konnte gerade nicht antworten: ${(err as Error).message}. Versuch es bitte noch einmal.`,
+          error: true,
+        });
+      }
     } finally {
+      abortRef.current = null;
       setBusy(false);
+      setProgress(null);
+      setStreaming('');
     }
   }, [addMessage, busy, getContext, input, locale, runUiActions, sessionId, startListening]);
 
@@ -346,8 +393,71 @@ export function StuttBot({
     if (a.url) window.open(a.url, '_blank', 'noopener,noreferrer');
   };
 
+  const shownMessages = chatQuery.trim() ? messages.filter((m) => m.text.toLowerCase().includes(chatQuery.trim().toLowerCase())) : messages;
+  const ctx = getContext();
+  const savedLocation = readSavedLocation();
+  const actionLog = messages.flatMap((m) => m.receipts ?? []);
+  void locVersion;
   const last = messages[messages.length - 1];
-  const showSuggestions = !busy && last?.role === 'assistant' && (last.suggestions?.length ?? 0) > 0;
+  const contextual = (() => {
+    const out: string[] = [];
+    for (const c of last?.cards ?? []) {
+      if (c.type === 'office') out.push('Gibt es ein Bürgerbüro mit kürzerer Wartezeit?');
+      if (c.type === 'route') out.push('Gibt es eine barrierefreie Alternative?');
+      if (c.type === 'events') out.push('Was ist bei Regen los?');
+      if (c.type === 'parking') out.push('Gibt es eine Alternative ohne Auto?');
+    }
+    return [...new Set(out)].slice(0, 3);
+  })();
+  const suggestions = (last?.suggestions?.length ?? 0) ? last!.suggestions! : contextual;
+  const showSuggestions = !busy && last?.role === 'assistant' && suggestions.length > 0;
+  const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+  const copyAnswer = async (m: ChatMessage) => {
+    try {
+      const text = [m.text, ...(m.sources ?? []).map((s) => `Quelle: ${s.name}${s.url ? ` (${s.url})` : ''}`)].join('\n\n');
+      await navigator.clipboard.writeText(text);
+      setCopiedId(m.id);
+      window.setTimeout(() => setCopiedId(null), 1600);
+    } catch { /* Clipboard verweigert */ }
+  };
+  const copyMarkdown = async (m: ChatMessage) => {
+    const lines = [m.text, '', '**Quellen**'];
+    for (const s of m.sources ?? []) lines.push(`- ${s.name}${s.url ? ` (${s.url})` : ''}${s.license ? ` – ${s.license}` : ''}`);
+    try { await navigator.clipboard.writeText(lines.join('\n')); setCopiedId(m.id); window.setTimeout(() => setCopiedId(null), 1600); } catch { /* egal */ }
+  };
+  const summarize = (m: ChatMessage) => {
+    const sentences = m.text.replace(/\s+/g, ' ').split(/(?<=[.!?])\s+/).slice(0, 3).join(' ');
+    addMessage({ role: 'assistant', text: `Kurzfassung: ${sentences}`, sources: m.sources, suggestions: ['Mehr Details', 'Quellen öffnen'] });
+  };
+  const explainPlain = async (m: ChatMessage) => {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/labor/werkzeug?id=leichte-sprache&text=${encodeURIComponent(m.text)}`);
+      const j = await r.json();
+      const text = (j.blocks ?? []).find((b: { type?: string; text?: string }) => b.type === 'text' && b.text)?.text;
+      if (!text) throw new Error('Keine einfache Fassung erhalten');
+      addMessage({ role: 'assistant', text, suggestions: ['Mehr Details', 'Quellen öffnen'] });
+    } catch (err) { addMessage({ role: 'assistant', text: `Einfache Fassung nicht verfügbar: ${(err as Error).message}.`, error: true }); }
+    finally { setBusy(false); }
+  };
+  const shareAnswer = async (m: ChatMessage) => {
+    const text = [m.text, ...(m.sources ?? []).map((s) => `Quelle: ${s.name}`)].join('\n\n');
+    try {
+      if (navigator.share) await navigator.share({ title: 'StuggiAI · Open Stuttgart', text });
+      else await navigator.clipboard.writeText(text);
+    } catch { /* Abbruch durch Nutzer */ }
+  };
+  const rate = (m: ChatMessage, value: 'up' | 'down') => {
+    setFeedback((prev) => {
+      const next = { ...prev, [m.id]: value };
+      try { localStorage.setItem('os-bot-feedback', JSON.stringify(next)); } catch { /* egal */ }
+      return next;
+    });
+  };
+  const clearChat = () => {
+    if (!messages.length) return;
+    if (window.confirm('Den sichtbaren Chatverlauf leeren? Die Karte bleibt unverändert.')) setMessages([]);
+  };
 
   return (
     <>
@@ -370,6 +480,12 @@ export function StuttBot({
             </div>
             <p>Fragen, zeigen, machen – sag einfach.</p>
           </div>
+          <button type="button" className="sb-close" onClick={() => setShowHelp((v) => !v)} aria-label="Fragehilfe" title="Was kann ich fragen?" aria-expanded={showHelp}>
+            <Icon name="help" size={18} />
+          </button>
+          <button type="button" className="sb-close" onClick={clearChat} aria-label="Chatverlauf leeren" title="Chat leeren" disabled={!messages.length}>
+            <Icon name="trash" size={17} />
+          </button>
           <button
             type="button"
             className={`sb-voice-toggle ${speakReplies ? 'on' : ''}`}
@@ -388,7 +504,28 @@ export function StuttBot({
           </button>
         </header>
 
-        <div className="sb-scroll" ref={scrollRef}>
+        {showHelp && (
+          <div className="sb-help" role="region" aria-label="Fragehilfe">
+            <strong>Was kann ich fragen?</strong>
+            <ul>
+              <li>„Wie komme ich von der Marienstraße 5 zum Marienplatz?“</li>
+              <li>„Welches Bürgerbüro hat jetzt die kürzeste Wartezeit?“</li>
+              <li>„Was geht heute Abend bei Regen?“</li>
+              <li>„Ist meine Adresse bei Starkregen gefährdet?“</li>
+              <li>„Zeig mir die Abfahrten am Charlottenplatz.“</li>
+            </ul>
+            {actionLog.length > 0 && (
+              <div className="sb-action-log">
+                <strong>Ausgeführte Aktionen</strong>
+                <ul>{actionLog.slice(-5).map((r) => <li key={r.actionId}><span>{r.label}</span>{r.undoable && <button type="button" onClick={() => onUndo(r.actionId)}>Rückgängig</button>}</li>)}</ul>
+              </div>
+            )}
+            <label className="sb-history-search"><Icon name="search" size={14} /><input value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} placeholder="Verlauf durchsuchen" aria-label="Chatverlauf durchsuchen" /></label>
+            <p>Tipp: Cmd/Ctrl+J öffnet mich überall. Esc schließt.</p>
+          </div>
+        )}
+
+        <div className="sb-scroll" ref={scrollRef} role="log" aria-live="polite" aria-relevant="additions" aria-label="Unterhaltung mit StuggiAI">
           {messages.length === 0 && (
             <div className="sb-hero">
               <StuggiMark size={92} badge title="StuggiAI" />
@@ -411,7 +548,7 @@ export function StuttBot({
             </div>
           )}
 
-          {messages.map((m) => (
+          {shownMessages.map((m) => (
             <div key={m.id} className={`sb-msg sb-msg--${m.role} ${m.error ? 'is-error' : ''}`}>
               {m.role === 'assistant' && (
                 <div className="sb-avatar">
@@ -421,7 +558,26 @@ export function StuttBot({
               <div className="sb-bubble-wrap">
                 <div className="sb-bubble">
                   <p>{m.text}</p>
-                  {m.role === 'assistant' && <div className="sb-speak"><SpeakButton text={m.text} compact /></div>}
+                  {m.at && <time className="sb-time" dateTime={m.at}>{new Date(m.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</time>}
+                  {m.role === 'assistant' && (
+                    <div className="sb-speak">
+                      <SpeakButton text={m.text} compact />
+                      <button type="button" className="sb-mini-btn" onClick={() => void copyAnswer(m)} aria-label="Antwort kopieren" title="Antwort kopieren">
+                        <Icon name={copiedId === m.id ? 'check' : 'copy'} size={14} /> {copiedId === m.id ? 'Kopiert' : 'Kopieren'}
+                      </button>
+                      <button type="button" className="sb-mini-btn" onClick={() => void copyMarkdown(m)} aria-label="Antwort als Markdown kopieren" title="Als Markdown kopieren">MD</button>
+                      <button type="button" className="sb-mini-btn" onClick={() => summarize(m)} aria-label="Antwort zusammenfassen" title="Auf drei Sätze kürzen">Kürzen</button>
+                      <button type="button" className="sb-mini-btn" onClick={() => void explainPlain(m)} aria-label="Antwort in einfacher Sprache" title="Einfache Sprache">Einfach</button>
+                      {m.id === last?.id && lastUser && (
+                        <button type="button" className="sb-mini-btn" onClick={() => void send(lastUser.text, undefined, { silentUser: true })} disabled={busy} aria-label="Antwort neu erzeugen">
+                          <Icon name="refresh" size={14} /> Neu
+                        </button>
+                      )}
+                      <button type="button" className="sb-mini-btn" onClick={() => void shareAnswer(m)} aria-label="Antwort teilen"><Icon name="share" size={14} /> Teilen</button>
+                      <button type="button" className={`sb-mini-btn ${feedback[m.id] === 'up' ? 'is-on' : ''}`} onClick={() => rate(m, 'up')} aria-pressed={feedback[m.id] === 'up'} aria-label="Antwort war hilfreich">Hilfreich</button>
+                      <button type="button" className={`sb-mini-btn ${feedback[m.id] === 'down' ? 'is-on' : ''}`} onClick={() => rate(m, 'down')} aria-pressed={feedback[m.id] === 'down'} aria-label="Antwort war nicht hilfreich">Nicht hilfreich</button>
+                    </div>
+                  )}
                   {m.cards?.map((card, i) => <BotCardView key={`${card.type}-${i}`} card={card} onAction={onAction} />)}
                   {(m.actions?.length ?? 0) > 0 && (
                     <div className="sb-actions">
@@ -469,7 +625,7 @@ export function StuttBot({
                   )}
                   {((m.sources?.length ?? 0) > 0 || (m.limits?.length ?? 0) > 0) && (
                     <div className="sb-sources">
-                      {m.sources?.map((s) => <span key={s.name} title={s.license ?? undefined}>{s.name}</span>)}
+                      {m.sources?.map((s) => s.url ? <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer" title={s.license ?? undefined}>{s.name}</a> : <span key={s.name} title={s.license ?? undefined}>{s.name}</span>)}
                       {m.limits?.map((l) => <span key={l} className="is-limit">{l}</span>)}
                     </div>
                   )}
@@ -481,9 +637,11 @@ export function StuttBot({
             </div>
           ))}
 
+          {chatQuery && shownMessages.length === 0 && <p className="sb-history-empty">Keine Nachricht gefunden.</p>}
+
           {showSuggestions && (
             <div className="sb-followups">
-              {last.suggestions!.map((s) => (
+              {suggestions.map((s) => (
                 <button key={s} type="button" className="sb-chip" onClick={() => void send(s)} disabled={busy}>
                   {s}
                 </button>
@@ -496,6 +654,8 @@ export function StuttBot({
               <div className="sb-avatar"><StuggiMark size={28} badge tone="accent" /></div>
               <div className="sb-typing" aria-label="StuggiAI arbeitet">
                 <span /><span /><span />
+                {streaming ? <em className="sb-stream">{streaming.slice(-280)}</em> : progress ? <em className="sb-progress">{progress}</em> : null}
+                <button type="button" className="sb-stop" onClick={() => abortRef.current?.abort()}>Stopp</button>
               </div>
             </div>
           )}
@@ -542,9 +702,16 @@ export function StuttBot({
             <span className="sb-hf-dot" aria-hidden />
             <span>Freihändig</span>
           </button>
-          <span className="sb-voice-hint">
-            {speechRecognitionSupported() ? 'Sprache bleibt im Browser' : 'Tippen ist der Weg'}
+          <span className="sb-voice-hint" role="status" aria-live="polite">
+            {listening ? 'Mikrofon aktiv – sprich jetzt' : handsFree ? 'Freihändig aktiv' : speakReplies ? 'Antworten werden vorgelesen' : (speechRecognitionSupported() ? 'Sprache bleibt im Browser' : 'Tippen ist der Weg')}
           </span>
+        </div>
+
+        <div className="sb-context" aria-label="Aktueller Kontext">
+          <span className="sb-context-chip"><Icon name="pin" size={12} /> {savedLocation?.label ?? 'Kein Ort gemerkt'}</span>
+          <span className="sb-context-chip">{ctx.module ?? 'Karte'}{ctx.focus ? ` · ${ctx.focus}` : ''}</span>
+          <span className="sb-context-chip">{ctx.localTime?.slice(0, 5)}</span>
+          {savedLocation && <button type="button" className="sb-context-clear" onClick={() => { try { localStorage.removeItem('os-adresse'); } catch { /* egal */ } setLocVersion((v) => v + 1); }} aria-label="Gemerkten Ort löschen">Ort löschen</button>}
         </div>
 
         <form

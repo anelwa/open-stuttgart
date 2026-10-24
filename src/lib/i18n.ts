@@ -80,6 +80,12 @@ const EN: Record<string, string> = {
   'Unterwegs am Abend': 'Out and about in the evening', 'Mensen und Hochschulgastronomie': 'University canteens',
   'Warngebiete (NINA / MoWaS)': 'Warning areas (NINA / MoWaS)', 'Flugverkehr (ADS-B)': 'Air traffic (ADS-B)',
   'Kaltluftabfluss (Klimaatlas)': 'Cold air flow (climate atlas)', 'Wohnlage & Satzung': 'Housing area & ordinances',
+  Stadtlabor: 'City lab', Werkzeuge: 'Tools', Quellen: 'Sources', Verbesserungen: 'Improvements', Fortschritt: 'Progress',
+  'So funktioniert das Stadtlabor': 'How the city lab works', 'Quellen & Lizenzen': 'Sources & licences',
+  'Über 100 neue öffentliche Schnittstellen und Datensätze: amtliche Statistik, WFS-Layer, Landesdaten und offene APIs. Alle mit Lizenz und Quellenangabe.':
+    'More than 100 new public interfaces and datasets: official statistics, WFS layers, state data and open APIs. All with licence and attribution.',
+  '100 Werkzeuge, die aus den offenen Daten konkrete Antworten machen. Jedes Ergebnis nennt Quelle, Lizenz und Grenzen.':
+    '100 tools that turn open data into concrete answers. Every result names its source, licence and limits.',
 };
 
 const KEY = 'os-sprache';

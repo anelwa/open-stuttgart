@@ -127,6 +127,17 @@ export const ANLIEGEN: Anliegen[] = [
     primary: 'Jetzt ansehen',
   },
   {
+    id: 'labor',
+    short: 'Stadtlabor',
+    label: 'Stadtlabor & Daten',
+    hint: 'Über 100 neue Quellen, 100 Werkzeuge: Kiez, Umwelt, Wissen, Alltag',
+    icon: 'flask',
+    module: 'labor',
+    focus: 'werkzeuge',
+    layers: ['wissen'],
+    primary: 'Werkzeug öffnen',
+  },
+  {
     id: 'wissen',
     short: 'Stadtwissen',
     label: 'Stadtwissen & Transparenz',
@@ -153,4 +164,5 @@ export const ALLE_THEMEN = [
   { id: 'spiel', label: 'Stadtspiel', icon: 'compass', hint: 'Fünf Routen, Antworten vor Ort, ein Routenbuch' },
   { id: 'sun', label: 'Sonne', icon: 'sunset', hint: 'Verschattung, Höhenlagen, Aussicht' },
   { id: 'wissen', label: 'Stadtwissen', icon: 'layers', hint: 'WFS-Layer, Statistik, Transparenz, Feeds, Standards' },
+  { id: 'labor', label: 'Stadtlabor', icon: 'flask', hint: 'Über 100 neue Quellen und 100 Werkzeuge für konkrete Fragen' },
 ];

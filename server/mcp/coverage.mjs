@@ -12,6 +12,7 @@ export const COVERAGE = {
     { id: 'address', label: 'Adressprofil', status: 'cached', note: 'Geoserver, Statistisches Amt; 30 Tage je Ort' },
     { id: 'knowledge', label: 'Seiten, Dokumente, Kontakte', status: 'cached', note: 'lokale SQLite/FTS5-Suche' },
     { id: 'open_data', label: 'WFS-Layer und offene Kataloge', status: 'live', note: 'Geoserver, GovData, CKAN, KOMUNIS' },
+    { id: 'labor', label: 'Stadtlabor: über 100 Quellen, 100 Werkzeuge, 100 Verbesserungen', status: 'live', note: 'CKAN, WFS, LUBW, LGL, Erdbeben, Wetter, Satelliten, Kultur, Wissen; Werkzeuge mit Quellen und Grenzen; Verbesserungsregister' },
     { id: 'nature', label: 'Arten, Bäume, Fairteiler', status: 'live', note: 'iNaturalist, GBIF, Baumkataster, foodsharing' },
     { id: 'participation', label: 'Bebauungspläne, Wahlen, Verfahren', status: 'mixed', note: 'Geodaten und amtliche Dateien; Beteiligungsportal ohne offenen Feed' },
     { id: 'booking', label: 'Terminbuchung', status: 'link-only', note: 'keine offene API für freie Slots; nur Link' },

@@ -893,3 +893,9 @@
   font-weight: 700;
   text-decoration: none;
 }
+
+/* Kiosk: größere Zeilen und klarere Hierarchie für den Blick aus einigen Metern. */
+.kiosk-list-main strong { font-size: clamp(18px, 1.55vw, 26px); line-height: 1.2; }
+.kiosk-list-main small { font-size: clamp(12px, 1vw, 16px); }
+.kiosk-list .kiosk-time { font-size: clamp(15px, 1.2vw, 20px); }
+.kiosk-empty { font-size: clamp(15px, 1.2vw, 19px); }
