@@ -2,7 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 import { usePolling, type Polled } from './api';
 import type { Radar } from './rain';
 import type { Kessel } from '../components/Kessel';
-import type { AirStation, BartourenResponse, EventsResponse, FlugDaten, KaltluftDaten, NinaWarnung, ParkingSite, Place, Roadwork, SharingResponse, TrafficItem, UnfallAntwort, WanderwegeAntwort, Water, Weather } from './types';
+import type { AirStation, BartourenResponse, EventsResponse, FlugDaten, KaltluftDaten, NinaWarnung, ParkingSite, Place, Roadwork, SharingResponse, TrafficItem, UmlandAntwort, UnfallAntwort, WanderwegeAntwort, Water, Weather } from './types';
 
 export interface AppData {
   parking: Polled<{ sites: ParkingSite[]; fetchedAt: string; source: string }>;
@@ -23,6 +23,7 @@ export interface AppData {
   unfaelle: Polled<UnfallAntwort>;
   wanderwege: Polled<WanderwegeAntwort>;
   bartouren: Polled<BartourenResponse>;
+  umland: Polled<UmlandAntwort>;
   eventDate: string | null;
   setEventDate: (d: string | null) => void;
 }
@@ -57,6 +58,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     unfaelle: usePolling('/api/unfaelle', 24 * 3600_000),
     wanderwege: usePolling('/api/wanderwege', 24 * 3600_000),
     bartouren: usePolling('/api/bartouren', 30 * 60_000),
+    umland: usePolling('/api/umland/ziele', 24 * 3600_000),
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

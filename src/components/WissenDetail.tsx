@@ -33,6 +33,8 @@ export function objectUrl(sel: Selection): string {
     u.searchParams.set('o', 'water');
   } else if (sel.type === 'event') {
     u.searchParams.set('o', 'event'); u.searchParams.set('id', sel.id);
+  } else if (sel.type === 'umland') {
+    u.searchParams.set('o', 'umland'); u.searchParams.set('id', sel.id);
   } else if (sel.type === 'facility') {
     u.searchParams.set('o', 'facility'); u.searchParams.set('cat', sel.item.cat); u.searchParams.set('id', sel.item.id);
   } else if (sel.type === 'verwaltung_gebaeude') {

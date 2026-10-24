@@ -37,17 +37,17 @@ function eventEnd(e: CultureEvent): { t: number; estimated: boolean } | null {
   return { t: s + 150 * 60_000, estimated: true };
 }
 
-export function GettingThere({ lngLat, select, flyTo, exclude, label }: Nav & { lngLat: [number, number]; exclude?: string; label?: string }) {
+export function GettingThere({ lngLat, select, flyTo, exclude, label, maxM = 1500 }: Nav & { lngLat: [number, number]; exclude?: string; label?: string; maxM?: number }) {
   const stops = useStops();
   const { parking } = useData();
   const [lon, lat] = lngLat;
-  const near = useMemo(() => nearestStops(stops, [lon, lat]).filter((n) => n.stop.properties.id !== exclude), [stops, lon, lat, exclude]);
+  const near = useMemo(() => nearestStops(stops, [lon, lat], 3, maxM).filter((n) => n.stop.properties.id !== exclude), [stops, lon, lat, exclude, maxM]);
   const parks = useMemo(() => within((parking.data?.sites ?? []).filter((p) => p.free != null), [lon, lat], 900).slice(0, 2), [parking.data, lon, lat]);
   if (!stops.length) return null;
   return (
     <Section title="Anreise">
       <RouteButtons to={{ lat, lon, label: label ?? 'Ziel' }} />
-      {near.length === 0 && <p className="muted small">Keine Haltestelle im Umkreis von 1,5 km.</p>}
+      {near.length === 0 && <p className="muted small">Keine Haltestelle im Umkreis von {(maxM / 1000).toLocaleString('de-DE', { maximumFractionDigits: 1 })} km.</p>}
       <ul className="near-list">
         {near.map(({ stop, walk }) => {
           const c = stop.geometry.coordinates as [number, number];

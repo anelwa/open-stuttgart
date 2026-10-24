@@ -10,7 +10,7 @@ export const aerialTiles = (year: string) =>
 
 export const BLANK_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
-export type OverlayKey = 'network' | 'stops' | 'parking' | 'sharing' | 'roadworks' | 'bike' | 'air' | 'water' | 'events' | 'places' | 'sun' | 'radar' | 'aerial' | 'nearby' | 'live' | 'route' | 'vehicles' | 'traffic' | 'warnung' | 'flug' | 'kaltluft' | 'unfall' | 'hike' | 'wissen' | 'bartouren' | 'spiel';
+export type OverlayKey = 'network' | 'stops' | 'parking' | 'sharing' | 'roadworks' | 'bike' | 'air' | 'water' | 'events' | 'places' | 'sun' | 'radar' | 'aerial' | 'nearby' | 'live' | 'route' | 'vehicles' | 'traffic' | 'warnung' | 'flug' | 'kaltluft' | 'unfall' | 'hike' | 'wissen' | 'bartouren' | 'spiel' | 'umland';
 
 export const OVERLAY_LAYERS: Record<OverlayKey, string[]> = {
   bike: ['bike-routes'],
@@ -39,6 +39,7 @@ export const OVERLAY_LAYERS: Record<OverlayKey, string[]> = {
   wissen: ['wissen-fill', 'wissen-line', 'wissen-dot', 'wissen-label'],
   spiel: ['spiel-route-casing', 'spiel-route', 'spiel-area', 'spiel-area-line', 'spiel-station', 'spiel-station-label'],
   bartouren: ['bartour-casing', 'bartour-line', 'bartour-stop', 'bartour-stop-label'],
+  umland: ['umland-dot'],
 };
 
 export const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -71,6 +72,7 @@ export function addOverlays(map: MlMap, theme: Theme, visible: Record<OverlayKey
   map.addSource('air', { type: 'geojson', data: EMPTY });
   map.addSource('water', { type: 'geojson', data: EMPTY });
   map.addSource('places', { type: 'geojson', data: EMPTY });
+  map.addSource('umland', { type: 'geojson', data: EMPTY });
   map.addSource('events', { type: 'geojson', data: EMPTY });
   map.addSource('bartouren', { type: 'geojson', data: EMPTY });
   map.addSource('nearby', { type: 'geojson', data: EMPTY });
@@ -321,6 +323,7 @@ export function addOverlays(map: MlMap, theme: Theme, visible: Record<OverlayKey
     paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 2 },
   });
 
+
   // Veranstaltungen des gewählten Tages, mit Beginnzeit
   // Einrichtungen der Nähe-Suche (Farbe je Kategorie aus den Daten)
   map.addLayer({
@@ -459,6 +462,27 @@ export function addOverlays(map: MlMap, theme: Theme, visible: Record<OverlayKey
       'text-size': 11.5,
       'text-anchor': 'left',
       'text-offset': [1.2, -1.4],
+      'text-optional': true,
+    },
+    paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 2 },
+  });
+
+
+  // Ausflugsziele im Umland: Kategorie-Symbole, Namen ab mittlerer Zoomstufe
+  map.addLayer({
+    id: 'umland-dot', type: 'symbol', source: 'umland',
+    layout: {
+      ...vis('umland'),
+      'icon-image': ['concat', 'umland-', ['get', 'kategorie']],
+      'icon-size': zl([[8, 0.62], [12, 0.88], [16, 1.08]]),
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+      'text-field': ['step', ['zoom'], '', 11, ['get', 'name']],
+      'text-font': ['Noto Sans Bold'],
+      'text-size': zl([[11, 10.5], [15, 12]]),
+      'text-anchor': 'top',
+      'text-offset': [0, 1.15],
+      'text-max-width': 9,
       'text-optional': true,
     },
     paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 2 },
@@ -707,4 +731,4 @@ export function setOverlayVisibility(map: MlMap, key: OverlayKey, on: boolean) {
   }
 }
 
-export const INTERACTIVE_LAYERS = ['stops-rail', 'stops-bus', 'parking-icon', 'parking-dot', 'roadworks', 'share-point', 'share-cluster', 'air-circle', 'water-gauge', 'events-pin', 'bartour-stop', 'places-icon', 'nearby-dot', 'live-dot', 'vehicles-dot', 'traffic-dot', 'traffic-line', 'flug-dot', 'warnung-label', 'kaltluft-line', 'unfall-dot', 'hike-line', 'wissen-dot', 'wissen-line', 'wissen-fill'];
+export const INTERACTIVE_LAYERS = ['stops-rail', 'stops-bus', 'parking-icon', 'parking-dot', 'roadworks', 'share-point', 'share-cluster', 'air-circle', 'water-gauge', 'events-pin', 'bartour-stop', 'places-icon', 'umland-dot', 'nearby-dot', 'live-dot', 'vehicles-dot', 'traffic-dot', 'traffic-line', 'flug-dot', 'warnung-label', 'kaltluft-line', 'unfall-dot', 'hike-line', 'wissen-dot', 'wissen-line', 'wissen-fill'];

@@ -120,6 +120,12 @@ export const SOURCES = {
     license: 'Quellenangabe Stadt Stuttgart',
     note: 'Kaltluftleitbahnen und Klimatope.',
   },
+  umland: {
+    name: 'Ausflugsziele im Umland (redaktionell)',
+    url: 'https://openstuttgart.de/',
+    license: 'Zusammenstellung und Texte: EUPL-1.2; Bilder je Dateiseite',
+    note: 'Kuratierte Ausflugsziele in der Region Stuttgart, ergänzt um Haltestellen, Wetter und Wikipedia.',
+  },
   wikidata: {
     name: 'Wikidata',
     url: 'https://www.wikidata.org/',

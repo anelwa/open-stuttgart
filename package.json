@@ -25,6 +25,7 @@
     "check:kontakte": "node scripts/check-kontakte.mjs",
     "check:wasgeht": "node scripts/check-wasgeht-quellen.mjs",
     "check:bot": "node scripts/bot-eval.mjs",
+    "check:umland": "node scripts/check-umland.mjs",
     "data:spiel": "node scripts/build-spiel-data.mjs"
   },
   "engines": {

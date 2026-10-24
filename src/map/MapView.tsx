@@ -8,7 +8,7 @@ import { BLANK_PNG, aerialTiles, addOverlays, setOverlayVisibility, INTERACTIVE_
 import { registerIcons } from './icons';
 import { getVehicleTrips, subscribeVehicles, vehiclePaths, vehiclePositions } from '../lib/vehicles';
 import { fmtTime, occupancy } from '../lib/format';
-import type { AirStation, Bartour, CultureEvent, Facility, Flugzeug, KaltluftPunkt, NinaWarnung, ParkingSite, Place, Roadwork, Selection, SharingItem, TrafficItem, Unfall, Wanderweg, Water } from '../lib/types';
+import type { AirStation, Bartour, CultureEvent, Facility, Flugzeug, KaltluftPunkt, NinaWarnung, ParkingSite, Place, Roadwork, Selection, SharingItem, TrafficItem, UmlandZiel, Unfall, Wanderweg, Water } from '../lib/types';
 
 export interface MapData {
   parking: ParkingSite[] | null;
@@ -20,6 +20,7 @@ export interface MapData {
   events: CultureEvent[] | null;
   bartouren: Bartour[] | null;
   places: Place[] | null;
+  umland: UmlandZiel[] | null;
   sunImage: string | null;
   nearby: { items: Facility[]; color: Record<string, string> } | null;
   live: (Facility & { level: string; short: string })[] | null;
@@ -90,6 +91,10 @@ function toGeo(data: MapData) {
     water: fc(data.water ? [pt(data.water.lon, data.water.lat, { value: data.water.value })] : []),
     bike: data.bike ?? fc([]),
     places: fc((data.places ?? []).map((p) => pt(p.lon, p.lat, { id: p.id, name: p.name, kind: p.kind, rank: p.rank }))),
+    umland: fc((data.umland ?? []).map((z) => pt(z.lon, z.lat, {
+      id: z.id, name: z.name, kategorie: z.kategorie, kategorieLabel: z.kategorieLabel,
+      farbe: z.farbe, kreis: z.kreis, gemeinde: z.gemeinde, kurz: z.kurz,
+    }))),
     nearby: fc((data.nearby?.items ?? []).map((f, i) => pt(f.lon, f.lat, { id: f.id, i, name: f.name, closed: !!f.closed, rank: i, color: data.nearby?.color[f.cat] ?? '#26262C' }))),
     events: fc(eventVenues(data.events ?? [])),
     bartouren: fc((data.bartouren ?? []).flatMap((t) => [
@@ -202,6 +207,9 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
       const p = propsRef.current.padding;
       // Das Panel verdeckt je nach Ansicht einen Teil der Karte. Der Ausschnitt wird in die
       // tatsächlich sichtbare Fläche gelegt, damit Start, Ziel und Verlauf nicht darunter liegen.
+      // Vorher die Karten-Padding zurücksetzen: fitBounds würde sonst das bereits gesetzte
+      // Padding und die hier übergebenen Ränder doppelt zählen.
+      m.setPadding({ top: 0, left: 0, right: 0, bottom: 0 });
       m.fitBounds(bounds, {
         padding: {
           top: 34,
@@ -278,6 +286,7 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
     (m.getSource('water') as GeoJSONSource).setData(g.water);
     (m.getSource('bike') as GeoJSONSource).setData(g.bike);
     (m.getSource('places') as GeoJSONSource).setData(g.places);
+    (m.getSource('umland') as GeoJSONSource | undefined)?.setData(g.umland);
     (m.getSource('events') as GeoJSONSource).setData(g.events);
     (m.getSource('bartouren') as GeoJSONSource | undefined)?.setData(g.bartouren);
     (m.getSource('nearby') as GeoJSONSource).setData(g.nearby);
@@ -390,6 +399,7 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
         case 'air-circle': return `Luft ${pr.name}: ${pr.label}`;
         case 'water-gauge': return `Neckar Pegel Cannstatt: ${pr.value} cm`;
         case 'places-icon': return String(pr.name);
+        case 'umland-dot': return `${pr.name} · ${pr.kategorieLabel ?? pr.kategorie}`;
         case 'nearby-dot': return String(pr.name);
         case 'live-dot': return `${pr.name}: ${pr.live}`;
         case 'flug-dot': return `${pr.callsign}${pr.type ? ` (${pr.type})` : ''} · ${pr.alt} ft${pr.heli ? ' · Hubschrauber' : ''}`;
@@ -451,6 +461,7 @@ export const MapView = forwardRef<MapHandle, Props>(function MapView(props, ref)
           type: 'bartour-stop', tourId: String(pr.tourId), stopIndex: Number(pr.stopIndex), lngLat: coord,
         }); break;
         case 'places-icon': propsRef.current.onSelect({ type: 'place', id: String(pr.id) }); break;
+        case 'umland-dot': propsRef.current.onSelect({ type: 'umland', id: String(pr.id), lngLat: coord }); break;
         case 'nearby-dot': {
           const item = propsRef.current.data.nearby?.items[Number(pr.i)];
           if (item) propsRef.current.onSelect({ type: 'facility', item });

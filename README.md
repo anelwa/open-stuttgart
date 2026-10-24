@@ -68,6 +68,7 @@ optionaler Gancio-Anbindung — steht in [`docs/deploy-dokploy.md`](docs/deploy-
 | Verwaltung | Verwaltungsleistungen (Voraussetzungen, Unterlagen, Gebühren, Bearbeitungsdauer, Ablauf, Rechtsgrundlage), Online-Dienste, Terminbuchung und Gebäude mit Dienststellen, Öffnungszeiten („jetzt geöffnet“) und Live-Wartezeit der Bürgerbüros (`/api/verwaltung/*`) | stuttgart.de (Sitepark/citygov-Kopfdaten und Leistungsseiten), Wartezeitanzeige der Bürgerbüros |
 | StuggiAI (StuttBot) | Bürgeranliegen-Assistent: versteht Freitext, fragt fehlende Angaben ab, findet die Leistung, empfiehlt das schnellste Bürgerbüro aus Wartezeit plus Anfahrt und verlinkt Termin/Online-Dienst. Mit eigenem Büsten-Zeichen und deterministischem Fallback ohne API-Key (`POST /api/bot`) | Gemini Flash-Lite (nur Sprachschicht), stuttgart.de-Verwaltungsdatensatz, Live-Wartezeiten, EFA-BW/Valhalla |
 | In der Nähe | Kitas, alle Schularten (Grund-, Real-, Werkreal-, Gemeinschafts-, Förder-, Berufs- und Gymnasien), Hochschulen, Volkshochschulen, sonstige Bildungseinrichtungen, Spielplätze, Ferienprogramm, digitale Teilhabe, Toiletten, Trinkbrunnen, Mineral- und Heilquellen, Hofläden/Direktvermarkter, kühle Orte, Jugend-Chillorte (inkl. umgenutzter Orte), Fahrrad- und Lastenrad-Abstellanlagen, E-Scooter-Abstellzonen, Behindertenparkplätze, Wertstoffhöfe, Schadstoffmobil, Grüngutannahme, RECUP-Mehrweg-Standorte, Notfall-Treffpunkte und Leuchttürme, Aktion Gute Fee, Obst- und Nussbäume, Minigolf, Kunst, Musik, Theater und Kinos; Vereine und Engagement (öffentliche Sportanlagen, Bürgerhäuser, Jugendtreffs, Kulturorte); Weinwanderwege, Innenstadtrundweg und MTB-Downhill „Woodcracker“ (verknüpft mit der Zahnradbahn „Zacke“); Geocaching über Opencaching.de; Ladepunkte mit Grünstrom-Anteil; Essen und Trinken mit Filter „vegan“/„vegetarisch“ (nur oder auch), dazu Mensen | Geoserver der Stadt (CC BY 4.0), OCPDB über MobiData BW, OpenStreetMap (Auszug 17.10.2026, ODbL), OpenMensa, Fraunhofer ISE Energy-Charts, Opencaching.de |
+| Umland | 36 kuratierte Ausflugsziele in den fünf Landkreisen der Region: Schlösser, Burgen, Klöster, Museen, Altstädte, Naturziele, Seen, Weinorte und Thermen; mit Zeitbedarf, Preis- und Saisonhinweis, nächster VVS-Haltestelle, Wetter am Ziel und Wikipedia-Kurztext; als Kartenebene, Filterliste und Detailansicht | redaktionelle Auswahl (Stand 24.10.2026), VVS-Soll-Fahrplan (GTFS), Open-Meteo (CC BY 4.0), Wikipedia (CC BY-SA 4.0), Wikimedia Commons |
 | Bar-Touren | Sieben kuratierte Routen durch Bars, Weinbars, Biergärten und Clubs: Leonhardsviertel, Cocktailbars, West/Süd, Karlshöhe, Ostend, Bad Cannstatt und die Nachtlinie; mit Dramaturgie, Öffnungszeiten, Fußwegen, Barrierefreiheit, alkoholfreien Optionen, Regenvarianten, Heimweg und GPX | OpenStreetMap-Auszug (`public/data/gastro.geojson`, ODbL), `server/data/bartouren.json`, Venue-Websites; redaktionell kuratiert |
 | Unfallatlas | 1.635 Unfälle mit Personenschaden in Stuttgart (2025), davon 8 tödliche, 500 mit Rad, 241 mit Fuß; Kartenebene nach Schwere, Schwerpunkte, Unfälle im 30-Meter-Korridor einer Route und im 300-Meter-Umkreis einer Adresse | Unfallatlas der Statistischen Ämter des Bundes und der Länder (dl-de/by-2-0) |
 | Stadtgedächtnis | Archiv der öffentlichen Veränderungen: Meldungen, amtliche Bekanntmachungen, neu erfasste OpenStreetMap-Orte und Änderungen an Verwaltungsseiten, mit Datum, Quelle, Lizenz und Bezirksfilter; als RSS abonnierbar | Stadt, Feuerwehr, Polizei, SWR, Kessel.TV, Amtliche Bekanntmachungen, OpenStreetMap (ODbL), Verwaltungsseiten |
@@ -89,6 +90,11 @@ optionaler Gancio-Anbindung — steht in [`docs/deploy-dokploy.md`](docs/deploy-
 - **Ausgabe:** Jeder freigegebene Layer ist als GeoJSON und RSS abrufbar; „Was geht“ bleibt als iCal, das Stadtgedächtnis und FragDenStaat als RSS, das Archiv als CSV. Detailansichten teilen einen permanenten Link (`?o=…`); das QR-Schild wird lokal im Browser erzeugt und gedruckt. `?display=kiosk` startet das Public-Display-Profil.
 - **Standards:** Die App führt in „Ausgabe“ eine Matrix, was live integriert ist, was nur verlinkt wird und was einen Key oder eine Freigabe braucht. Die vollständige Zuordnung steht in [`docs/schnittstellen-integration.md`](docs/schnittstellen-integration.md).
 
+### Umland und die Region
+
+- **Ausflugsziele:** `/api/umland/ziele` führt 36 kuratierte Ziele in den Landkreisen Böblingen, Esslingen, Göppingen, Ludwigsburg und Rems-Murr-Kreis, mit Filtern nach Kategorie, Kreis, Stichwort, Nähe und Familiengeeignetheit. `/api/umland/ziele/<id>` ergänzt Wikipedia-Kurztext, Wetter am Ziel und die nächsten Haltestellen; `/api/umland/ziele.geojson` liefert die Punkte für die Karte, `/api/umland/wetter` eine Punktvorhersage für die ganze Region. Die Kartenebene `umland` zeigt die Ziele als Kategorie-Symbole, das Modul „Umland“ bietet Filter, Liste und Detailansicht. Datensatz, Quellen, Grenzen und Pflege: [`docs/umland.md`](docs/umland.md).
+- **Haltestellen im Umland:** Der Haltestellenbestand enthält außerhalb Stuttgarts nur Schienenhalte. Für Busse im Umland die Verbindungssuche im Modul „Weg“ nutzen; sie fragt EFA-BW für das gesamte VVS-Gebiet. Deshalb zeigt ein Ziel ohne Bahnhalt in 3 km keine Haltestelle an, statt einen langen Fußweg zu empfehlen.
+
 ### Unfallatlas, Stadtgedächtnis und die neuen Freizeitdaten
 
 - **Unfallatlas:** `npm run data:unfall` lädt den aktuellen Unfallatlas (Standard 2025), filtert den Stadtkreis Stuttgart und schreibt `server/data/unfaelle-stuttgart.json` (dl-de/by-2-0). Die Karte zeigt die Punkte nach Schwere, die Adressansicht zählt Unfälle im 300-Meter-Umkreis, und im Routenmodul werden Unfälle im 30-Meter-Korridor der gewählten Verbindung gezählt. Es sind nur Unfälle mit Personenschaden, keine Sachschäden.
@@ -96,6 +102,7 @@ optionaler Gancio-Anbindung — steht in [`docs/deploy-dokploy.md`](docs/deploy-
 - **Wanderwege:** `/api/wanderwege` liefert Weinwanderwege, Innenstadtrundweg und Woodpecker-Trail aus dem Geoserver sowie die OSM-Routenrelationen (Blaustrümpflerweg, Rößleweg, 4-Burgen-Weg, Georg-Fahrbach-Weg, HW 5, Stuttgarter Weinwanderwege) mit Länge, Auf-/Abstieg, Start/Ziel, Haltestellen und Brunnen/Toiletten im 150-Meter-Korridor. Die OSM-Datei wird mit `npm run data:wanderwege` erneuert. Die Ebene `hike` zeigt alle Linien, im Modul „Weg“ lassen sie sich öffnen.
 - **Vereine und Engagement:** neue Kategorien in „Nähe“ für öffentliche Sportanlagen, Bürgerhäuser, Jugendtreffs, Kultur- und Musikorte. Bewusst nur öffentliche Adressen, keine Vorstands-Wohnadressen.
 - **Kollektive:** kuratierte Stammliste in `server/data/kollektive.json` plus Erkennung von `kollektiv:<slug>` und Veranstalter-Nennungen in Gancio-Terminen. Filter „Kollektive & freie Szene“ in „Was geht“.
+- **Umland:** Die Auswahl ist redaktionell und nicht vollständig; Öffnungszeiten, Preise und Zugänglichkeit sind Momentaufnahmen. Das Wetter ist eine Modellvorhersage, keine amtliche Warnung. Die Karte zeigt Punkte, keine Navigation. Prüfung mit `npm run check:umland`.
 - **Geocaching:** `/api/geocaches` liest Opencaching.de höchstens alle 12 Stunden und zeigt nur Startkoordinaten, D/T-Wertung, Größe und Listing-Link. Die Quelle war bei der Einrichtung nicht erreichbar (HTTP 503); ein lokaler Bestand und ein optionaler JSON-Export (`OS_OPENCACHING_JSON`) sind vorbereitet. Keine Spoiler, kein Geocaching.com-Scraping.
 - **Vegan/vegetarisch:** In „Essen und Trinken“ filtern „Vegan“ und „Vegetarisch“ nach `diet:vegan`/`diet:vegetarian` aus OpenStreetMap. „Nur komplett“ trennt `only` von `yes`.
 - **Einkaufen und Geld:** `npm run data:pois` lädt den BBBike-Extrakt Stuttgart (rund 138 MB, ODbL), schneidet ihn mit der amtlichen Stadtgrenze zu und schreibt `server/data/pois-stuttgart.json`. Die Kategorien in „Nähe“ zeigen Supermärkte, Bäckereien, Kioske, Metzgereien, Obst und Gemüse, Tabakläden, Hofläden aus OpenStreetMap, alle Geschäfte, Banken, Geldautomaten und Zigarettenautomaten, jeweils nächste zuerst, mit Öffnungszeiten und Rollstuhl-Angabe soweit erfasst. Für Zigarettenautomaten gibt es kein amtliches Register; die Liste ist entsprechend unvollständig.
@@ -185,8 +192,8 @@ Zeitstand an jeder Antwort.
 - **Eigener Prozess:** `npm run mcp:http` → `http://127.0.0.1:8788/mcp`.
 - **stdio:** `node server/mcp/stdio.mjs` für Claude Desktop, Cursor und andere lokale Clients
   (direkt starten, nicht über `npm run`, damit nur JSON-RPC auf stdout landet).
-- **Umfang:** 34 Werkzeuge (Suche, Verwaltung, Adressprofil, Weg/Abfahrten, Verkehr, Parken,
-  Termine, Kultur, Umwelt, Gesundheit, WFS/Open Data), 4 Ressourcen, 6 Vorlagen und 6 Prompts.
+- **Umfang:** 35 Werkzeuge (Suche, Verwaltung, Adressprofil, Weg/Abfahrten, Verkehr, Parken,
+  Termine, Kultur, Umwelt, Umland, Gesundheit, WFS/Open Data), 4 Ressourcen, 6 Vorlagen und 6 Prompts.
 - **Grenzen:** keine Buchungen, Anträge oder Schreibzugriffe; jede Quelle mit Lizenz; Rate-Limit
   pro IP und Werkzeug; keine Standortabfrage ohne übergebene Koordinaten.
 - **Dokumentation:** [`docs/mcp.md`](docs/mcp.md) mit Client-Konfigurationen, Header-Beispielen
@@ -199,12 +206,12 @@ server/            Node-Server ohne Abhängigkeiten
   index.mjs        API-Routen /api/* und Auslieferung von dist/
   cache.mjs        Zwischenspeicher mit Ablaufzeit, höflicher Abruf je Host, letzter guter Wert bei Ausfall
   sources/         eine Datei je Quelle (efa, parking, sharing, roadworks, environment, culture, events-extra, radar, kessel,
-                   nearby, adresse, verwaltung, verlauf, routing, aufzuege, hitze, beteiligung, partner, bot, bot-katalog)
-  mcp/             MCP-Server: Streamable HTTP (/mcp), stdio, 34 Werkzeuge, Ressourcen und Prompts (siehe docs/mcp.md)
+                   nearby, adresse, verwaltung, verlauf, routing, aufzuege, hitze, beteiligung, partner, bot, bot-katalog, umland)
+  mcp/             MCP-Server: Streamable HTTP (/mcp), stdio, 35 Werkzeuge, Ressourcen und Prompts (siehe docs/mcp.md)
   .cache/          dauerhafter Zwischenspeicher (iCal-Details, Verortungen), nicht im Git
 src/
   map/             Kartenstil (mapStyle.ts), Fachebenen (overlays.ts), Symbole (icons.ts), MapView.tsx
-  modules/         Themenmodule: nearby, route, mobility, environment, culture, sun
+  modules/         Themenmodule: nearby, route, mobility, environment, culture, sun, umland
   components/      Suche, Detailansichten, Bedienelemente, StuggiAI mit Büsten-Zeichen
   lib/             Datenabruf, Formatierung, Typen, Geometrie, Sonnenstand, sunWorker.ts (Schattenrechnung im Web Worker)
 public/data/       aufbereitete Fahrplandaten (network.geojson, stops.geojson)
@@ -292,6 +299,7 @@ User-Agent. Fällt eine Quelle aus, zeigt die Demo den letzten guten Stand und e
 - Stadt-Natur: iNaturalist-Community (CC BY 4.0), Fotos cc0 / CC BY / CC BY-SA je Beobachtung
 - Mensen: OpenMensa (CC BY-SA 4.0), Daten der Studierendenwerke
 - Schriften: Merriweather Sans und DM Sans (SIL Open Font License), lokal eingebunden
+- Umland: redaktionelle Auswahl (EUPL-1.2), Haltestellen VVS (CC BY 4.0), Wetter Open-Meteo (CC BY 4.0), Wikipedia (CC BY-SA 4.0), Bilder Wikimedia Commons (Lizenz je Dateiseite)
 
 Die Nutzung der städtischen Daten und der Drittanbieter ist laut Projektleitung durch eine schriftliche Bestätigung
 der Stadt (Fair Use) gedeckt. Die Quellenangaben stehen zusätzlich in der App an jeder Ansicht.

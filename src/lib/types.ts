@@ -143,7 +143,8 @@ export type Selection =
   | { type: 'verwaltung_gebaeude'; id: string; lngLat?: [number, number] }
   | { type: 'verwaltung_leistung'; url: string; lat?: number; lon?: number }
   | { type: 'wissen'; id: string; layer: string; layerTitle: string; name: string; lngLat: [number, number]; props: Record<string, unknown> }
-  | { type: 'bartour-stop'; tourId: string; stopIndex: number; lngLat: [number, number] };
+  | { type: 'bartour-stop'; tourId: string; stopIndex: number; lngLat: [number, number] }
+  | { type: 'umland'; id: string; lngLat: [number, number] };
 
 /** Eine kuratierte Bar- oder Drinking-Spot-Tour. */
 export interface BartourStop {
@@ -485,5 +486,112 @@ export interface KaltluftDaten {
   punkte: KaltluftPunkt[];
   anzahl: number;
   fetchedAt: string;
+  source: string;
+}
+
+/** Kategorie eines Ausflugsziels im Umland. */
+export type UmlandKategorie = 'schloss' | 'kloster' | 'museum' | 'stadt' | 'natur' | 'see' | 'wein' | 'therme';
+
+export interface UmlandHaltestelle {
+  id: string;
+  name: string;
+  kind: string;
+  lines: string[];
+  lat: number;
+  lon: number;
+  dist: number;
+  walkMin: number;
+}
+
+/** Ein kuratiertes Ausflugsziel in der Region Stuttgart. */
+export interface UmlandZiel {
+  id: string;
+  name: string;
+  kategorie: UmlandKategorie;
+  kategorieLabel: string;
+  kategorieKurz: string;
+  farbe: string;
+  icon: string;
+  kreis: string;
+  kreisLabel: string;
+  gemeinde: string;
+  lat: number;
+  lon: number;
+  kurz: string;
+  beschreibung: string;
+  highlights: string[];
+  dauerMin: number;
+  preis: string;
+  saison: string;
+  familie: boolean;
+  website: string | null;
+  wikipedia: string | null;
+  image: string | null;
+  imagePage: string | null;
+  stand: string;
+  quelle: string;
+  naechsteHaltestellen: UmlandHaltestelle[];
+  naechsteHaltestelle: UmlandHaltestelle | null;
+  entfernungM?: number;
+  wiki?: WikiSummary | null;
+  wetter?: UmlandWetter | null;
+  wetterFehler?: string | null;
+  source?: string;
+  lizenz?: string | null;
+  hinweis?: string | null;
+}
+
+export interface UmlandKategorieInfo {
+  id: string;
+  label: string;
+  kurz: string;
+  farbe: string;
+  icon: string;
+  anzahl: number;
+}
+
+export interface UmlandKreisInfo {
+  id: string;
+  label: string;
+  lat: number;
+  lon: number;
+  anzahl: number;
+}
+
+export interface UmlandAntwort {
+  items: UmlandZiel[];
+  total: number;
+  kategorien: UmlandKategorieInfo[];
+  kreise: UmlandKreisInfo[];
+  stand: string | null;
+  source: string;
+  lizenz: string | null;
+  hinweis: string | null;
+}
+
+export interface UmlandWetter {
+  ort: string | null;
+  aktuell: {
+    t: string | null;
+    temperature: number | null;
+    apparent: number | null;
+    precipitation: number | null;
+    wind: number | null;
+    code: number | null;
+    text: string;
+    icon: string;
+  } | null;
+  tage: {
+    date: string;
+    code: number | null;
+    min: number | null;
+    max: number | null;
+    regen: number | null;
+    text: string;
+    icon: string;
+  }[];
+  fetchedAt: string;
+  fresh?: boolean;
+  error?: string;
   source: string;
 }

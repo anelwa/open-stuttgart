@@ -54,6 +54,7 @@ const HOST_GAP = {
   'feuerwehr.stuttgart.de': 1000,
   'api.mobidata-bw.de': 300,
   'api.brightsky.dev': 300,
+  'api.open-meteo.com': 500,
   'opendata.dwd.de': 500,
   'warnung.bund.de': 500,
   'api.adsb.lol': 1000, // ADS-B-Echtzeitdaten, mehrmals pro Minute ist genug

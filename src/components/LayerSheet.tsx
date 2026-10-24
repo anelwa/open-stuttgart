@@ -24,6 +24,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
     label: 'Orte und Termine',
     items: [
       { key: 'nearby', label: 'Einrichtungen der Nähe', icon: 'pin', meta: 'Kategorie im Panel wählen' },
+      { key: 'umland', label: 'Ausflugsziele im Umland', icon: 'tree', meta: 'Schlösser, Seen, Altstädte' },
       { key: 'bartouren', label: 'Bar-Touren', icon: 'cocktail', meta: '7 Touren, nummerierte Stopps' },
       { key: 'events', label: 'Termine', icon: 'ticket', meta: 'Kultur und Szene' },
       { key: 'places', label: 'Sehenswürdigkeiten', icon: 'culture', meta: 'Museen, Parks, Denkmäler' },

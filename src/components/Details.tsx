@@ -14,6 +14,7 @@ import { FacilityDetail } from './FacilityDetail';
 import { GebaeudeDetail, LeistungDetail } from './VerwaltungDetail';
 import { WissenDetail } from './WissenDetail';
 import { BartourStopDetail } from './BartourDetail';
+import { UmlandDetail } from './UmlandDetail';
 import { Explain } from '../lib/info';
 import { setVehicleTrips, type VehicleTrip } from '../lib/vehicles';
 
@@ -418,5 +419,6 @@ export function DetailSheet({ sel, onClose, select, flyTo }: Close & Nav & { sel
     case 'verwaltung_leistung': return <LeistungDetail key={sel.url} url={sel.url} lat={sel.lat} lon={sel.lon} onClose={onClose} select={select} flyTo={flyTo} />;
     case 'wissen': return <WissenDetail key={`${sel.layer}-${sel.id}`} sel={sel} onClose={onClose} />;
     case 'bartour-stop': return <BartourStopDetail key={`${sel.tourId}-${sel.stopIndex}`} sel={sel} onClose={onClose} select={select} flyTo={flyTo} />;
+    case 'umland': return <UmlandDetail key={sel.id} sel={sel} onClose={onClose} select={select} flyTo={flyTo} />;
   }
 }

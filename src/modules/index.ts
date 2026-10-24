@@ -10,6 +10,7 @@ import { WasGehtPanel } from './wasgeht/WasGehtPanel';
 import { BartourenPanel } from './bartouren/BartourenPanel';
 import { SchnittstellenPanel } from './schnittstellen/SchnittstellenPanel';
 import { SpielPanel } from './spiel/SpielPanel';
+import { UmlandPanel } from './umland/UmlandPanel';
 
 export const MODULES: ModuleDef[] = [
   { id: 'nearby', label: 'Nähe', icon: 'pin', status: 'live', overlays: ['nearby'], Panel: NearbyPanel },
@@ -23,4 +24,5 @@ export const MODULES: ModuleDef[] = [
   { id: 'spiel', label: 'Stadtspiel', icon: 'compass', status: 'live', overlays: ['spiel'], Panel: SpielPanel },
   { id: 'sun', label: 'Sonne', icon: 'sunset', status: 'live', overlays: ['sun'], Panel: SunPanel },
   { id: 'wissen', label: 'Stadtwissen', icon: 'layers', status: 'live', overlays: ['wissen'], Panel: SchnittstellenPanel },
+  { id: 'umland', label: 'Umland', icon: 'tree', status: 'live', overlays: ['umland'], Panel: UmlandPanel },
 ];

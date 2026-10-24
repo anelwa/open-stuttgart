@@ -6,6 +6,7 @@ export const COVERAGE = {
     { id: 'parking', label: 'Parken, P+R, B+R, Sharing, Laden', status: 'live', note: 'ParkAPI, GBFS, OCPDB über MobiData BW' },
     { id: 'verwaltung', label: 'Leistungen, Stellen, Bürgerbüros', status: 'live', note: 'stuttgart.de, Live-Wartezeiten' },
     { id: 'events', label: 'Termine, Szene, Kultur', status: 'live', note: 'Stadtkalender, Hausseiten, offenes Register' },
+    { id: 'umland', label: 'Ausflugsziele im Umland', status: 'live', note: 'redaktionelle Auswahl, VVS, Open-Meteo, Wikipedia' },
     { id: 'environment', label: 'Wetter, Luft, Pegel, Warnungen, Radar', status: 'live', note: 'DWD, UBA, PEGELONLINE, BBK' },
     { id: 'health', label: 'Pollen, UV, Hitze, Stromnetz, Grünstrom', status: 'live', note: 'DWD, TransnetBW, Fraunhofer ISE' },
     { id: 'address', label: 'Adressprofil', status: 'cached', note: 'Geoserver, Statistisches Amt; 30 Tage je Ort' },

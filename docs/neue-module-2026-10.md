@@ -135,7 +135,27 @@ Diese waren im Projekt schon angebunden und wurden nicht neu aufgebaut:
   (Beispiel Kabi: OSM Mo–Fr, Website Di–Sa) wird der Widerspruch angezeigt, nicht geglättet.
   Die Touren sind redaktionelle Vorschläge, keine bezahlte Platzierung und keine Rangliste.
 
-## 11. Betriebsgrenzen und bewusste Auslassungen
+## 11. Umland: Ausflugsziele in der Region Stuttgart
+
+- **Daten:** `server/data/umland-ziele.json` mit 36 kuratierten Zielen in den Landkreisen
+  Böblingen, Esslingen, Göppingen, Ludwigsburg und Rems-Murr-Kreis; Kategorien, Koordinaten,
+  Kurztext, Highlights, Zeitbedarf, Preis-/Saisonhinweis, Familienhinweis, Website,
+  Wikipedia-Titel und Commons-Bild.
+- **APIs:** `GET /api/umland`, `/api/umland/ziele`, `/api/umland/ziele/:id`,
+  `/api/umland/ziele.geojson` und `/api/umland/wetter?lat=&lon=`. Der Server ergänzt die
+  nächsten Haltestellen aus dem VVS-Soll-Fahrplan (max. 3 km), Wikipedia-Kurztexte und eine
+  Open-Meteo-Punktvorhersage. Wetter und Wikipedia werden zwischengespeichert; ohne
+  erreichbare Quelle bleiben Liste und Steckbrief nutzbar.
+- **Frontend:** Modul „Umland“ mit Kategorie-Chips, Landkreis- und Familienfilter, Suche,
+  Kartenebene `umland` und Detailansicht mit Wetter, Anreise und Wikipedia.
+- **Quellen:** redaktionelle Auswahl (EUPL-1.2), VVS/GTFS (CC BY 4.0), Open-Meteo
+  (CC BY 4.0), Wikipedia (CC BY-SA 4.0), Wikimedia Commons (Lizenz je Dateiseite).
+- **Prüfung:** `npm run check:umland`; Details und Pflege in [`umland.md`](umland.md).
+- **Grenzen:** keine vollständige Tourismusdatenbank, keine Live-Öffnungszeiten; außerhalb
+  Stuttgarts enthält der Haltestellenbestand nur Schienenhalte; Wetter ist Modell, keine
+  amtliche Warnung.
+
+## 12. Betriebsgrenzen und bewusste Auslassungen
 
 - Keine Social-Media-Scrapes (Instagram, TikTok, Facebook, Telegram).
 - Keine kostenpflichtigen Bulk-Datenbanken (Google Places, Foursquare, Yelp, HappyCow).

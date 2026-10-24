@@ -59,6 +59,20 @@ const EN: Record<string, string> = {
   'Kneipen und Bars': 'Pubs and bars', Biergärten: 'Beer gardens', Eiscafés: 'Ice cream', 'Jetzt geöffnet': 'Open now', 'Stufenlos zugänglich': 'Step-free',
   'Aktion Gute Fee': 'Safe places for children (Gute Fee)', 'Obst- und Nussbäume': 'Fruit and nut trees', 'Jugend-Chillorte': 'Youth hangouts',
   'Essbare Stadt: Obst- und Nussbäume': 'Edible city: fruit and nut trees', 'Mineralquellen': 'Mineral springs', 'Mehrweg (RECUP)': 'Reusable cups (RECUP)',
+  // Umland
+  Umland: 'Surrounding area', 'Ausflüge ins Umland': 'Day trips around Stuttgart', 'Ausflugsziele im Umland': 'Day-trip destinations',
+  'Ausflugsziele': 'Destinations', 'Ziele filtern': 'Filter destinations', 'Landkreis': 'District', 'Alle Landkreise': 'All districts',
+  'Nur mit Kindern': 'Family-friendly only', 'Ziel, Ort oder Stichwort': 'Destination, place or keyword', 'Ausflugsziele durchsuchen': 'Search destinations',
+  'Gefilterte Ziele auf der Karte': 'Filtered destinations on the map', 'Filter zurücksetzen': 'Reset filters',
+  'Schlösser und Burgen': 'Palaces and castles', 'Schlösser, Burgen und Gärten': 'Palaces, castles and gardens', 'Klöster und Kirchen': 'Monasteries and churches', Museen: 'Museums',
+  Altstädte: 'Old towns', 'Natur und Aussicht': 'Nature and views', Seen: 'Lakes', 'Wein und Genuss': 'Wine and food',
+  'Thermen und Wellness': 'Spas and wellness', 'Zeitbedarf': 'Time needed', 'Mit Kindern': 'With children',
+  'Website des Ziels': 'Destination website', 'Aus Wikipedia': 'From Wikipedia', Artikel: 'Article',
+  'Schlösser, Burgen, Seen, Altstädte und Natur in der Region Stuttgart – erreichbar mit VVS, Rad oder Auto. Die Auswahl ist redaktionell und keine Rangliste.':
+    'Palaces, castles, lakes, old towns and nature in the Stuttgart region – reachable by public transport, bike or car. The selection is editorial and not a ranking.',
+  'Kein Ziel passt zu dieser Auswahl. Bitte einen Filter zurücksetzen.': 'No destination matches this selection. Please reset a filter.',
+  'Ausflugsziel': 'Destination', 'Ausflugsziel nicht gefunden': 'Destination not found',
+  'Der Steckbrief wird geladen …': 'Loading destination details …', 'Ausflugsziel ·': 'Destination ·',
   // Natur, Flugverkehr, Mensen, Grünstrom
   'Himmel über Stuttgart': 'Skies over Stuttgart', 'Abendspaziergang in der kühlen Brise': 'Evening stroll in the cool breeze',
   'Stadt-Natur in der Nähe': 'Urban nature nearby', 'Stadt-Natur hier': 'Urban nature here',

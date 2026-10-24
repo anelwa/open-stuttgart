@@ -11,7 +11,7 @@ Antwort Quelle und Lizenz und kann sowohl lokal über **stdio** als auch öffent
 - **Health:** `GET /healthz` beim eigenen Prozess, `GET /api/health` bei der App
 - **Protokoll:** MCP `2026-07-28` (modern, zustandslos) und abwärtskompatibel
   `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05` (initialize + Sitzung)
-- **Werkzeuge:** 34 · **Ressourcen:** 4 + 6 Vorlagen · **Prompts:** 6
+- **Werkzeuge:** 35 · **Ressourcen:** 4 + 6 Vorlagen · **Prompts:** 6
 - **Lizenz:** EUPL-1.2; die Daten selbst stehen unter den Lizenzen der jeweiligen Quellen.
 
 ## Start
@@ -258,6 +258,7 @@ JSON-Schemata stehen im laufenden Server unter `tools/list` und in `stuttgart://
 |---|---|
 | `events` | Städtischer Kulturkalender und/oder „Was geht“-Szene; Tag, Abend, Wochenende, Szene, Publikum, Preis |
 | `places` | Sehenswürdigkeiten aus Wikidata mit Bild, Kurztext und Artikel |
+| `umland` | Ausflugsziele in der Region Stuttgart mit Filtern, nächster Haltestelle, Wetter und Wikipedia-Kurztext |
 | `wiki` | Wikipedia-Kurztext zu einem Titel |
 | `mensa` | Tagesgerichte der Stuttgarter Mensen |
 | `news` | Meldungen aus offenen Feeds und/oder Stadtgedächtnis |
@@ -371,7 +372,7 @@ npm run check:mcp
 
 Der Rauchtest prüft:
 
-- Katalog (34 Werkzeuge, eindeutige Namen, read-only, Schemata),
+- Katalog (35 Werkzeuge, eindeutige Namen, read-only, Schemata),
 - Legacy: `initialize`, `tools/list`, `tools/call`, Ressourcen, Prompts, Completion, Fehler,
 - modern: `server/discover`, `tools/list`, `tools/call`, Cache-Felder,
 - HTTP: CORS, Session, SSE, DELETE, Header-Pflicht, Versionsfehler,
@@ -397,7 +398,7 @@ server/mcp/
   sources.mjs     Quellen- und Lizenzregister
   coverage.mjs     Abdeckung und Grenzen
   util.mjs         Validierung, Fristen, Ergebnisse, Rate-Limit
-  tools/           34 Werkzeuge nach Domäne
+  tools/           35 Werkzeuge nach Domäne
 ```
 
 ## Bekannte Grenzen

@@ -48,6 +48,14 @@ export const ERKLAERUNGEN: Record<string, Erklaerung> = {
     grenzen: 'Öffnungszeiten, Einlass und Barrierefreiheit sind Momentaufnahmen und keine Garantie. Die Touren sind redaktionelle Vorschläge, keine Rangliste und keine bezahlte Platzierung. Die Linie verbindet die Stationen; der tatsächliche Fußweg läuft über das Weg-Modul. Bei Widersprüchen (z. B. Kabi: OSM Mo–Fr, Website Di–Sa) wird der Widerspruch angezeigt.',
     lizenz: 'OpenStreetMap: ODbL 1.0; redaktionelle Texte: EUPL-1.2',
   },
+  umland: {
+    gruppe: 'Freizeit', titel: 'Ausflugsziele im Umland',
+    was: 'Redaktionell ausgewählte Schlösser, Burgen, Museen, Altstädte, Naturziele, Seen, Weinorte und Thermen in den fünf Landkreisen der Region Stuttgart. Zu jedem Ziel: Kurzbeschreibung, Zeitbedarf, Preis- und Saisonhinweis, nächste VVS-Haltestelle, Wetter am Ziel und Links zu Anbieter und Wikipedia.',
+    quelle: 'Kuratierte Auswahl (Stand 24.10.2026), Koordinaten mit Wikipedia und OpenStreetMap abgeglichen; Haltestellen aus dem VVS-Soll-Fahrplan (GTFS, CC BY 4.0); Wetter von Open-Meteo (CC BY 4.0); Wikipedia-Kurztexte unter CC BY-SA 4.0; Bilder von Wikimedia Commons, Lizenz je Dateiseite.',
+    intervall: 'Zieldaten statisch; Haltestellen mit dem Fahrplanstand; Wetter alle 30 Minuten je Ziel; Wikipedia-Kurztext sieben Tage zwischengespeichert.',
+    grenzen: 'Die Auswahl ist nicht vollständig und keine Rangliste. Öffnungszeiten, Preise und Zugänglichkeit ändern sich und werden nicht live geprüft; maßgeblich sind die Angaben des Anbieters. Das Wetter ist eine Modellvorhersage für einen Punkt, keine amtliche Warnung. Die Karte zeigt Punkte, keine Navigation; die Route führt über das Weg-Modul.',
+    lizenz: 'Zusammenstellung und Texte: EUPL-1.2; Haltestellen: VVS, CC BY 4.0; Wetter: Open-Meteo, CC BY 4.0; Wikipedia: CC BY-SA 4.0; Bilder: Wikimedia Commons, Lizenz je Dateiseite.',
+  },
   puenktlichkeit: {
     gruppe: 'Mobilität', titel: 'Pünktlichkeit im Netz',
     was: 'Anteil der Halte der letzten 60 Minuten mit weniger als 3 Minuten Verspätung je Verkehrsmittel, dazu die Linien mit der höchsten mittleren Verspätung (ab 20 Halten). Verfrühungen zählen als pünktlich, Ausfälle getrennt.',

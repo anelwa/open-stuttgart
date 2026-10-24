@@ -2,14 +2,19 @@ import { OVERLAY_LAYERS, type OverlayKey } from '../../map/overlays';
 import type { BotUiAction } from './types';
 
 const OVERLAY_KEYS = new Set(Object.keys(OVERLAY_LAYERS) as OverlayKey[]);
-const MODULES = new Set(['nearby', 'verwaltung', 'route', 'mobility', 'environment', 'culture', 'wasgeht', 'bartouren', 'sun', 'wissen']);
+const MODULES = new Set(['nearby', 'verwaltung', 'route', 'mobility', 'environment', 'culture', 'wasgeht', 'bartouren', 'sun', 'wissen', 'umland']);
 const INFO_PAGES = new Set(['grundsaetze', 'werte', 'barrierefreiheit', 'leicht', 'daten', 'stadt']);
 const ROUTE_MODES = new Set(['oepnv', 'rad', 'fuss', 'auto']);
 const PROFILES = new Set(['standard', 'rollstuhl', 'kinderwagen']);
-const SELECTION_TYPES = new Set(['stop', 'parking', 'roadwork', 'air', 'sharing', 'water', 'event', 'facility', 'place', 'verwaltung_gebaeude', 'verwaltung_leistung', 'wissen']);
+const SELECTION_TYPES = new Set(['stop', 'parking', 'roadwork', 'air', 'sharing', 'water', 'event', 'facility', 'place', 'verwaltung_gebaeude', 'verwaltung_leistung', 'wissen', 'umland']);
 
 /** Stuttgart plus kleiner regionaler Saum. */
 export const STUTTGART_BBOX = { minLon: 8.85, maxLon: 9.55, minLat: 48.55, maxLat: 49.05 };
+/** Region Stuttgart inklusive der äußeren Landkreise für Ausflugsziele. */
+export const UMLAND_BBOX = { minLon: 8.3, maxLon: 10.0, minLat: 48.25, maxLat: 49.3 };
+const inUmlandBox = (lat: number, lon: number) =>
+  lat >= UMLAND_BBOX.minLat && lat <= UMLAND_BBOX.maxLat
+  && lon >= UMLAND_BBOX.minLon && lon <= UMLAND_BBOX.maxLon;
 
 const isRec = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const str = (v: unknown, max = 400) => typeof v === 'string' ? v.slice(0, max) : '';
@@ -44,6 +49,14 @@ function validSelection(raw: unknown): BotUiAction | null {
     return { type: 'select', selection: { type: 'stop', id, name, lngLat: [lon, lat] } };
   }
   if (type === 'water') return { type: 'select', selection: { type: 'water' } };
+  if (type === 'umland') {
+    const id = str(raw.id, 160);
+    const ll = raw.lngLat;
+    const lon = Array.isArray(ll) ? num(ll[0]) : null;
+    const lat = Array.isArray(ll) ? num(ll[1]) : null;
+    if (!id || lat == null || lon == null || !inUmlandBox(lat, lon)) return null;
+    return { type: 'select', selection: { type: 'umland', id, lngLat: [lon, lat] } };
+  }
   if (type === 'verwaltung_leistung') {
     const url = str(raw.url, 1000);
     if (!/^https:\/\/(www\.)?stuttgart\.de\//i.test(url)) return null;

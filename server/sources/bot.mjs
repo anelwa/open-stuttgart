@@ -728,9 +728,9 @@ async function composeAnswer(facts, question, askLocation) {
 const OVERLAY_KEYS = new Set([
   'network', 'stops', 'parking', 'sharing', 'roadworks', 'bike', 'air', 'water', 'events', 'places',
   'sun', 'radar', 'aerial', 'nearby', 'live', 'route', 'vehicles', 'traffic', 'warnung', 'flug',
-  'kaltluft', 'unfall', 'hike', 'wissen', 'bartouren',
+  'kaltluft', 'unfall', 'hike', 'wissen', 'bartouren', 'umland',
 ]);
-const MODULE_IDS = new Set(['nearby', 'verwaltung', 'route', 'mobility', 'environment', 'culture', 'wasgeht', 'bartouren', 'sun', 'wissen']);
+const MODULE_IDS = new Set(['nearby', 'verwaltung', 'route', 'mobility', 'environment', 'culture', 'wasgeht', 'bartouren', 'sun', 'wissen', 'umland']);
 
 // Kuratierte Ansichten. Sie machen „zeig nur …“ und „mach die Karte ruhig“ zuverlässig,
 // ohne dass das Modell 24 Overlay-Schlüssel einzeln erraten muss.
@@ -743,6 +743,7 @@ const LAYER_PRESETS = {
   termine: ['events', 'places', 'nearby', 'network', 'stops'],
   natur: ['water', 'hike', 'wissen', 'network', 'stops'],
   ausgehen: ['bartouren', 'network', 'stops', 'places'],
+  umland: ['umland', 'network', 'stops'],
   route: ['network', 'stops', 'route', 'vehicles'],
   alles: [...OVERLAY_KEYS],
 };
@@ -1487,11 +1488,11 @@ const TOOL_DEFS = [
     parameters: {
       type: 'object',
       properties: {
-        preset: { type: 'string', enum: ['standard', 'ruhig', 'luft', 'verkehr', 'parken', 'termine', 'natur', 'route', 'alles'], description: 'Kuratierte Ansicht; ersetzt einzelne Ebenen' },
+        preset: { type: 'string', enum: ['standard', 'ruhig', 'luft', 'verkehr', 'parken', 'termine', 'natur', 'ausgehen', 'umland', 'route', 'alles'], description: 'Kuratierte Ansicht; ersetzt einzelne Ebenen' },
         ebenen_an: { type: 'array', items: { type: 'string' }, description: 'Overlay-Schlüssel, z. B. roadworks, air, events' },
         ebenen_aus: { type: 'array', items: { type: 'string' } },
         nur: { type: 'boolean', description: 'Alle anderen Ebenen ausschalten' },
-        modul: { type: 'string', enum: ['nearby', 'verwaltung', 'route', 'mobility', 'environment', 'culture', 'wasgeht', 'bartouren', 'sun', 'wissen'] },
+        modul: { type: 'string', enum: ['nearby', 'verwaltung', 'route', 'mobility', 'environment', 'culture', 'wasgeht', 'bartouren', 'sun', 'wissen', 'umland'] },
         panel_aus: { type: 'boolean', description: 'Das geöffnete Themenpanel schließen' },
         detail_aus: { type: 'boolean', description: 'Die geöffnete Detailansicht schließen' },
         route_aus: { type: 'boolean', description: 'Die Route von der Karte nehmen' },

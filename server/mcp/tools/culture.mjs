@@ -9,6 +9,7 @@ import { baeder } from '../../sources/nearby.mjs';
 import { wanderwege } from '../../sources/wanderwege.mjs';
 import { bartour, bartouren } from '../../sources/bartouren.mjs';
 import { spielRoute, spielRouten } from '../../sources/spiel.mjs';
+import { umlandZiel, umlandZiele } from '../../sources/umland.mjs';
 import { flug } from '../../sources/flug.mjs';
 import { stadtpalais } from '../../sources/stadtpalais.mjs';
 import { freizeitRouten } from '../../sources/nearby.mjs';
@@ -120,6 +121,37 @@ export const cultureTools = [
       const r = await wikiSummary(a.title);
       if (!r?.extract) throw toolError(`Kein Wikipedia-Artikel zu „${a.title}“ gefunden.`);
       return { data: r };
+    },
+  }),
+
+  defineTool({
+    name: 'umland',
+    title: 'Ausflugsziele im Umland',
+    description: 'Kuratierte Ausflugsziele in der Region Stuttgart: Schlösser, Burgen, Klöster, Museen, Altstädte, Natur, Seen, Weinorte und Thermen. Ohne id eine Liste mit Filtern nach Kategorie, Landkreis, Stichwort, Nähe und Familiengeeignetheit; mit id der Steckbrief inklusive nächster VVS-Haltestelle, Wetter am Ziel und Wikipedia-Kurztext. Deckt die Landkreise Böblingen, Esslingen, Göppingen, Ludwigsburg und den Rems-Murr-Kreis ab.',
+    sources: ['Ausflugsziele im Umland (redaktionell)', 'VVS-Fahrplan', 'Wikipedia', 'Wikimedia Commons', 'Open-Meteo', 'OpenStreetMap'],
+    cost: 2,
+    timeoutMs: 45_000,
+    inputSchema: obj({
+      id: str('ID eines Ziels für den Steckbrief, z. B. „ebnisee“ oder „residenzschloss-ludwigsburg“.', { maxLength: 120 }),
+      kategorie: enumStr('Kategorie.', ['alle', 'schloss', 'kloster', 'museum', 'stadt', 'natur', 'see', 'wein', 'therme'], { default: 'alle' }),
+      kreis: enumStr('Landkreis.', ['alle', 'Böblingen', 'Esslingen', 'Göppingen', 'Ludwigsburg', 'Rems-Murr-Kreis'], { default: 'alle' }),
+      q: str('Stichwort in Name, Kurztext, Gemeinde oder Kreis, z. B. „Schloss“ oder „See“.', { maxLength: 120 }),
+      ...COORD,
+      radius_m: int('Radius um lat/lon in Metern (1.000–120.000).', { minimum: 1000, maximum: 120000, default: 50000 }),
+      familie: bool('Nur Ziele, die für Familien geeignet sind.', { default: false }),
+      limit: int('Maximale Anzahl Ziele (1–60).', { minimum: 1, maximum: 60, default: 20 }),
+    }),
+    async execute(a) {
+      if (a.id) {
+        const detail = await umlandZiel(String(a.id), { lat: a.lat, lon: a.lon });
+        return { data: detail, limits: ['Öffnungszeiten, Preise und Zugänglichkeit vor dem Besuch prüfen; das Wetter ist eine Modellvorhersage.'] };
+      }
+      const r = umlandZiele({
+        kategorie: a.kategorie, kreis: a.kreis, q: a.q, lat: a.lat, lon: a.lon,
+        r: a.radius_m, familie: a.familie, limit: a.limit,
+      });
+      const { shown, limits } = takeWithNote(r.items, a.limit ?? 20, 'Ziele');
+      return { data: { ...r, items: shown }, limits: [...limits, 'Die Auswahl ist redaktionell und nicht vollständig; maßgeblich sind die Angaben der Anbieter.'] };
     },
   }),
 

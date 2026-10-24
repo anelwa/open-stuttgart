@@ -33,7 +33,7 @@ import { actionLabel, validateBotAction } from './lib/bot/actions';
 import type { ModuleCommand } from './modules/types';
 
 const DEFAULT_VISIBLE: Record<OverlayKey, boolean> = {
-  network: true, stops: true, parking: true, sharing: false, roadworks: true, bike: false, air: true, water: true, events: true, places: true, sun: false, radar: true, aerial: false, nearby: true, live: true, route: true, vehicles: true, traffic: false, warnung: true, flug: false, kaltluft: false, unfall: false, hike: false, wissen: false, bartouren: false, spiel: false,
+  network: true, stops: true, parking: true, sharing: false, roadworks: true, bike: false, air: true, water: true, events: true, places: true, sun: false, radar: true, aerial: false, nearby: true, live: true, route: true, vehicles: true, traffic: false, warnung: true, flug: false, kaltluft: false, unfall: false, hike: false, wissen: false, bartouren: false, spiel: false, umland: false,
 };
 
 function readPref<T>(key: string, fallback: T): T {
@@ -160,6 +160,10 @@ function Shell() {
       case 'verwaltung_leistung': return selection.lon != null && selection.lat != null ? [selection.lon, selection.lat] : null;
       case 'wissen': return selection.lngLat;
       case 'bartour-stop': return selection.lngLat;
+      case 'umland': {
+        const z = data.umland.data?.items.find((x) => x.id === selection.id);
+        return z ? [z.lon, z.lat] : selection.lngLat;
+      }
     }
   }, [selection, data]);
 
@@ -322,6 +326,14 @@ function Shell() {
         select({ type: 'verwaltung_leistung', url, ...(Number.isFinite(lat) ? { lat } : {}), ...(Number.isFinite(lon) ? { lon } : {}) });
         deepLinkDone.current = true;
       }
+    } else if (kind === 'umland' && data.umland.data) {
+      const z = data.umland.data.items.find((x) => x.id === id);
+      if (z) {
+        setModuleId('umland'); setFocus('ziele'); setAnliegenId('umland');
+        select({ type: 'umland', id: z.id, lngLat: [z.lon, z.lat] });
+        flyTo([z.lon, z.lat], 13);
+      }
+      deepLinkDone.current = true;
     } else if (kind === 'facility') {
       const cat = q.get('cat');
       if (cat && id && !deepLinkDone.current) {
@@ -337,7 +349,7 @@ function Shell() {
           }).catch(() => { /* egal */ });
       }
     }
-  }, [data.parking.data, data.roadworks.data, data.places.data, data.air.data, data.sharing.data, data.water.data, data.events.data, select, flyTo]);
+  }, [data.parking.data, data.roadworks.data, data.places.data, data.air.data, data.sharing.data, data.water.data, data.events.data, data.umland.data, select, flyTo]);
 
   // Tiefe Links: ?spiel=kessel-code öffnet das Stadtspiel.
   useEffect(() => {
@@ -507,6 +519,10 @@ function Shell() {
         const list = data.bartouren.data?.items;
         return !list || list.some((t) => t.id === s.tourId && t.stops.some((x) => x.index === s.stopIndex));
       }
+      case 'umland': {
+        const list = data.umland.data?.items;
+        return !list || list.some((x) => x.id === s.id);
+      }
       default:
         return true;
     }
@@ -528,6 +544,10 @@ function Shell() {
     }
     if (layer === 'places') {
       const hit = data.places.data?.places.find((x) => has(x.id));
+      return hit ? [hit.lon, hit.lat] : null;
+    }
+    if (layer === 'umland') {
+      const hit = data.umland.data?.items.find((x) => has(x.id));
       return hit ? [hit.lon, hit.lat] : null;
     }
     if (layer === 'air') {
@@ -760,6 +780,7 @@ function Shell() {
     events: data.events.data?.events ?? null,
     bartouren: data.bartouren.data?.items ?? null,
     places: data.places.data?.places ?? null,
+    umland: data.umland.data?.items ?? null,
     sunImage,
     radarImage: radarImg,
     nearby,
@@ -773,7 +794,7 @@ function Shell() {
     wanderwege: data.wanderwege.data?.items ?? null,
     wissen,
     spiel: spielGeo,
-  }), [data.traffic.data, sunImage, radarImg, nearby, live, routeGeo, spielGeo, data.parking.data, data.sharing.data, data.roadworks.data, data.air.data, data.water.data, data.bike.data, data.events.data, data.bartouren.data, data.places.data, data.warnungen.data, data.flug.data, data.kaltluft.data, data.unfaelle.data, data.wanderwege.data, wissen]);
+  }), [data.traffic.data, sunImage, radarImg, nearby, live, routeGeo, spielGeo, data.parking.data, data.sharing.data, data.roadworks.data, data.air.data, data.water.data, data.bike.data, data.events.data, data.bartouren.data, data.places.data, data.umland.data, data.warnungen.data, data.flug.data, data.kaltluft.data, data.unfaelle.data, data.wanderwege.data, wissen]);
 
   const showDetail = !!selection;
   const kiosk = new URLSearchParams(location.search).get('display') === 'kiosk';

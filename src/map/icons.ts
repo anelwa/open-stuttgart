@@ -162,6 +162,34 @@ export function registerIcons(map: MlMap, dark: boolean) {
     }, 30, 30);
   }
 
+  // Ausflugsziele im Umland: Kategorie-Farbe mit Glyph
+  const UMLAND: Record<string, { color: string; icon: string }> = {
+    schloss: { color: '#8A4B08', icon: 'monument' },
+    kloster: { color: '#5D5C62', icon: 'church' },
+    museum: { color: '#6D4AA8', icon: 'culture' },
+    stadt: { color: '#B85C00', icon: 'home' },
+    natur: { color: '#2F8F5B', icon: 'tree' },
+    see: { color: '#1E6FD9', icon: 'water' },
+    wein: { color: '#8E2F4A', icon: 'leaf' },
+    therme: { color: '#0E7C86', icon: 'drop' },
+  };
+  for (const [k, def] of Object.entries(UMLAND)) {
+    add(map, `umland-${k}`, (ctx) => {
+      ctx.shadowColor = 'rgba(0,0,0,.3)';
+      ctx.shadowBlur = 5;
+      ctx.shadowOffsetY = 1.5;
+      ctx.beginPath();
+      ctx.arc(16, 16, 12.5, 0, Math.PI * 2);
+      ctx.fillStyle = def.color;
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+      ctx.lineWidth = 2.2;
+      ctx.strokeStyle = card;
+      ctx.stroke();
+      glyph(ctx, def.icon, 16, 16, 15, '#fff', 1.8);
+    }, 32, 32);
+  }
+
   // Veranstaltungen: Amber-Marke mit Ticket (mit Uhrzeit) bzw. helle Marke mit Amberrand (ganztägig)
   for (const allDay of [false, true]) {
     add(map, allDay ? 'event-allday' : 'event-pin', (ctx) => {

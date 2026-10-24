@@ -23,6 +23,7 @@ import { hitze } from './sources/hitze.mjs';
 import { flug } from './sources/flug.mjs';
 import { unfaelle, unfallStatistik } from './sources/unfall.mjs';
 import { wanderwege, wanderwegeGeoJson } from './sources/wanderwege.mjs';
+import { umlandGeoJson, umlandMeta, umlandWetter, umlandZiel, umlandZiele } from './sources/umland.mjs';
 import { bartour, bartourGpx, bartouren, bartourenGeoJson } from './sources/bartouren.mjs';
 import { spielAbschluss, spielPruefen, spielRoute, spielRouten } from './sources/spiel.mjs';
 import { stadtgedaechtnis, stadtgedaechtnisRss } from './sources/stadtgedaechtnis.mjs';
@@ -99,6 +100,10 @@ const routes = {
   '/api/nearby/facilities': (q) => facilities(q.get('cat'), { diet: q.get('diet') }),
   '/api/nearby/tanken': () => tankpreise(),
   '/api/freizeit/routen': () => freizeitRouten(),
+  '/api/umland': () => umlandMeta(),
+  '/api/umland/ziele': (q) => umlandZiele({ kategorie: q.get('kategorie'), kreis: q.get('kreis'), q: q.get('q'), lat: q.get('lat'), lon: q.get('lon'), r: q.get('r'), familie: q.get('familie'), limit: q.get('limit') }),
+  '/api/umland/ziele.geojson': () => umlandGeoJson(),
+  '/api/umland/wetter': (q) => umlandWetter(q.get('lat'), q.get('lon'), q.get('ort')),
   '/api/wanderwege': () => wanderwege(),
   '/api/wanderwege.geojson': () => wanderwegeGeoJson(),
   '/api/bartouren': () => bartouren(),
@@ -311,6 +316,19 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       res.writeHead(err.status ?? 500, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: err.message ?? 'Spielroute nicht erreichbar' }));
+    }
+    return;
+  }
+
+  const umlandZielMatch = /^\/api\/umland\/ziele\/([^/]+)$/.exec(url.pathname);
+  if (umlandZielMatch) {
+    try {
+      const data = await umlandZiel(decodeURIComponent(umlandZielMatch[1]), { lat: url.searchParams.get('lat'), lon: url.searchParams.get('lon') });
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(data));
+    } catch (err) {
+      res.writeHead(err.status ?? 500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: err.message ?? 'Ausflugsziel nicht erreichbar' }));
     }
     return;
   }

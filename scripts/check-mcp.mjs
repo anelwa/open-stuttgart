@@ -67,8 +67,8 @@ async function waitFor(url, tries = 80) {
 async function main() {
   console.log('MCP-Rauchtest\n');
 
-  await test('Katalog: 34 Werkzeuge, eindeutige Namen, read-only', () => {
-    assert.equal(CATALOG.tools.length, 34);
+  await test('Katalog: 35 Werkzeuge, eindeutige Namen, read-only', () => {
+    assert.equal(CATALOG.tools.length, 35);
     assert.equal(new Set(CATALOG.tools.map((t) => t.name)).size, CATALOG.tools.length);
     for (const t of CATALOG.tools) {
       assert.equal(t.annotations.readOnlyHint, true, `${t.name}: readOnlyHint`);
@@ -92,11 +92,11 @@ async function main() {
     assert.equal(init.result.serverInfo.name, 'open-stuttgart');
 
     const list = await dispatchRpc(server, { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }, legacyCtx);
-    assert.equal(list.result.tools.length, 34);
+    assert.equal(list.result.tools.length, 35);
 
     const about = await dispatchRpc(server, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'about', arguments: {} } }, legacyCtx);
     assert.equal(about.result.isError, false);
-    assert.equal(about.result.structuredContent.data.counts.tools, 34);
+    assert.equal(about.result.structuredContent.data.counts.tools, 35);
 
     const search = await dispatchRpc(server, {
       jsonrpc: '2.0', id: 4, method: 'tools/call',
@@ -305,7 +305,7 @@ async function main() {
     for (const line of lines) JSON.parse(line);
     const responses = lines.map((l) => JSON.parse(l));
     assert.equal(responses[0].result.serverInfo.name, 'open-stuttgart');
-    assert.equal(responses[1].result.tools.length, 34);
+    assert.equal(responses[1].result.tools.length, 35);
     assert.equal(err.filter((e) => /error/i.test(e)).length, 0);
     if (childErr) process.stderr.write(childErr);
   });
